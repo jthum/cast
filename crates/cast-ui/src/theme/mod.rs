@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, fs, io, path::Path, sync::Arc};
 
 use egui::{
     Color32, Context, FontData, FontDefinitions, FontFamily, FontId, Stroke, Style, TextStyle, Ui,
@@ -401,6 +401,10 @@ impl FontFace {
             bytes: Cow::Owned(bytes.into()),
         }
     }
+
+    pub fn from_path(name: impl Into<String>, path: impl AsRef<Path>) -> io::Result<Self> {
+        fs::read(path).map(|bytes| Self::from_owned(name, bytes))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -471,6 +475,11 @@ impl FontStack {
     }
 
     #[must_use]
+    pub fn builder() -> FontStackBuilder {
+        FontStackBuilder::default()
+    }
+
+    #[must_use]
     pub fn google_fonts_css2_url(families: &[GoogleFontFamily]) -> String {
         let query = families
             .iter()
@@ -488,6 +497,155 @@ impl FontStack {
             .collect::<Vec<_>>();
         Self::google_fonts_css2_url(&families)
     }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct FontStackBuilder {
+    faces: Vec<FontFace>,
+    body: FontRoleBuilder,
+    button: FontRoleBuilder,
+    strong: FontRoleBuilder,
+    heading: FontRoleBuilder,
+    mono: FontRoleBuilder,
+}
+
+impl FontStackBuilder {
+    #[must_use]
+    pub fn face(mut self, face: FontFace) -> Self {
+        self.faces.push(face);
+        self
+    }
+
+    #[must_use]
+    pub fn faces(mut self, faces: impl IntoIterator<Item = FontFace>) -> Self {
+        self.faces.extend(faces);
+        self
+    }
+
+    #[must_use]
+    pub fn body_family(
+        mut self,
+        family: impl Into<String>,
+        fonts: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        self.body = FontRoleBuilder::new(family, fonts);
+        self
+    }
+
+    #[must_use]
+    pub fn button_family(
+        mut self,
+        family: impl Into<String>,
+        fonts: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        self.button = FontRoleBuilder::new(family, fonts);
+        self
+    }
+
+    #[must_use]
+    pub fn strong_family(
+        mut self,
+        family: impl Into<String>,
+        fonts: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        self.strong = FontRoleBuilder::new(family, fonts);
+        self
+    }
+
+    #[must_use]
+    pub fn heading_family(
+        mut self,
+        family: impl Into<String>,
+        fonts: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        self.heading = FontRoleBuilder::new(family, fonts);
+        self
+    }
+
+    #[must_use]
+    pub fn mono_family(
+        mut self,
+        family: impl Into<String>,
+        fonts: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        self.mono = FontRoleBuilder::new(family, fonts);
+        self
+    }
+
+    #[must_use]
+    pub fn build(self) -> FontStack {
+        let default_fonts = self
+            .faces
+            .iter()
+            .map(|face| face.name.clone())
+            .collect::<Vec<_>>();
+        let body = self.body.or_fonts("Cast Body", default_fonts);
+        let button = self.button.or_clone("Cast Button", &body);
+        let strong = self.strong.or_clone("Cast Strong", &button);
+        let heading = self.heading.or_clone("Cast Heading", &strong);
+        let mono = self.mono;
+
+        FontStack {
+            faces: self.faces,
+            body_family: body.family,
+            button_family: button.family,
+            strong_family: strong.family,
+            heading_family: heading.family,
+            mono_family: mono.family_or("Cast Mono"),
+            body: body.fonts,
+            button: button.fonts,
+            strong: strong.fonts,
+            heading: heading.fonts,
+            mono: mono.fonts,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct FontRoleBuilder {
+    family: Option<String>,
+    fonts: Vec<String>,
+}
+
+impl FontRoleBuilder {
+    fn new(family: impl Into<String>, fonts: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        Self {
+            family: Some(family.into()),
+            fonts: fonts.into_iter().map(Into::into).collect(),
+        }
+    }
+
+    fn or_fonts(self, family: impl Into<String>, fallback_fonts: Vec<String>) -> FontRole {
+        FontRole {
+            family: self.family.unwrap_or_else(|| family.into()),
+            fonts: if self.fonts.is_empty() {
+                fallback_fonts
+            } else {
+                self.fonts
+            },
+        }
+    }
+
+    fn or_clone(self, family: impl Into<String>, fallback: &FontRole) -> FontRole {
+        FontRole {
+            family: self.family.unwrap_or_else(|| family.into()),
+            fonts: if self.fonts.is_empty() {
+                fallback.fonts.clone()
+            } else {
+                self.fonts
+            },
+        }
+    }
+
+    fn family_or(&self, family: impl Into<String>) -> String {
+        self.family.clone().unwrap_or_else(|| family.into())
+    }
+}
+
+#[derive(Clone, Debug)]
+struct FontRole {
+    family: String,
+    fonts: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1593,6 +1751,63 @@ mod tests {
         assert_eq!(typography.heading_lg.family, heading);
         assert_eq!(typography.body.family, body);
         assert_eq!(typography.caption.family, body);
+    }
+
+    #[test]
+    fn font_face_from_path_reads_owned_bytes() {
+        let path = std::env::temp_dir().join(format!(
+            "cast-ui-font-face-{}-{}.ttf",
+            std::process::id(),
+            "read"
+        ));
+        std::fs::write(&path, [1, 2, 3, 4]).unwrap();
+
+        let face = FontFace::from_path("custom_font", &path).unwrap();
+
+        assert_eq!(face.name, "custom_font");
+        assert_eq!(face.bytes.as_ref(), &[1, 2, 3, 4]);
+        assert!(matches!(face.bytes, Cow::Owned(_)));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn font_stack_builder_assigns_role_families() {
+        let stack = FontStack::builder()
+            .face(FontFace::from_owned("body_regular", vec![0]))
+            .face(FontFace::from_owned("heading_semibold", vec![1]))
+            .body_family("Body", ["body_regular"])
+            .heading_family("Heading", ["heading_semibold", "body_regular"])
+            .mono_family("Mono", ["code_regular"])
+            .build();
+
+        assert_eq!(stack.body_family, "Body");
+        assert_eq!(stack.body, vec!["body_regular".to_owned()]);
+        assert_eq!(stack.button, vec!["body_regular".to_owned()]);
+        assert_eq!(stack.strong, vec!["body_regular".to_owned()]);
+        assert_eq!(stack.heading_family, "Heading");
+        assert_eq!(
+            stack.heading,
+            vec!["heading_semibold".to_owned(), "body_regular".to_owned()]
+        );
+        assert_eq!(stack.mono_family, "Mono");
+        assert_eq!(stack.mono, vec!["code_regular".to_owned()]);
+    }
+
+    #[test]
+    fn font_stack_builder_defaults_body_to_registered_faces() {
+        let stack = FontStack::builder()
+            .faces([
+                FontFace::from_owned("regular", vec![0]),
+                FontFace::from_owned("medium", vec![1]),
+            ])
+            .build();
+
+        let expected = vec!["regular".to_owned(), "medium".to_owned()];
+        assert_eq!(stack.body, expected);
+        assert_eq!(stack.button, expected);
+        assert_eq!(stack.heading, expected);
+        assert!(stack.mono.is_empty());
     }
 
     #[test]
