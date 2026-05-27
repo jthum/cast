@@ -1,6 +1,6 @@
 use cast::{
-    Badge, Button, Card, CastTheme, Checkbox, Intent, Panel as CastPanel, SearchInput, Separator,
-    Size, Switch, TextInput, ThemeMode, Variant,
+    Alert, Badge, Button, Card, CastTheme, Checkbox, Intent, Label, Link, Notice,
+    Panel as CastPanel, SearchInput, Separator, Size, Switch, TextInput, ThemeMode, Variant,
     egui::{self, CentralPanel, Panel as EguiPanel, RichText},
 };
 
@@ -91,6 +91,8 @@ impl eframe::App for CastGallery {
             ui.add_space(12.0);
             show_surfaces(ui);
             ui.add_space(12.0);
+            show_text_and_feedback(ui);
+            ui.add_space(12.0);
             show_forms(
                 ui,
                 &mut self.search,
@@ -175,6 +177,33 @@ fn show_surfaces(ui: &mut egui::Ui) {
                 ui.label("A raised surface for dense app UI regions.");
             });
         });
+    });
+}
+
+fn show_text_and_feedback(ui: &mut egui::Ui) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Text and feedback");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Label::new("Default label"));
+            ui.add(Label::new("Muted label").muted());
+            ui.add(Label::new("Small label").size(Size::Small));
+            ui.add(Link::new("Action link"));
+            ui.add(Link::new("egui").to("https://github.com/emilk/egui"));
+        });
+        ui.add(Separator::new().spacing(10.0));
+        ui.add(
+            Alert::new("Build succeeded")
+                .body("The latest component pass compiled and passed focused checks.")
+                .intent(Intent::Success),
+        );
+        ui.add_space(8.0);
+        ui.add(
+            Alert::new("Review warning")
+                .body("Palette derivation still needs dedicated contrast work.")
+                .intent(Intent::Warning),
+        );
+        ui.add_space(8.0);
+        ui.add(Notice::new("Neutral notice").body("Notices use the same feedback foundation."));
     });
 }
 

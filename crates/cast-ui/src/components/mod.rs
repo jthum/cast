@@ -1,16 +1,22 @@
+mod alert;
 mod badge;
 mod button;
 mod card;
 mod checkbox;
+mod label;
+mod link;
 mod panel;
 mod separator;
 mod switch;
 mod text_input;
 
+pub use alert::{Alert, Notice};
 pub use badge::Badge;
 pub use button::Button;
 pub use card::Card;
 pub use checkbox::Checkbox;
+pub use label::Label;
+pub use link::Link;
 pub use panel::Panel;
 pub use separator::Separator;
 pub use switch::Switch;

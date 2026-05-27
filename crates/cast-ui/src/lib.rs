@@ -6,7 +6,8 @@ mod style;
 pub mod theme;
 
 pub use components::{
-    Badge, Button, Card, Checkbox, Panel, SearchInput, Separator, Switch, TextInput,
+    Alert, Badge, Button, Card, Checkbox, Label, Link, Notice, Panel, SearchInput, Separator,
+    Switch, TextInput,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};
