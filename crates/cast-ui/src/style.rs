@@ -38,7 +38,7 @@ pub(crate) fn resolve_component_style(
     ComponentStyle {
         colors,
         metrics,
-        stroke: Stroke::new(theme.stroke.sm, colors.border),
+        stroke: Stroke::new(theme.components.button.border_width, colors.border),
     }
 }
 

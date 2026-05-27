@@ -57,6 +57,7 @@ impl CastTheme {
 pub struct ThemeSeed {
     pub mode: ThemeMode,
     pub palette: CastPaletteInput,
+    pub component_overrides: ComponentTokenOverrides,
     pub spacing: SpacingTokens,
     pub radius: RadiusTokens,
     pub stroke: StrokeTokens,
@@ -72,6 +73,7 @@ impl ThemeSeed {
         Self {
             mode,
             palette,
+            component_overrides: ComponentTokenOverrides::default(),
             spacing: SpacingTokens::default(),
             radius: RadiusTokens::default(),
             stroke: StrokeTokens::default(),
@@ -90,13 +92,14 @@ impl ThemeSeed {
     #[must_use]
     pub fn resolve(self) -> CastTheme {
         let colors = ColorTokens::from_palette(self.mode, &self.palette);
-        let components = ComponentTokens::derive(
+        let mut components = ComponentTokens::derive(
             &colors,
             &self.spacing,
             &self.radius,
             &self.stroke,
             &self.controls,
         );
+        self.component_overrides.apply_to(&mut components);
         let focus = FocusTokens {
             width: 2.0,
             color: colors.focus,
@@ -130,6 +133,7 @@ impl CastTheme {
 
         style.spacing.item_spacing = Vec2::splat(self.spacing.sm);
         style.spacing.button_padding = Vec2::new(self.controls.padding_x, self.controls.padding_y);
+        style.animation_time = self.animation.normal_seconds();
         style
     }
 
@@ -494,6 +498,137 @@ pub struct ComponentTokens {
     pub alert: FeedbackTokens,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ComponentTokenOverrides {
+    pub button: ButtonTokenOverrides,
+    pub input: InputTokenOverrides,
+    pub card: SurfaceTokenOverrides,
+}
+
+impl ComponentTokenOverrides {
+    pub fn apply_to(&self, components: &mut ComponentTokens) {
+        self.button.apply_to(&mut components.button);
+        self.input.apply_to(&mut components.input);
+        self.card.apply_to(&mut components.card);
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ButtonTokenOverrides {
+    pub radius: Option<f32>,
+    pub border_width: Option<f32>,
+    pub padding_x: Option<f32>,
+    pub padding_y: Option<f32>,
+    pub min_height: Option<f32>,
+}
+
+impl ButtonTokenOverrides {
+    fn apply_to(&self, tokens: &mut ButtonTokens) {
+        if let Some(value) = self.radius {
+            tokens.radius = value;
+        }
+        if let Some(value) = self.border_width {
+            tokens.border_width = value;
+        }
+        if let Some(value) = self.padding_x {
+            tokens.padding_x = value;
+        }
+        if let Some(value) = self.padding_y {
+            tokens.padding_y = value;
+        }
+        if let Some(value) = self.min_height {
+            tokens.min_height = value;
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SurfaceTokenOverrides {
+    pub fill: Option<Color32>,
+    pub border: Option<Color32>,
+    pub border_width: Option<f32>,
+    pub radius: Option<f32>,
+    pub padding: Option<f32>,
+}
+
+impl SurfaceTokenOverrides {
+    fn apply_to(&self, tokens: &mut SurfaceTokens) {
+        if let Some(value) = self.fill {
+            tokens.fill = value;
+        }
+        if let Some(value) = self.border {
+            tokens.border = value;
+        }
+        if let Some(value) = self.border_width {
+            tokens.border_width = value;
+        }
+        if let Some(value) = self.radius {
+            tokens.radius = value;
+        }
+        if let Some(value) = self.padding {
+            tokens.padding = value;
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct InputTokenOverrides {
+    pub fill: Option<Color32>,
+    pub fg: Option<Color32>,
+    pub border: Option<Color32>,
+    pub focus_border: Option<Color32>,
+    pub placeholder: Option<Color32>,
+    pub border_width: Option<f32>,
+    pub radius: Option<f32>,
+    pub padding_x: Option<f32>,
+    pub padding_y: Option<f32>,
+    pub min_height: Option<f32>,
+}
+
+impl InputTokenOverrides {
+    fn apply_to(&self, tokens: &mut InputTokens) {
+        if let Some(value) = self.fill {
+            tokens.fill = value;
+        }
+        if let Some(value) = self.fg {
+            tokens.fg = value;
+        }
+        if let Some(value) = self.border {
+            tokens.border = value;
+        }
+        if let Some(value) = self.focus_border {
+            tokens.focus_border = value;
+        }
+        if let Some(value) = self.placeholder {
+            tokens.placeholder = value;
+        }
+        if let Some(value) = self.border_width {
+            tokens.border_width = value;
+        }
+        if let Some(value) = self.radius {
+            tokens.radius = value;
+        }
+        if let Some(value) = self.padding_x {
+            tokens.padding_x = value;
+        }
+        if let Some(value) = self.padding_y {
+            tokens.padding_y = value;
+        }
+        if let Some(value) = self.min_height {
+            tokens.min_height = value;
+        }
+    }
+}
+
 impl ComponentTokens {
     #[must_use]
     pub fn derive(
@@ -742,13 +877,44 @@ impl Default for ElevationTokens {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug)]
 pub struct AnimationTokens {
+    pub enabled: bool,
+    pub reduced_motion: bool,
+    pub duration_scale: f32,
     pub fast_ms: u64,
     pub normal_ms: u64,
+}
+
+impl AnimationTokens {
+    #[must_use]
+    pub fn fast_seconds(&self) -> f32 {
+        self.seconds(self.fast_ms)
+    }
+
+    #[must_use]
+    pub fn normal_seconds(&self) -> f32 {
+        self.seconds(self.normal_ms)
+    }
+
+    #[must_use]
+    pub fn should_animate(&self) -> bool {
+        self.enabled && !self.reduced_motion && self.duration_scale > 0.0
+    }
+
+    fn seconds(&self, milliseconds: u64) -> f32 {
+        if self.should_animate() {
+            milliseconds as f32 * self.duration_scale / 1000.0
+        } else {
+            0.0
+        }
+    }
 }
 
 impl Default for AnimationTokens {
     fn default() -> Self {
         Self {
+            enabled: true,
+            reduced_motion: false,
+            duration_scale: 1.0,
             fast_ms: 100,
             normal_ms: 160,
         }
@@ -852,5 +1018,33 @@ mod tests {
         assert_eq!(theme.components.card.border_width, 2.0);
         assert_eq!(theme.typography.body.size, 16.0);
         assert_eq!(theme.components.button.min_height, 40.0);
+    }
+
+    #[test]
+    fn theme_seed_component_overrides_are_applied_after_derivation() {
+        let mut seed = ThemeSeed::for_mode(ThemeMode::Light);
+        seed.radius.md = 10.0;
+        seed.component_overrides.button.radius = Some(14.0);
+        seed.component_overrides.input.min_height = Some(42.0);
+        seed.component_overrides.card.padding = Some(22.0);
+
+        let theme = seed.resolve();
+
+        assert_eq!(theme.components.button.radius, 14.0);
+        assert_eq!(theme.components.input.min_height, 42.0);
+        assert_eq!(theme.components.card.padding, 22.0);
+        assert_eq!(theme.radius.md, 10.0);
+    }
+
+    #[test]
+    fn animation_tokens_reduce_motion_to_zero_duration() {
+        let mut animation = AnimationTokens::default();
+
+        assert!(animation.fast_seconds() > 0.0);
+
+        animation.reduced_motion = true;
+
+        assert_eq!(animation.fast_seconds(), 0.0);
+        assert!(!animation.should_animate());
     }
 }

@@ -56,6 +56,9 @@ impl Widget for Button {
             egui::Button::new(text)
                 .fill(style.colors.fill)
                 .stroke(style.stroke)
+                .corner_radius(egui::CornerRadius::same(
+                    theme.components.button.radius as u8,
+                ))
                 .min_size(egui::vec2(
                     style.metrics.padding.x * 2.0,
                     style.metrics.min_height.max(style.metrics.padding.y * 2.0),

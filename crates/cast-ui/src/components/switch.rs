@@ -37,11 +37,21 @@ impl Widget for Switch<'_> {
 
         if ui.is_rect_visible(rect) {
             let on = *self.checked;
-            let track_fill = if on {
-                theme.colors.primary
+            let t = if theme.animation.should_animate() {
+                ui.ctx().animate_bool_with_time(
+                    response.id.with("checked"),
+                    on,
+                    theme.animation.fast_seconds(),
+                )
+            } else if on {
+                1.0
             } else {
-                theme.colors.surface_muted
+                0.0
             };
+            let track_fill = theme
+                .colors
+                .surface_muted
+                .lerp_to_gamma(theme.colors.primary, t);
             let track_stroke = if response.hovered() {
                 theme.colors.border_strong
             } else {
@@ -58,16 +68,13 @@ impl Widget for Switch<'_> {
             );
 
             let knob_radius = (rect.height() - 6.0) / 2.0;
-            let knob_x = if on {
-                rect.right() - 3.0 - knob_radius
-            } else {
-                rect.left() + 3.0 + knob_radius
-            };
-            let knob_fill = if on {
-                theme.colors.primary_fg
-            } else {
-                theme.colors.surface
-            };
+            let knob_left = rect.left() + 3.0 + knob_radius;
+            let knob_right = rect.right() - 3.0 - knob_radius;
+            let knob_x = egui::lerp(knob_left..=knob_right, t);
+            let knob_fill = theme
+                .colors
+                .surface
+                .lerp_to_gamma(theme.colors.primary_fg, t);
 
             ui.painter()
                 .circle_filled(egui::pos2(knob_x, rect.center().y), knob_radius, knob_fill);
