@@ -16,4 +16,5 @@ experimental = []
 
 [dependencies]
 egui.workspace = true
+palette.workspace = true
 serde = { workspace = true, optional = true }

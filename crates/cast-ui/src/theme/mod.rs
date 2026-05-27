@@ -1,5 +1,7 @@
 use egui::{Color32, Context, FontFamily, FontId, Stroke, Style, Ui, Vec2, Visuals};
 
+use crate::color::{accessible_foreground, mix_oklch, with_alpha};
+
 const THEME_ID: &str = "cast_theme";
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -254,22 +256,22 @@ impl ColorTokens {
         let primary = palette.primary;
         let secondary = palette
             .secondary
-            .unwrap_or_else(|| mix(primary, neutral, 0.35));
+            .unwrap_or_else(|| mix_oklch(primary, neutral, 0.35));
         let success = palette.success.unwrap_or(Color32::from_rgb(22, 163, 74));
         let warning = palette.warning.unwrap_or(Color32::from_rgb(217, 119, 6));
         let danger = palette.danger.unwrap_or(Color32::from_rgb(220, 38, 38));
         let info = palette.info.unwrap_or(Color32::from_rgb(8, 145, 178));
 
         Self {
-            background: mix(neutral, Color32::WHITE, 0.94),
+            background: mix_oklch(neutral, Color32::WHITE, 0.94),
             surface: Color32::WHITE,
-            surface_muted: mix(neutral, Color32::WHITE, 0.86),
-            surface_raised: mix(neutral, Color32::WHITE, 0.92),
+            surface_muted: mix_oklch(neutral, Color32::WHITE, 0.86),
+            surface_raised: mix_oklch(neutral, Color32::WHITE, 0.92),
             surface_overlay: Color32::WHITE,
-            border: mix(neutral, Color32::WHITE, 0.72),
-            border_strong: mix(neutral, Color32::WHITE, 0.35),
-            text: mix(neutral, Color32::BLACK, 0.78),
-            text_muted: mix(neutral, Color32::BLACK, 0.35),
+            border: mix_oklch(neutral, Color32::WHITE, 0.72),
+            border_strong: mix_oklch(neutral, Color32::WHITE, 0.35),
+            text: mix_oklch(neutral, Color32::BLACK, 0.78),
+            text_muted: mix_oklch(neutral, Color32::BLACK, 0.35),
             text_subtle: neutral,
             primary,
             primary_fg: accessible_foreground(primary),
@@ -294,23 +296,23 @@ impl ColorTokens {
         let primary = palette.primary;
         let secondary = palette
             .secondary
-            .unwrap_or_else(|| mix(primary, neutral, 0.35));
+            .unwrap_or_else(|| mix_oklch(primary, neutral, 0.35));
         let success = palette.success.unwrap_or(Color32::from_rgb(74, 222, 128));
         let warning = palette.warning.unwrap_or(Color32::from_rgb(251, 191, 36));
         let danger = palette.danger.unwrap_or(Color32::from_rgb(248, 113, 113));
         let info = palette.info.unwrap_or(Color32::from_rgb(34, 211, 238));
 
         Self {
-            background: mix(neutral, Color32::BLACK, 0.90),
-            surface: mix(neutral, Color32::BLACK, 0.78),
-            surface_muted: mix(neutral, Color32::BLACK, 0.64),
-            surface_raised: mix(neutral, Color32::BLACK, 0.66),
-            surface_overlay: mix(neutral, Color32::BLACK, 0.78),
-            border: mix(neutral, Color32::BLACK, 0.50),
-            border_strong: mix(neutral, Color32::BLACK, 0.20),
-            text: mix(neutral, Color32::WHITE, 0.92),
-            text_muted: mix(neutral, Color32::WHITE, 0.62),
-            text_subtle: mix(neutral, Color32::WHITE, 0.35),
+            background: mix_oklch(neutral, Color32::BLACK, 0.90),
+            surface: mix_oklch(neutral, Color32::BLACK, 0.78),
+            surface_muted: mix_oklch(neutral, Color32::BLACK, 0.64),
+            surface_raised: mix_oklch(neutral, Color32::BLACK, 0.66),
+            surface_overlay: mix_oklch(neutral, Color32::BLACK, 0.78),
+            border: mix_oklch(neutral, Color32::BLACK, 0.50),
+            border_strong: mix_oklch(neutral, Color32::BLACK, 0.20),
+            text: mix_oklch(neutral, Color32::WHITE, 0.92),
+            text_muted: mix_oklch(neutral, Color32::WHITE, 0.62),
+            text_subtle: mix_oklch(neutral, Color32::WHITE, 0.35),
             primary,
             primary_fg: accessible_foreground(primary),
             secondary,
@@ -328,59 +330,6 @@ impl ColorTokens {
             link: primary,
         }
     }
-}
-
-#[must_use]
-pub fn contrast_ratio(a: Color32, b: Color32) -> f32 {
-    let a = relative_luminance(a);
-    let b = relative_luminance(b);
-    let lighter = a.max(b);
-    let darker = a.min(b);
-
-    (lighter + 0.05) / (darker + 0.05)
-}
-
-fn accessible_foreground(background: Color32) -> Color32 {
-    let light = Color32::WHITE;
-    let dark = Color32::BLACK;
-
-    if contrast_ratio(background, light) >= contrast_ratio(background, dark) {
-        light
-    } else {
-        dark
-    }
-}
-
-fn relative_luminance(color: Color32) -> f32 {
-    fn channel(value: u8) -> f32 {
-        let value = f32::from(value) / 255.0;
-        if value <= 0.03928 {
-            value / 12.92
-        } else {
-            ((value + 0.055) / 1.055).powf(2.4)
-        }
-    }
-
-    0.2126 * channel(color.r()) + 0.7152 * channel(color.g()) + 0.0722 * channel(color.b())
-}
-
-fn mix(a: Color32, b: Color32, t: f32) -> Color32 {
-    let t = t.clamp(0.0, 1.0);
-    let mix_channel = |a: u8, b: u8| -> u8 {
-        (f32::from(a) + (f32::from(b) - f32::from(a)) * t)
-            .round()
-            .clamp(0.0, 255.0) as u8
-    };
-
-    Color32::from_rgb(
-        mix_channel(a.r(), b.r()),
-        mix_channel(a.g(), b.g()),
-        mix_channel(a.b(), b.b()),
-    )
-}
-
-fn with_alpha(color: Color32, alpha: u8) -> Color32 {
-    Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -535,6 +484,7 @@ impl Default for AnimationTokens {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contrast_ratio;
 
     #[test]
     fn set_theme_stores_current_theme() {

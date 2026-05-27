@@ -1,10 +1,12 @@
 //! Cast is a standalone, themeable component library for `egui`.
 
+mod color;
 pub mod components;
 pub mod foundation;
 mod style;
 pub mod theme;
 
+pub use color::contrast_ratio;
 pub use components::{
     Alert, Badge, Button, Card, Checkbox, Label, Link, Notice, Panel, SearchInput, Separator,
     Switch, TextInput,
