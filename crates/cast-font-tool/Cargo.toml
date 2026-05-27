@@ -1,0 +1,13 @@
+[package]
+name = "cast-font-tool"
+version = "0.1.0"
+description = "Font asset tooling for cast-ui."
+readme = "README.md"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+reqwest.workspace = true
+serde.workspace = true

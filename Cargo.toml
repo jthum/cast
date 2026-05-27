@@ -2,6 +2,7 @@
 members = [
     "crates/cast-ui",
     "crates/cast-gallery",
+    "crates/cast-font-tool",
 ]
 resolver = "3"
 
@@ -15,4 +16,5 @@ cast = { package = "cast-ui", path = "crates/cast-ui" }
 eframe = "0.34.2"
 egui = "0.34.2"
 palette = { version = "0.7.6", default-features = false, features = ["std"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
