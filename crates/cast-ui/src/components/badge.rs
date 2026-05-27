@@ -61,6 +61,9 @@ impl Widget for Badge {
                 theme.components.badge.border_width,
                 colors.border,
             ))
+            .corner_radius(egui::CornerRadius::same(
+                theme.components.badge.radius as u8,
+            ))
             .min_size(egui::vec2(
                 metrics.padding.x * 2.0,
                 metrics.min_height.max(metrics.padding.y * 2.0),

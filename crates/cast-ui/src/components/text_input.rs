@@ -1,4 +1,4 @@
-use egui::{Response, TextEdit, Ui, Widget};
+use egui::{Response, StrokeKind, TextEdit, Ui, Widget};
 
 use crate::{
     foundation::Size,
@@ -64,7 +64,17 @@ impl Widget for TextInput<'_> {
             edit = edit.desired_width(width);
         }
 
-        ui.add(edit)
+        let response = ui.add(edit);
+        if response.has_focus() {
+            ui.painter().rect_stroke(
+                response.rect,
+                egui::CornerRadius::same(theme.components.input.radius as u8),
+                egui::Stroke::new(theme.focus.width, theme.components.input.focus_border),
+                StrokeKind::Outside,
+            );
+        }
+
+        response
     }
 }
 

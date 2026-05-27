@@ -92,13 +92,16 @@ pub(crate) fn resolve_badge_metrics(theme: &CastTheme, size: Size) -> ControlMet
             theme.typography.small.size,
         ),
         Size::Medium => (
-            theme.controls.min_height,
-            Vec2::new(theme.controls.padding_x, theme.controls.padding_y),
+            base.min_height + 6.0,
+            Vec2::new(base.padding_x + theme.spacing.xs, base.padding_y + 3.0),
             theme.typography.body.size,
         ),
         Size::Large => (
-            theme.controls.min_height + 8.0,
-            Vec2::new(theme.spacing.lg, theme.spacing.sm),
+            base.min_height + 14.0,
+            Vec2::new(
+                base.padding_x + theme.spacing.sm,
+                base.padding_y + theme.spacing.xs,
+            ),
             theme.typography.body.size + 1.0,
         ),
     };
@@ -158,6 +161,14 @@ pub(crate) fn input_frame(theme: &CastTheme) -> egui::Frame {
             tokens.padding_x as i8,
             tokens.padding_y as i8,
         ))
+}
+
+pub(crate) fn alert_frame(theme: &CastTheme, border: Color32) -> egui::Frame {
+    let tokens = theme.components.alert;
+    egui::Frame::new()
+        .stroke(Stroke::new(tokens.border_width, border))
+        .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
+        .inner_margin(Margin::same(tokens.padding as i8))
 }
 
 fn semantic_family(theme: &CastTheme, intent: Intent) -> SemanticColorTokens {
@@ -240,5 +251,22 @@ mod tests {
         assert_eq!(metrics.min_height, theme.components.badge.min_height);
         assert_eq!(metrics.padding.x, theme.components.badge.padding_x);
         assert_eq!(metrics.padding.y, theme.components.badge.padding_y);
+    }
+
+    #[test]
+    fn badge_metrics_scale_from_badge_tokens() {
+        let mut seed = crate::ThemeSeed::for_mode(crate::ThemeMode::Light);
+        seed.component_overrides.badge.min_height = Some(20.0);
+        seed.component_overrides.badge.padding_x = Some(10.0);
+        let theme = seed.resolve();
+
+        let small = resolve_badge_metrics(&theme, Size::Small);
+        let medium = resolve_badge_metrics(&theme, Size::Medium);
+        let large = resolve_badge_metrics(&theme, Size::Large);
+
+        assert_eq!(small.min_height, 20.0);
+        assert_eq!(small.padding.x, 10.0);
+        assert_eq!(medium.min_height, 26.0);
+        assert_eq!(large.min_height, 34.0);
     }
 }
