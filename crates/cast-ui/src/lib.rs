@@ -15,6 +15,6 @@ pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};
 pub use theme::{
     AnimationTokens, CastPaletteInput, CastTheme, ColorTokens, ControlTokens, ElevationTokens,
-    FocusTokens, RadiusTokens, SpacingTokens, StrokeTokens, ThemeMode, TypographyTokens,
-    apply_theme, set_theme, theme_for_ui,
+    FocusTokens, RadiusTokens, SemanticColorTokens, SpacingTokens, StrokeTokens, ThemeMode,
+    TypographyTokens, apply_theme, set_theme, theme_for_ui,
 };

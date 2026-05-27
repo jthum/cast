@@ -1,6 +1,7 @@
 use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link, Notice,
-    Panel as CastPanel, SearchInput, Separator, Size, Switch, TextInput, ThemeMode, Variant,
+    Panel as CastPanel, SearchInput, SemanticColorTokens, Separator, Size, Switch, TextInput,
+    ThemeMode, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -97,6 +98,8 @@ impl eframe::App for CastGallery {
             ui.add_space(12.0);
 
             show_theme_foundation(ui);
+            ui.add_space(12.0);
+            show_palette_preview(ui, &self.theme);
             ui.add_space(12.0);
             show_buttons_and_badges(ui);
             ui.add_space(12.0);
@@ -228,6 +231,36 @@ fn show_theme_foundation(ui: &mut egui::Ui) {
             ui.add(Badge::new("secondary").intent(Intent::Secondary));
         });
     });
+}
+
+fn show_palette_preview(ui: &mut egui::Ui, theme: &CastTheme) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Derived palette");
+        palette_family_row(ui, "Primary", theme.colors.primary_family);
+        palette_family_row(ui, "Secondary", theme.colors.secondary_family);
+        palette_family_row(ui, "Success", theme.colors.success_family);
+        palette_family_row(ui, "Warning", theme.colors.warning_family);
+        palette_family_row(ui, "Danger", theme.colors.danger_family);
+        palette_family_row(ui, "Info", theme.colors.info_family);
+    });
+}
+
+fn palette_family_row(ui: &mut egui::Ui, label: &str, family: SemanticColorTokens) {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        color_swatch(ui, family.base, "base");
+        color_swatch(ui, family.subtle, "subtle");
+        color_swatch(ui, family.muted, "muted");
+        color_swatch(ui, family.border, "border");
+        color_swatch(ui, family.hover, "hover");
+        color_swatch(ui, family.active, "active");
+    });
+}
+
+fn color_swatch(ui: &mut egui::Ui, color: Color32, label: &str) {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(24.0, 18.0), egui::Sense::hover());
+    ui.painter().rect_filled(rect, 3, color);
+    response.on_hover_text(label);
 }
 
 fn show_buttons_and_badges(ui: &mut egui::Ui) {

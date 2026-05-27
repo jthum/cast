@@ -209,16 +209,22 @@ pub struct ColorTokens {
     pub text: Color32,
     pub text_muted: Color32,
     pub text_subtle: Color32,
+    pub primary_family: SemanticColorTokens,
     pub primary: Color32,
     pub primary_fg: Color32,
+    pub secondary_family: SemanticColorTokens,
     pub secondary: Color32,
     pub secondary_fg: Color32,
+    pub success_family: SemanticColorTokens,
     pub success: Color32,
     pub success_fg: Color32,
+    pub warning_family: SemanticColorTokens,
     pub warning: Color32,
     pub warning_fg: Color32,
+    pub danger_family: SemanticColorTokens,
     pub danger: Color32,
     pub danger_fg: Color32,
+    pub info_family: SemanticColorTokens,
     pub info: Color32,
     pub info_fg: Color32,
     pub selection: Color32,
@@ -262,33 +268,27 @@ impl ColorTokens {
         let danger = palette.danger.unwrap_or(Color32::from_rgb(220, 38, 38));
         let info = palette.info.unwrap_or(Color32::from_rgb(8, 145, 178));
 
-        Self {
-            background: mix_oklch(neutral, Color32::WHITE, 0.94),
-            surface: Color32::WHITE,
-            surface_muted: mix_oklch(neutral, Color32::WHITE, 0.86),
-            surface_raised: mix_oklch(neutral, Color32::WHITE, 0.92),
-            surface_overlay: Color32::WHITE,
-            border: mix_oklch(neutral, Color32::WHITE, 0.72),
-            border_strong: mix_oklch(neutral, Color32::WHITE, 0.35),
-            text: mix_oklch(neutral, Color32::BLACK, 0.78),
-            text_muted: mix_oklch(neutral, Color32::BLACK, 0.35),
-            text_subtle: neutral,
+        let surface = Color32::WHITE;
+        Self::from_parts(
+            ThemeMode::Light,
+            surface,
+            mix_oklch(neutral, Color32::WHITE, 0.94),
+            mix_oklch(neutral, Color32::WHITE, 0.86),
+            mix_oklch(neutral, Color32::WHITE, 0.92),
+            surface,
+            mix_oklch(neutral, Color32::WHITE, 0.72),
+            mix_oklch(neutral, Color32::WHITE, 0.35),
+            mix_oklch(neutral, Color32::BLACK, 0.78),
+            mix_oklch(neutral, Color32::BLACK, 0.35),
+            neutral,
             primary,
-            primary_fg: accessible_foreground(primary),
             secondary,
-            secondary_fg: accessible_foreground(secondary),
             success,
-            success_fg: accessible_foreground(success),
             warning,
-            warning_fg: accessible_foreground(warning),
             danger,
-            danger_fg: accessible_foreground(danger),
             info,
-            info_fg: accessible_foreground(info),
-            selection: with_alpha(primary, 48),
-            focus: primary,
-            link: primary,
-        }
+            48,
+        )
     }
 
     fn from_dark_palette(palette: &CastPaletteInput) -> Self {
@@ -302,32 +302,129 @@ impl ColorTokens {
         let danger = palette.danger.unwrap_or(Color32::from_rgb(248, 113, 113));
         let info = palette.info.unwrap_or(Color32::from_rgb(34, 211, 238));
 
-        Self {
-            background: mix_oklch(neutral, Color32::BLACK, 0.90),
-            surface: mix_oklch(neutral, Color32::BLACK, 0.78),
-            surface_muted: mix_oklch(neutral, Color32::BLACK, 0.64),
-            surface_raised: mix_oklch(neutral, Color32::BLACK, 0.66),
-            surface_overlay: mix_oklch(neutral, Color32::BLACK, 0.78),
-            border: mix_oklch(neutral, Color32::BLACK, 0.50),
-            border_strong: mix_oklch(neutral, Color32::BLACK, 0.20),
-            text: mix_oklch(neutral, Color32::WHITE, 0.92),
-            text_muted: mix_oklch(neutral, Color32::WHITE, 0.62),
-            text_subtle: mix_oklch(neutral, Color32::WHITE, 0.35),
+        let surface = mix_oklch(neutral, Color32::BLACK, 0.78);
+        Self::from_parts(
+            ThemeMode::Dark,
+            surface,
+            mix_oklch(neutral, Color32::BLACK, 0.90),
+            mix_oklch(neutral, Color32::BLACK, 0.64),
+            mix_oklch(neutral, Color32::BLACK, 0.66),
+            surface,
+            mix_oklch(neutral, Color32::BLACK, 0.50),
+            mix_oklch(neutral, Color32::BLACK, 0.20),
+            mix_oklch(neutral, Color32::WHITE, 0.92),
+            mix_oklch(neutral, Color32::WHITE, 0.62),
+            mix_oklch(neutral, Color32::WHITE, 0.35),
             primary,
-            primary_fg: accessible_foreground(primary),
             secondary,
-            secondary_fg: accessible_foreground(secondary),
             success,
-            success_fg: accessible_foreground(success),
             warning,
-            warning_fg: accessible_foreground(warning),
             danger,
-            danger_fg: accessible_foreground(danger),
             info,
-            info_fg: accessible_foreground(info),
-            selection: with_alpha(primary, 64),
+            64,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn from_parts(
+        mode: ThemeMode,
+        surface: Color32,
+        background: Color32,
+        surface_muted: Color32,
+        surface_raised: Color32,
+        surface_overlay: Color32,
+        border: Color32,
+        border_strong: Color32,
+        text: Color32,
+        text_muted: Color32,
+        text_subtle: Color32,
+        primary: Color32,
+        secondary: Color32,
+        success: Color32,
+        warning: Color32,
+        danger: Color32,
+        info: Color32,
+        selection_alpha: u8,
+    ) -> Self {
+        let primary_family = SemanticColorTokens::derive(primary, mode, surface);
+        let secondary_family = SemanticColorTokens::derive(secondary, mode, surface);
+        let success_family = SemanticColorTokens::derive(success, mode, surface);
+        let warning_family = SemanticColorTokens::derive(warning, mode, surface);
+        let danger_family = SemanticColorTokens::derive(danger, mode, surface);
+        let info_family = SemanticColorTokens::derive(info, mode, surface);
+
+        Self {
+            background,
+            surface,
+            surface_muted,
+            surface_raised,
+            surface_overlay,
+            border,
+            border_strong,
+            text,
+            text_muted,
+            text_subtle,
+            primary_family,
+            primary,
+            primary_fg: primary_family.fg,
+            secondary_family,
+            secondary,
+            secondary_fg: secondary_family.fg,
+            success_family,
+            success,
+            success_fg: success_family.fg,
+            warning_family,
+            warning,
+            warning_fg: warning_family.fg,
+            danger_family,
+            danger,
+            danger_fg: danger_family.fg,
+            info_family,
+            info,
+            info_fg: info_family.fg,
+            selection: with_alpha(primary, selection_alpha),
             focus: primary,
             link: primary,
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SemanticColorTokens {
+    pub base: Color32,
+    pub fg: Color32,
+    pub subtle: Color32,
+    pub muted: Color32,
+    pub emphasis: Color32,
+    pub border: Color32,
+    pub hover: Color32,
+    pub active: Color32,
+    pub disabled: Color32,
+}
+
+impl SemanticColorTokens {
+    #[must_use]
+    pub fn derive(base: Color32, mode: ThemeMode, surface: Color32) -> Self {
+        let (subtle_mix, muted_mix, border_mix, hover_mix, active_mix, disabled_mix) = match mode {
+            ThemeMode::Light => (0.90, 0.78, 0.58, 0.90, 0.80, 0.84),
+            ThemeMode::Dark => (0.84, 0.70, 0.46, 0.82, 0.74, 0.78),
+        };
+        let hover_anchor = match mode {
+            ThemeMode::Light => Color32::BLACK,
+            ThemeMode::Dark => Color32::WHITE,
+        };
+
+        Self {
+            base,
+            fg: accessible_foreground(base),
+            subtle: mix_oklch(base, surface, subtle_mix),
+            muted: mix_oklch(base, surface, muted_mix),
+            emphasis: base,
+            border: mix_oklch(base, surface, border_mix),
+            hover: mix_oklch(base, hover_anchor, hover_mix),
+            active: mix_oklch(base, hover_anchor, active_mix),
+            disabled: mix_oklch(base, surface, disabled_mix),
         }
     }
 }
@@ -538,5 +635,16 @@ mod tests {
             assert!(contrast_ratio(theme.colors.warning, theme.colors.warning_fg) >= 4.5);
             assert!(contrast_ratio(theme.colors.danger, theme.colors.danger_fg) >= 4.5);
         }
+    }
+
+    #[test]
+    fn semantic_family_derives_variant_roles() {
+        let theme = CastTheme::light();
+        let family = theme.colors.primary_family;
+
+        assert_eq!(family.base, theme.colors.primary);
+        assert_eq!(family.fg, theme.colors.primary_fg);
+        assert_ne!(family.subtle, family.base);
+        assert_ne!(family.hover, family.active);
     }
 }

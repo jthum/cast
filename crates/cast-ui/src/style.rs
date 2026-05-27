@@ -2,7 +2,7 @@ use egui::{Color32, Margin, Stroke, Vec2};
 
 use crate::{
     foundation::{Intent, Size, Variant},
-    theme::CastTheme,
+    theme::{CastTheme, SemanticColorTokens},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -47,23 +47,33 @@ pub(crate) fn resolve_intent_colors(
     intent: Intent,
     variant: Variant,
 ) -> IntentColors {
-    let solid = solid_intent_colors(theme, intent);
+    if intent == Intent::Neutral {
+        return neutral_intent_colors(theme, variant);
+    }
 
+    semantic_intent_colors(semantic_family(theme, intent), variant)
+}
+
+fn semantic_intent_colors(family: SemanticColorTokens, variant: Variant) -> IntentColors {
     match variant {
-        Variant::Solid => solid,
+        Variant::Solid => IntentColors {
+            fill: family.base,
+            fg: family.fg,
+            border: family.base,
+        },
         Variant::Subtle => IntentColors {
-            fill: subtle_fill(theme, intent),
-            fg: solid.fill,
-            border: subtle_fill(theme, intent),
+            fill: family.subtle,
+            fg: family.base,
+            border: family.border,
         },
         Variant::Outline => IntentColors {
             fill: Color32::TRANSPARENT,
-            fg: solid.fill,
-            border: solid.fill,
+            fg: family.base,
+            border: family.border,
         },
         Variant::Ghost => IntentColors {
             fill: Color32::TRANSPARENT,
-            fg: solid.fill,
+            fg: family.base,
             border: Color32::TRANSPARENT,
         },
     }
@@ -106,51 +116,40 @@ pub(crate) fn input_frame(theme: &CastTheme) -> egui::Frame {
         ))
 }
 
-fn solid_intent_colors(theme: &CastTheme, intent: Intent) -> IntentColors {
+fn semantic_family(theme: &CastTheme, intent: Intent) -> SemanticColorTokens {
     match intent {
-        Intent::Neutral => IntentColors {
+        Intent::Neutral => unreachable!("neutral intent has no semantic family"),
+        Intent::Primary => theme.colors.primary_family,
+        Intent::Secondary => theme.colors.secondary_family,
+        Intent::Success => theme.colors.success_family,
+        Intent::Warning => theme.colors.warning_family,
+        Intent::Danger => theme.colors.danger_family,
+        Intent::Info => theme.colors.info_family,
+    }
+}
+
+fn neutral_intent_colors(theme: &CastTheme, variant: Variant) -> IntentColors {
+    match variant {
+        Variant::Solid => IntentColors {
             fill: theme.colors.surface_muted,
             fg: theme.colors.text,
             border: theme.colors.border,
         },
-        Intent::Primary => IntentColors {
-            fill: theme.colors.primary,
-            fg: theme.colors.primary_fg,
-            border: theme.colors.primary,
+        Variant::Subtle => IntentColors {
+            fill: theme.colors.surface_muted,
+            fg: theme.colors.text_muted,
+            border: theme.colors.border,
         },
-        Intent::Secondary => IntentColors {
-            fill: theme.colors.secondary,
-            fg: theme.colors.secondary_fg,
-            border: theme.colors.secondary,
+        Variant::Outline => IntentColors {
+            fill: Color32::TRANSPARENT,
+            fg: theme.colors.text,
+            border: theme.colors.border,
         },
-        Intent::Success => IntentColors {
-            fill: theme.colors.success,
-            fg: theme.colors.success_fg,
-            border: theme.colors.success,
+        Variant::Ghost => IntentColors {
+            fill: Color32::TRANSPARENT,
+            fg: theme.colors.text,
+            border: Color32::TRANSPARENT,
         },
-        Intent::Warning => IntentColors {
-            fill: theme.colors.warning,
-            fg: theme.colors.warning_fg,
-            border: theme.colors.warning,
-        },
-        Intent::Danger => IntentColors {
-            fill: theme.colors.danger,
-            fg: theme.colors.danger_fg,
-            border: theme.colors.danger,
-        },
-        Intent::Info => IntentColors {
-            fill: theme.colors.info,
-            fg: theme.colors.info_fg,
-            border: theme.colors.info,
-        },
-    }
-}
-
-fn subtle_fill(theme: &CastTheme, intent: Intent) -> Color32 {
-    match intent {
-        Intent::Neutral => theme.colors.surface_muted,
-        Intent::Primary | Intent::Secondary | Intent::Info => theme.colors.selection,
-        Intent::Success | Intent::Warning | Intent::Danger => theme.colors.surface_muted,
     }
 }
 
@@ -163,9 +162,9 @@ mod tests {
         let theme = CastTheme::light();
         let colors = resolve_intent_colors(&theme, Intent::Primary, Variant::Solid);
 
-        assert_eq!(colors.fill, theme.colors.primary);
-        assert_eq!(colors.fg, theme.colors.primary_fg);
-        assert_eq!(colors.border, theme.colors.primary);
+        assert_eq!(colors.fill, theme.colors.primary_family.base);
+        assert_eq!(colors.fg, theme.colors.primary_family.fg);
+        assert_eq!(colors.border, theme.colors.primary_family.base);
     }
 
     #[test]
@@ -174,7 +173,7 @@ mod tests {
         let colors = resolve_intent_colors(&theme, Intent::Danger, Variant::Ghost);
 
         assert_eq!(colors.fill, Color32::TRANSPARENT);
-        assert_eq!(colors.fg, theme.colors.danger);
+        assert_eq!(colors.fg, theme.colors.danger_family.base);
         assert_eq!(colors.border, Color32::TRANSPARENT);
     }
 
