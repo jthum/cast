@@ -28,47 +28,38 @@ pub struct CastTheme {
 impl CastTheme {
     #[must_use]
     pub fn light() -> Self {
-        Self {
-            mode: ThemeMode::Light,
-            palette: CastPaletteInput {
-                accent: Color32::from_rgb(37, 99, 235),
-                neutral: Some(Color32::from_rgb(100, 116, 139)),
-                success: Some(Color32::from_rgb(22, 163, 74)),
-                warning: Some(Color32::from_rgb(217, 119, 6)),
-                danger: Some(Color32::from_rgb(220, 38, 38)),
-                info: Some(Color32::from_rgb(8, 145, 178)),
-            },
-            colors: ColorTokens::light(),
-            spacing: SpacingTokens::default(),
-            radius: RadiusTokens::default(),
-            stroke: StrokeTokens::default(),
-            typography: TypographyTokens::default(),
-            controls: ControlTokens::default(),
-            focus: FocusTokens::light(),
-            elevation: ElevationTokens::default(),
-            animation: AnimationTokens::default(),
-        }
+        Self::from_palette(
+            ThemeMode::Light,
+            CastPaletteInput::default_for(ThemeMode::Light),
+        )
     }
 
     #[must_use]
     pub fn dark() -> Self {
+        Self::from_palette(
+            ThemeMode::Dark,
+            CastPaletteInput::default_for(ThemeMode::Dark),
+        )
+    }
+
+    #[must_use]
+    pub fn from_palette(mode: ThemeMode, palette: CastPaletteInput) -> Self {
+        let colors = ColorTokens::from_palette(mode, &palette);
+        let focus = FocusTokens {
+            width: 2.0,
+            color: colors.focus,
+        };
+
         Self {
-            mode: ThemeMode::Dark,
-            palette: CastPaletteInput {
-                accent: Color32::from_rgb(96, 165, 250),
-                neutral: Some(Color32::from_rgb(148, 163, 184)),
-                success: Some(Color32::from_rgb(74, 222, 128)),
-                warning: Some(Color32::from_rgb(251, 191, 36)),
-                danger: Some(Color32::from_rgb(248, 113, 113)),
-                info: Some(Color32::from_rgb(34, 211, 238)),
-            },
-            colors: ColorTokens::dark(),
+            mode,
+            palette,
+            colors,
             spacing: SpacingTokens::default(),
             radius: RadiusTokens::default(),
             stroke: StrokeTokens::default(),
             typography: TypographyTokens::default(),
             controls: ControlTokens::default(),
-            focus: FocusTokens::dark(),
+            focus,
             elevation: ElevationTokens::default(),
             animation: AnimationTokens::default(),
         }
@@ -155,12 +146,52 @@ pub fn theme_for_ui(ui: &Ui) -> CastTheme {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug)]
 pub struct CastPaletteInput {
-    pub accent: Color32,
+    pub primary: Color32,
+    pub secondary: Option<Color32>,
     pub neutral: Option<Color32>,
     pub success: Option<Color32>,
     pub warning: Option<Color32>,
     pub danger: Option<Color32>,
     pub info: Option<Color32>,
+}
+
+impl CastPaletteInput {
+    #[must_use]
+    pub fn from_primary(primary: Color32) -> Self {
+        Self {
+            primary,
+            secondary: None,
+            neutral: None,
+            success: None,
+            warning: None,
+            danger: None,
+            info: None,
+        }
+    }
+
+    #[must_use]
+    pub fn default_for(mode: ThemeMode) -> Self {
+        match mode {
+            ThemeMode::Light => Self {
+                primary: Color32::from_rgb(37, 99, 235),
+                secondary: Some(Color32::from_rgb(124, 58, 237)),
+                neutral: Some(Color32::from_rgb(100, 116, 139)),
+                success: Some(Color32::from_rgb(22, 163, 74)),
+                warning: Some(Color32::from_rgb(217, 119, 6)),
+                danger: Some(Color32::from_rgb(220, 38, 38)),
+                info: Some(Color32::from_rgb(8, 145, 178)),
+            },
+            ThemeMode::Dark => Self {
+                primary: Color32::from_rgb(96, 165, 250),
+                secondary: Some(Color32::from_rgb(196, 181, 253)),
+                neutral: Some(Color32::from_rgb(148, 163, 184)),
+                success: Some(Color32::from_rgb(74, 222, 128)),
+                warning: Some(Color32::from_rgb(251, 191, 36)),
+                danger: Some(Color32::from_rgb(248, 113, 113)),
+                info: Some(Color32::from_rgb(34, 211, 238)),
+            },
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -178,6 +209,8 @@ pub struct ColorTokens {
     pub text_subtle: Color32,
     pub primary: Color32,
     pub primary_fg: Color32,
+    pub secondary: Color32,
+    pub secondary_fg: Color32,
     pub success: Color32,
     pub success_fg: Color32,
     pub warning: Color32,
@@ -194,61 +227,160 @@ pub struct ColorTokens {
 impl ColorTokens {
     #[must_use]
     pub fn light() -> Self {
-        Self {
-            background: Color32::from_rgb(248, 250, 252),
-            surface: Color32::WHITE,
-            surface_muted: Color32::from_rgb(241, 245, 249),
-            surface_raised: Color32::from_rgb(248, 250, 252),
-            surface_overlay: Color32::WHITE,
-            border: Color32::from_rgb(226, 232, 240),
-            border_strong: Color32::from_rgb(148, 163, 184),
-            text: Color32::from_rgb(15, 23, 42),
-            text_muted: Color32::from_rgb(71, 85, 105),
-            text_subtle: Color32::from_rgb(100, 116, 139),
-            primary: Color32::from_rgb(37, 99, 235),
-            primary_fg: Color32::WHITE,
-            success: Color32::from_rgb(22, 163, 74),
-            success_fg: Color32::WHITE,
-            warning: Color32::from_rgb(217, 119, 6),
-            warning_fg: Color32::WHITE,
-            danger: Color32::from_rgb(220, 38, 38),
-            danger_fg: Color32::WHITE,
-            info: Color32::from_rgb(8, 145, 178),
-            info_fg: Color32::WHITE,
-            selection: Color32::from_rgba_premultiplied(37, 99, 235, 48),
-            focus: Color32::from_rgb(37, 99, 235),
-            link: Color32::from_rgb(29, 78, 216),
-        }
+        Self::from_palette(
+            ThemeMode::Light,
+            &CastPaletteInput::default_for(ThemeMode::Light),
+        )
     }
 
     #[must_use]
     pub fn dark() -> Self {
-        Self {
-            background: Color32::from_rgb(2, 6, 23),
-            surface: Color32::from_rgb(15, 23, 42),
-            surface_muted: Color32::from_rgb(30, 41, 59),
-            surface_raised: Color32::from_rgb(30, 41, 59),
-            surface_overlay: Color32::from_rgb(15, 23, 42),
-            border: Color32::from_rgb(51, 65, 85),
-            border_strong: Color32::from_rgb(100, 116, 139),
-            text: Color32::from_rgb(248, 250, 252),
-            text_muted: Color32::from_rgb(203, 213, 225),
-            text_subtle: Color32::from_rgb(148, 163, 184),
-            primary: Color32::from_rgb(96, 165, 250),
-            primary_fg: Color32::from_rgb(15, 23, 42),
-            success: Color32::from_rgb(74, 222, 128),
-            success_fg: Color32::from_rgb(5, 46, 22),
-            warning: Color32::from_rgb(251, 191, 36),
-            warning_fg: Color32::from_rgb(69, 26, 3),
-            danger: Color32::from_rgb(248, 113, 113),
-            danger_fg: Color32::from_rgb(69, 10, 10),
-            info: Color32::from_rgb(34, 211, 238),
-            info_fg: Color32::from_rgb(8, 47, 73),
-            selection: Color32::from_rgba_premultiplied(96, 165, 250, 64),
-            focus: Color32::from_rgb(147, 197, 253),
-            link: Color32::from_rgb(147, 197, 253),
+        Self::from_palette(
+            ThemeMode::Dark,
+            &CastPaletteInput::default_for(ThemeMode::Dark),
+        )
+    }
+
+    #[must_use]
+    pub fn from_palette(mode: ThemeMode, palette: &CastPaletteInput) -> Self {
+        match mode {
+            ThemeMode::Light => Self::from_light_palette(palette),
+            ThemeMode::Dark => Self::from_dark_palette(palette),
         }
     }
+
+    fn from_light_palette(palette: &CastPaletteInput) -> Self {
+        let neutral = palette.neutral.unwrap_or(Color32::from_rgb(100, 116, 139));
+        let primary = palette.primary;
+        let secondary = palette
+            .secondary
+            .unwrap_or_else(|| mix(primary, neutral, 0.35));
+        let success = palette.success.unwrap_or(Color32::from_rgb(22, 163, 74));
+        let warning = palette.warning.unwrap_or(Color32::from_rgb(217, 119, 6));
+        let danger = palette.danger.unwrap_or(Color32::from_rgb(220, 38, 38));
+        let info = palette.info.unwrap_or(Color32::from_rgb(8, 145, 178));
+
+        Self {
+            background: mix(neutral, Color32::WHITE, 0.94),
+            surface: Color32::WHITE,
+            surface_muted: mix(neutral, Color32::WHITE, 0.86),
+            surface_raised: mix(neutral, Color32::WHITE, 0.92),
+            surface_overlay: Color32::WHITE,
+            border: mix(neutral, Color32::WHITE, 0.72),
+            border_strong: mix(neutral, Color32::WHITE, 0.35),
+            text: mix(neutral, Color32::BLACK, 0.78),
+            text_muted: mix(neutral, Color32::BLACK, 0.35),
+            text_subtle: neutral,
+            primary,
+            primary_fg: accessible_foreground(primary),
+            secondary,
+            secondary_fg: accessible_foreground(secondary),
+            success,
+            success_fg: accessible_foreground(success),
+            warning,
+            warning_fg: accessible_foreground(warning),
+            danger,
+            danger_fg: accessible_foreground(danger),
+            info,
+            info_fg: accessible_foreground(info),
+            selection: with_alpha(primary, 48),
+            focus: primary,
+            link: primary,
+        }
+    }
+
+    fn from_dark_palette(palette: &CastPaletteInput) -> Self {
+        let neutral = palette.neutral.unwrap_or(Color32::from_rgb(148, 163, 184));
+        let primary = palette.primary;
+        let secondary = palette
+            .secondary
+            .unwrap_or_else(|| mix(primary, neutral, 0.35));
+        let success = palette.success.unwrap_or(Color32::from_rgb(74, 222, 128));
+        let warning = palette.warning.unwrap_or(Color32::from_rgb(251, 191, 36));
+        let danger = palette.danger.unwrap_or(Color32::from_rgb(248, 113, 113));
+        let info = palette.info.unwrap_or(Color32::from_rgb(34, 211, 238));
+
+        Self {
+            background: mix(neutral, Color32::BLACK, 0.90),
+            surface: mix(neutral, Color32::BLACK, 0.78),
+            surface_muted: mix(neutral, Color32::BLACK, 0.64),
+            surface_raised: mix(neutral, Color32::BLACK, 0.66),
+            surface_overlay: mix(neutral, Color32::BLACK, 0.78),
+            border: mix(neutral, Color32::BLACK, 0.50),
+            border_strong: mix(neutral, Color32::BLACK, 0.20),
+            text: mix(neutral, Color32::WHITE, 0.92),
+            text_muted: mix(neutral, Color32::WHITE, 0.62),
+            text_subtle: mix(neutral, Color32::WHITE, 0.35),
+            primary,
+            primary_fg: accessible_foreground(primary),
+            secondary,
+            secondary_fg: accessible_foreground(secondary),
+            success,
+            success_fg: accessible_foreground(success),
+            warning,
+            warning_fg: accessible_foreground(warning),
+            danger,
+            danger_fg: accessible_foreground(danger),
+            info,
+            info_fg: accessible_foreground(info),
+            selection: with_alpha(primary, 64),
+            focus: primary,
+            link: primary,
+        }
+    }
+}
+
+#[must_use]
+pub fn contrast_ratio(a: Color32, b: Color32) -> f32 {
+    let a = relative_luminance(a);
+    let b = relative_luminance(b);
+    let lighter = a.max(b);
+    let darker = a.min(b);
+
+    (lighter + 0.05) / (darker + 0.05)
+}
+
+fn accessible_foreground(background: Color32) -> Color32 {
+    let light = Color32::WHITE;
+    let dark = Color32::BLACK;
+
+    if contrast_ratio(background, light) >= contrast_ratio(background, dark) {
+        light
+    } else {
+        dark
+    }
+}
+
+fn relative_luminance(color: Color32) -> f32 {
+    fn channel(value: u8) -> f32 {
+        let value = f32::from(value) / 255.0;
+        if value <= 0.03928 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    }
+
+    0.2126 * channel(color.r()) + 0.7152 * channel(color.g()) + 0.0722 * channel(color.b())
+}
+
+fn mix(a: Color32, b: Color32, t: f32) -> Color32 {
+    let t = t.clamp(0.0, 1.0);
+    let mix_channel = |a: u8, b: u8| -> u8 {
+        (f32::from(a) + (f32::from(b) - f32::from(a)) * t)
+            .round()
+            .clamp(0.0, 255.0) as u8
+    };
+
+    Color32::from_rgb(
+        mix_channel(a.r(), b.r()),
+        mix_channel(a.g(), b.g()),
+        mix_channel(a.b(), b.b()),
+    )
+}
+
+fn with_alpha(color: Color32, alpha: u8) -> Color32 {
+    Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -426,5 +558,35 @@ mod tests {
         assert_eq!(style.spacing.button_padding.x, theme.controls.padding_x);
         assert_eq!(style.visuals.panel_fill, theme.colors.background);
         assert_eq!(style.visuals.hyperlink_color, theme.colors.link);
+    }
+
+    #[test]
+    fn palette_theme_uses_runtime_primary_color() {
+        let primary = Color32::from_rgb(180, 80, 210);
+        let theme =
+            CastTheme::from_palette(ThemeMode::Light, CastPaletteInput::from_primary(primary));
+
+        assert_eq!(theme.colors.primary, primary);
+        assert_eq!(theme.colors.focus, primary);
+        assert_eq!(theme.colors.link, primary);
+    }
+
+    #[test]
+    fn derived_foregrounds_have_reasonable_contrast() {
+        for theme in [
+            CastTheme::from_palette(
+                ThemeMode::Light,
+                CastPaletteInput::from_primary(Color32::from_rgb(37, 99, 235)),
+            ),
+            CastTheme::from_palette(
+                ThemeMode::Dark,
+                CastPaletteInput::from_primary(Color32::from_rgb(96, 165, 250)),
+            ),
+        ] {
+            assert!(contrast_ratio(theme.colors.primary, theme.colors.primary_fg) >= 4.5);
+            assert!(contrast_ratio(theme.colors.success, theme.colors.success_fg) >= 4.5);
+            assert!(contrast_ratio(theme.colors.warning, theme.colors.warning_fg) >= 4.5);
+            assert!(contrast_ratio(theme.colors.danger, theme.colors.danger_fg) >= 4.5);
+        }
     }
 }

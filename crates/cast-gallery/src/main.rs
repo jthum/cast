@@ -1,7 +1,7 @@
 use cast::{
-    Alert, Badge, Button, Card, CastTheme, Checkbox, Intent, Label, Link, Notice,
+    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link, Notice,
     Panel as CastPanel, SearchInput, Separator, Size, Switch, TextInput, ThemeMode, Variant,
-    egui::{self, CentralPanel, Panel as EguiPanel, RichText},
+    egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
 fn main() -> eframe::Result {
@@ -20,6 +20,7 @@ fn main() -> eframe::Result {
 
 struct CastGallery {
     theme: CastTheme,
+    palette: CastPaletteInput,
     mode: ThemeMode,
     search: String,
     name: String,
@@ -30,9 +31,14 @@ struct CastGallery {
 
 impl CastGallery {
     fn new() -> Self {
+        let mode = ThemeMode::Light;
+        let palette = CastPaletteInput::default_for(mode);
+        let theme = CastTheme::from_palette(mode, palette.clone());
+
         Self {
-            theme: CastTheme::light(),
-            mode: ThemeMode::Light,
+            theme,
+            palette,
+            mode,
             search: String::new(),
             name: String::from("Cast"),
             enabled: true,
@@ -43,10 +49,11 @@ impl CastGallery {
 
     fn set_mode(&mut self, ctx: &egui::Context, mode: ThemeMode) {
         self.mode = mode;
-        self.theme = match mode {
-            ThemeMode::Light => CastTheme::light(),
-            ThemeMode::Dark => CastTheme::dark(),
-        };
+        self.apply_theme(ctx);
+    }
+
+    fn apply_theme(&mut self, ctx: &egui::Context) {
+        self.theme = CastTheme::from_palette(self.mode, self.palette.clone());
         cast::set_theme(ctx, self.theme.clone());
     }
 }
@@ -78,11 +85,15 @@ impl eframe::App for CastGallery {
                 ui.label("Badge");
                 ui.label("Card");
                 ui.label("Inputs");
+                ui.separator();
+                if show_theme_editor(ui, &mut self.palette, self.mode) {
+                    self.apply_theme(&ctx);
+                }
             });
 
         CentralPanel::default().show_inside(ui, |ui| {
             ui.heading(RichText::new("Foundations").size(24.0));
-            ui.label("Runtime theme switching, semantic tokens, and initial primitives.");
+            ui.label("Runtime theme switching, live palette editing, semantic tokens, and initial primitives.");
             ui.add_space(12.0);
 
             show_theme_foundation(ui);
@@ -107,6 +118,104 @@ impl eframe::App for CastGallery {
     }
 }
 
+fn show_theme_editor(ui: &mut egui::Ui, palette: &mut CastPaletteInput, mode: ThemeMode) -> bool {
+    let mut changed = false;
+    ui.heading("Theme");
+
+    changed |= color_row(ui, "Primary", &mut palette.primary);
+    changed |= optional_color_row(
+        ui,
+        "Secondary",
+        &mut palette.secondary,
+        CastPaletteInput::default_for(mode)
+            .secondary
+            .unwrap_or(Color32::from_rgb(124, 58, 237)),
+    );
+    changed |= optional_color_row(
+        ui,
+        "Neutral",
+        &mut palette.neutral,
+        CastPaletteInput::default_for(mode)
+            .neutral
+            .unwrap_or(Color32::from_rgb(100, 116, 139)),
+    );
+    changed |= optional_color_row(
+        ui,
+        "Success",
+        &mut palette.success,
+        CastPaletteInput::default_for(mode)
+            .success
+            .unwrap_or(Color32::from_rgb(22, 163, 74)),
+    );
+    changed |= optional_color_row(
+        ui,
+        "Warning",
+        &mut palette.warning,
+        CastPaletteInput::default_for(mode)
+            .warning
+            .unwrap_or(Color32::from_rgb(217, 119, 6)),
+    );
+    changed |= optional_color_row(
+        ui,
+        "Danger",
+        &mut palette.danger,
+        CastPaletteInput::default_for(mode)
+            .danger
+            .unwrap_or(Color32::from_rgb(220, 38, 38)),
+    );
+    changed |= optional_color_row(
+        ui,
+        "Info",
+        &mut palette.info,
+        CastPaletteInput::default_for(mode)
+            .info
+            .unwrap_or(Color32::from_rgb(8, 145, 178)),
+    );
+
+    ui.horizontal(|ui| {
+        if ui.button("Reset").clicked() {
+            *palette = CastPaletteInput::default_for(mode);
+            changed = true;
+        }
+        if ui.button("Primary only").clicked() {
+            *palette = CastPaletteInput::from_primary(palette.primary);
+            changed = true;
+        }
+    });
+
+    changed
+}
+
+fn color_row(ui: &mut egui::Ui, label: &str, color: &mut Color32) -> bool {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        ui.color_edit_button_srgba(color).changed()
+    })
+    .inner
+}
+
+fn optional_color_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    color: &mut Option<Color32>,
+    fallback: Color32,
+) -> bool {
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        let mut enabled = color.is_some();
+        if ui.checkbox(&mut enabled, label).changed() {
+            *color = enabled.then_some(fallback);
+            changed = true;
+        }
+
+        if let Some(color) = color {
+            changed |= ui.color_edit_button_srgba(color).changed();
+        }
+    });
+
+    changed
+}
+
 fn show_theme_foundation(ui: &mut egui::Ui) {
     Card::new().show(ui, |ui| {
         ui.heading("Theme boundary");
@@ -116,6 +225,7 @@ fn show_theme_foundation(ui: &mut egui::Ui) {
             ui.add(Badge::new("CastTheme").intent(Intent::Primary));
             ui.add(Badge::new("egui::Style fallback").intent(Intent::Neutral));
             ui.add(Badge::new("runtime switching").intent(Intent::Info));
+            ui.add(Badge::new("secondary").intent(Intent::Secondary));
         });
     });
 }
@@ -125,6 +235,7 @@ fn show_buttons_and_badges(ui: &mut egui::Ui) {
         ui.heading("Buttons");
         ui.horizontal_wrapped(|ui| {
             ui.add(Button::new("Primary"));
+            ui.add(Button::new("Secondary").intent(Intent::Secondary));
             ui.add(Button::new("Success").intent(Intent::Success));
             ui.add(Button::new("Warning").intent(Intent::Warning));
             ui.add(Button::new("Danger").intent(Intent::Danger));
@@ -153,6 +264,7 @@ fn show_buttons_and_badges(ui: &mut egui::Ui) {
         ui.horizontal_wrapped(|ui| {
             ui.add(Badge::new("Neutral"));
             ui.add(Badge::new("Primary").intent(Intent::Primary));
+            ui.add(Badge::new("Secondary").intent(Intent::Secondary));
             ui.add(Badge::new("Success").intent(Intent::Success));
             ui.add(Badge::new("Warning").intent(Intent::Warning));
             ui.add(Badge::new("Danger").intent(Intent::Danger));

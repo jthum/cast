@@ -118,6 +118,11 @@ fn solid_intent_colors(theme: &CastTheme, intent: Intent) -> IntentColors {
             fg: theme.colors.primary_fg,
             border: theme.colors.primary,
         },
+        Intent::Secondary => IntentColors {
+            fill: theme.colors.secondary,
+            fg: theme.colors.secondary_fg,
+            border: theme.colors.secondary,
+        },
         Intent::Success => IntentColors {
             fill: theme.colors.success,
             fg: theme.colors.success_fg,
@@ -144,7 +149,7 @@ fn solid_intent_colors(theme: &CastTheme, intent: Intent) -> IntentColors {
 fn subtle_fill(theme: &CastTheme, intent: Intent) -> Color32 {
     match intent {
         Intent::Neutral => theme.colors.surface_muted,
-        Intent::Primary | Intent::Info => theme.colors.selection,
+        Intent::Primary | Intent::Secondary | Intent::Info => theme.colors.selection,
         Intent::Success | Intent::Warning | Intent::Danger => theme.colors.surface_muted,
     }
 }

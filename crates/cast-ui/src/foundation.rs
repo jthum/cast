@@ -4,6 +4,7 @@ pub enum Intent {
     #[default]
     Neutral,
     Primary,
+    Secondary,
     Success,
     Warning,
     Danger,
