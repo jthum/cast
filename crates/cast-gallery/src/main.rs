@@ -1,7 +1,7 @@
 use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link, Notice,
     Panel as CastPanel, SearchInput, SemanticColorTokens, Separator, Size, Switch, TextInput,
-    ThemeMode, Variant,
+    ThemeMode, ThemeSeed, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -21,8 +21,7 @@ fn main() -> eframe::Result {
 
 struct CastGallery {
     theme: CastTheme,
-    palette: CastPaletteInput,
-    mode: ThemeMode,
+    seed: ThemeSeed,
     search: String,
     name: String,
     enabled: bool,
@@ -33,13 +32,12 @@ struct CastGallery {
 impl CastGallery {
     fn new() -> Self {
         let mode = ThemeMode::Light;
-        let palette = CastPaletteInput::default_for(mode);
-        let theme = CastTheme::from_palette(mode, palette.clone());
+        let seed = ThemeSeed::for_mode(mode);
+        let theme = seed.clone().resolve();
 
         Self {
             theme,
-            palette,
-            mode,
+            seed,
             search: String::new(),
             name: String::from("Cast"),
             enabled: true,
@@ -49,12 +47,12 @@ impl CastGallery {
     }
 
     fn set_mode(&mut self, ctx: &egui::Context, mode: ThemeMode) {
-        self.mode = mode;
+        self.seed.mode = mode;
         self.apply_theme(ctx);
     }
 
     fn apply_theme(&mut self, ctx: &egui::Context) {
-        self.theme = CastTheme::from_palette(self.mode, self.palette.clone());
+        self.theme = self.seed.clone().resolve();
         cast::set_theme(ctx, self.theme.clone());
     }
 }
@@ -67,10 +65,11 @@ impl eframe::App for CastGallery {
             ui.horizontal(|ui| {
                 ui.heading("Cast Gallery");
                 ui.separator();
-                ui.selectable_value(&mut self.mode, ThemeMode::Light, "Light");
-                ui.selectable_value(&mut self.mode, ThemeMode::Dark, "Dark");
-                if self.mode != self.theme.mode {
-                    self.set_mode(&ctx, self.mode);
+                let mut mode = self.seed.mode;
+                ui.selectable_value(&mut mode, ThemeMode::Light, "Light");
+                ui.selectable_value(&mut mode, ThemeMode::Dark, "Dark");
+                if mode != self.seed.mode {
+                    self.set_mode(&ctx, mode);
                 }
             });
         });
@@ -87,7 +86,7 @@ impl eframe::App for CastGallery {
                 ui.label("Card");
                 ui.label("Inputs");
                 ui.separator();
-                if show_theme_editor(ui, &mut self.palette, self.mode) {
+                if show_theme_editor(ui, &mut self.seed) {
                     self.apply_theme(&ctx);
                 }
             });
@@ -121,72 +120,116 @@ impl eframe::App for CastGallery {
     }
 }
 
-fn show_theme_editor(ui: &mut egui::Ui, palette: &mut CastPaletteInput, mode: ThemeMode) -> bool {
+fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
     let mut changed = false;
     ui.heading("Theme");
 
-    changed |= color_row(ui, "Primary", &mut palette.primary);
+    changed |= color_row(ui, "Primary", &mut seed.palette.primary);
     changed |= optional_color_row(
         ui,
         "Secondary",
-        &mut palette.secondary,
-        CastPaletteInput::default_for(mode)
+        &mut seed.palette.secondary,
+        CastPaletteInput::default_for(seed.mode)
             .secondary
             .unwrap_or(Color32::from_rgb(124, 58, 237)),
     );
     changed |= optional_color_row(
         ui,
         "Neutral",
-        &mut palette.neutral,
-        CastPaletteInput::default_for(mode)
+        &mut seed.palette.neutral,
+        CastPaletteInput::default_for(seed.mode)
             .neutral
             .unwrap_or(Color32::from_rgb(100, 116, 139)),
     );
     changed |= optional_color_row(
         ui,
         "Success",
-        &mut palette.success,
-        CastPaletteInput::default_for(mode)
+        &mut seed.palette.success,
+        CastPaletteInput::default_for(seed.mode)
             .success
             .unwrap_or(Color32::from_rgb(22, 163, 74)),
     );
     changed |= optional_color_row(
         ui,
         "Warning",
-        &mut palette.warning,
-        CastPaletteInput::default_for(mode)
+        &mut seed.palette.warning,
+        CastPaletteInput::default_for(seed.mode)
             .warning
             .unwrap_or(Color32::from_rgb(217, 119, 6)),
     );
     changed |= optional_color_row(
         ui,
         "Danger",
-        &mut palette.danger,
-        CastPaletteInput::default_for(mode)
+        &mut seed.palette.danger,
+        CastPaletteInput::default_for(seed.mode)
             .danger
             .unwrap_or(Color32::from_rgb(220, 38, 38)),
     );
     changed |= optional_color_row(
         ui,
         "Info",
-        &mut palette.info,
-        CastPaletteInput::default_for(mode)
+        &mut seed.palette.info,
+        CastPaletteInput::default_for(seed.mode)
             .info
             .unwrap_or(Color32::from_rgb(8, 145, 178)),
     );
 
+    ui.separator();
+    let spacing_changed = theme_slider(ui, "Spacing", &mut seed.spacing.md, 8.0..=20.0);
+    changed |= spacing_changed;
+    if spacing_changed {
+        seed.spacing.xs = seed.spacing.md / 3.0;
+        seed.spacing.sm = seed.spacing.md * 2.0 / 3.0;
+        seed.spacing.lg = seed.spacing.md * 4.0 / 3.0;
+        seed.spacing.xl = seed.spacing.md * 2.0;
+    }
+    let radius_changed = theme_slider(ui, "Radius", &mut seed.radius.md, 0.0..=16.0);
+    changed |= radius_changed;
+    if radius_changed {
+        seed.radius.sm = (seed.radius.md - 2.0).max(0.0);
+        seed.radius.lg = seed.radius.md + 2.0;
+    }
+    let stroke_changed = theme_slider(ui, "Border", &mut seed.stroke.sm, 0.0..=3.0);
+    changed |= stroke_changed;
+    if stroke_changed {
+        seed.stroke.md = seed.stroke.sm + 0.5;
+        seed.stroke.lg = seed.stroke.sm + 1.0;
+    }
+    let typography_changed = theme_slider(ui, "Text", &mut seed.typography.body.size, 12.0..=18.0);
+    changed |= typography_changed;
+    if typography_changed {
+        seed.typography.small.size = seed.typography.body.size - 2.0;
+        seed.typography.heading.size = seed.typography.body.size + 6.0;
+    }
+    let controls_changed = theme_slider(ui, "Control", &mut seed.controls.min_height, 26.0..=44.0);
+    changed |= controls_changed;
+    if controls_changed {
+        seed.controls.padding_x = seed.controls.min_height * 0.375;
+        seed.controls.padding_y = seed.controls.min_height * 0.22;
+    }
+
     ui.horizontal(|ui| {
         if ui.button("Reset").clicked() {
-            *palette = CastPaletteInput::default_for(mode);
+            *seed = ThemeSeed::for_mode(seed.mode);
             changed = true;
         }
         if ui.button("Primary only").clicked() {
-            *palette = CastPaletteInput::from_primary(palette.primary);
+            seed.palette = CastPaletteInput::from_primary(seed.palette.primary);
             changed = true;
         }
     });
 
     changed
+}
+
+fn theme_slider(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: &mut f32,
+    range: std::ops::RangeInclusive<f32>,
+) -> bool {
+    ui.add(egui::Slider::new(value, range).text(label))
+        .changed()
 }
 
 fn color_row(ui: &mut egui::Ui, label: &str, color: &mut Color32) -> bool {

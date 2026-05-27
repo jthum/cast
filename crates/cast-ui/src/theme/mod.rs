@@ -15,6 +15,7 @@ pub enum ThemeMode {
 #[derive(Clone, Debug)]
 pub struct CastTheme {
     pub mode: ThemeMode,
+    pub seed: ThemeSeed,
     pub palette: CastPaletteInput,
     pub colors: ColorTokens,
     pub components: ComponentTokens,
@@ -47,34 +48,79 @@ impl CastTheme {
 
     #[must_use]
     pub fn from_palette(mode: ThemeMode, palette: CastPaletteInput) -> Self {
-        let colors = ColorTokens::from_palette(mode, &palette);
-        let spacing = SpacingTokens::default();
-        let radius = RadiusTokens::default();
-        let stroke = StrokeTokens::default();
-        let typography = TypographyTokens::default();
-        let controls = ControlTokens::default();
-        let components = ComponentTokens::derive(&colors, &spacing, &radius, &stroke, &controls);
-        let focus = FocusTokens {
-            width: 2.0,
-            color: colors.focus,
-        };
+        ThemeSeed::new(mode, palette).resolve()
+    }
+}
 
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Debug)]
+pub struct ThemeSeed {
+    pub mode: ThemeMode,
+    pub palette: CastPaletteInput,
+    pub spacing: SpacingTokens,
+    pub radius: RadiusTokens,
+    pub stroke: StrokeTokens,
+    pub typography: TypographyTokens,
+    pub controls: ControlTokens,
+    pub elevation: ElevationTokens,
+    pub animation: AnimationTokens,
+}
+
+impl ThemeSeed {
+    #[must_use]
+    pub fn new(mode: ThemeMode, palette: CastPaletteInput) -> Self {
         Self {
             mode,
             palette,
-            colors,
-            components,
-            spacing,
-            radius,
-            stroke,
-            typography,
-            controls,
-            focus,
+            spacing: SpacingTokens::default(),
+            radius: RadiusTokens::default(),
+            stroke: StrokeTokens::default(),
+            typography: TypographyTokens::default(),
+            controls: ControlTokens::default(),
             elevation: ElevationTokens::default(),
             animation: AnimationTokens::default(),
         }
     }
 
+    #[must_use]
+    pub fn for_mode(mode: ThemeMode) -> Self {
+        Self::new(mode, CastPaletteInput::default_for(mode))
+    }
+
+    #[must_use]
+    pub fn resolve(self) -> CastTheme {
+        let colors = ColorTokens::from_palette(self.mode, &self.palette);
+        let components = ComponentTokens::derive(
+            &colors,
+            &self.spacing,
+            &self.radius,
+            &self.stroke,
+            &self.controls,
+        );
+        let focus = FocusTokens {
+            width: 2.0,
+            color: colors.focus,
+        };
+
+        CastTheme {
+            mode: self.mode,
+            palette: self.palette.clone(),
+            seed: self.clone(),
+            colors,
+            components,
+            spacing: self.spacing,
+            radius: self.radius,
+            stroke: self.stroke,
+            typography: self.typography,
+            controls: self.controls,
+            focus,
+            elevation: self.elevation,
+            animation: self.animation,
+        }
+    }
+}
+
+impl CastTheme {
     #[must_use]
     pub fn to_egui_style(&self) -> Style {
         let mut style = Style {
@@ -788,5 +834,23 @@ mod tests {
         assert_eq!(theme.components.panel.fill, theme.colors.surface_raised);
         assert_eq!(theme.components.input.fg, theme.colors.text);
         assert_eq!(theme.components.input.focus_border, theme.colors.focus);
+    }
+
+    #[test]
+    fn theme_seed_controls_spacing_radius_stroke_and_type() {
+        let mut seed = ThemeSeed::for_mode(ThemeMode::Light);
+        seed.spacing.md = 18.0;
+        seed.radius.md = 12.0;
+        seed.stroke.sm = 2.0;
+        seed.typography.body.size = 16.0;
+        seed.controls.min_height = 40.0;
+
+        let theme = seed.resolve();
+
+        assert_eq!(theme.spacing.md, 18.0);
+        assert_eq!(theme.components.card.radius, theme.radius.lg);
+        assert_eq!(theme.components.card.border_width, 2.0);
+        assert_eq!(theme.typography.body.size, 16.0);
+        assert_eq!(theme.components.button.min_height, 40.0);
     }
 }
