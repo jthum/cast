@@ -100,6 +100,8 @@ impl eframe::App for CastGallery {
             ui.add_space(12.0);
             show_palette_preview(ui, &self.theme);
             ui.add_space(12.0);
+            show_override_preview(ui);
+            ui.add_space(12.0);
             show_buttons_and_badges(ui);
             ui.add_space(12.0);
             show_surfaces(ui);
@@ -484,6 +486,15 @@ fn show_buttons_and_badges(ui: &mut egui::Ui) {
         });
 
         ui.add_space(8.0);
+        ui.heading("States");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Button::new("With icon").leading_icon("[+]"));
+            ui.add(Button::new("Next").trailing_icon("[>]"));
+            ui.add(Button::new("Saving").loading(true));
+            ui.add(Button::new("Disabled").disabled());
+        });
+
+        ui.add_space(8.0);
         ui.heading("Sizes");
         ui.horizontal_wrapped(|ui| {
             ui.add(Button::new("Small").size(Size::Small));
@@ -507,6 +518,25 @@ fn show_buttons_and_badges(ui: &mut egui::Ui) {
                     .variant(Variant::Outline),
             );
         });
+    });
+}
+
+fn show_override_preview(ui: &mut egui::Ui) {
+    let mut preview_input = String::from("Input");
+
+    Card::new().show(ui, |ui| {
+        ui.heading("Live override preview");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Button::new("Button").leading_icon("[+]"));
+            ui.add(Badge::new("Badge").intent(Intent::Info));
+            ui.add(TextInput::new(&mut preview_input).width(160.0));
+        });
+        ui.add_space(8.0);
+        CastPanel::new().show(ui, |ui| {
+            ui.label("Panel padding and radius update here.");
+        });
+        ui.add_space(8.0);
+        ui.add(Alert::new("Alert preview").body("Alert padding and radius update here."));
     });
 }
 
@@ -568,6 +598,33 @@ fn show_forms(
         ui.horizontal(|ui| {
             ui.label("Search");
             ui.add(SearchInput::new(search).width(220.0));
+        });
+        ui.horizontal(|ui| {
+            ui.label("Outline");
+            ui.add(
+                TextInput::new(name)
+                    .hint_text("Outline input")
+                    .variant(Variant::Outline)
+                    .width(220.0),
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.label("Ghost");
+            ui.add(
+                TextInput::new(search)
+                    .hint_text("Ghost input")
+                    .variant(Variant::Ghost)
+                    .width(220.0),
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.label("Disabled");
+            ui.add(
+                TextInput::new(name)
+                    .hint_text("Disabled input")
+                    .disabled()
+                    .width(220.0),
+            );
         });
         ui.add(Separator::new().spacing(10.0));
         ui.horizontal_wrapped(|ui| {

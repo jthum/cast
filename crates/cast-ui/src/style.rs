@@ -151,11 +151,18 @@ pub(crate) fn panel_frame(theme: &CastTheme) -> egui::Frame {
         .inner_margin(Margin::same(tokens.padding as i8))
 }
 
-pub(crate) fn input_frame(theme: &CastTheme) -> egui::Frame {
+pub(crate) fn input_frame(theme: &CastTheme, variant: Variant) -> egui::Frame {
     let tokens = theme.components.input;
+    let (fill, border) = match variant {
+        Variant::Solid => (tokens.fill, tokens.border),
+        Variant::Subtle => (theme.colors.surface_muted, tokens.border),
+        Variant::Outline => (Color32::TRANSPARENT, tokens.border),
+        Variant::Ghost => (Color32::TRANSPARENT, Color32::TRANSPARENT),
+    };
+
     egui::Frame::new()
-        .fill(tokens.fill)
-        .stroke(Stroke::new(tokens.border_width, tokens.border))
+        .fill(fill)
+        .stroke(Stroke::new(tokens.border_width, border))
         .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
         .inner_margin(Margin::symmetric(
             tokens.padding_x as i8,
@@ -268,5 +275,14 @@ mod tests {
         assert_eq!(small.padding.x, 10.0);
         assert_eq!(medium.min_height, 26.0);
         assert_eq!(large.min_height, 34.0);
+    }
+
+    #[test]
+    fn ghost_input_frame_has_no_fill_or_border() {
+        let theme = CastTheme::light();
+        let frame = input_frame(&theme, Variant::Ghost);
+
+        assert_eq!(frame.fill, Color32::TRANSPARENT);
+        assert_eq!(frame.stroke.color, Color32::TRANSPARENT);
     }
 }

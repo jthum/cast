@@ -1,7 +1,7 @@
 use egui::{Response, StrokeKind, TextEdit, Ui, Widget};
 
 use crate::{
-    foundation::Size,
+    foundation::{Size, Variant},
     style::{input_frame, resolve_control_metrics},
     theme::theme_for_ui,
 };
@@ -12,6 +12,8 @@ pub struct TextInput<'a> {
     hint_text: Option<String>,
     width: Option<f32>,
     size: Size,
+    variant: Variant,
+    enabled: bool,
 }
 
 impl<'a> TextInput<'a> {
@@ -22,6 +24,8 @@ impl<'a> TextInput<'a> {
             hint_text: None,
             width: None,
             size: Size::Medium,
+            variant: Variant::Solid,
+            enabled: true,
         }
     }
 
@@ -42,6 +46,24 @@ impl<'a> TextInput<'a> {
         self.size = size;
         self
     }
+
+    #[must_use]
+    pub fn variant(mut self, variant: Variant) -> Self {
+        self.variant = variant;
+        self
+    }
+
+    #[must_use]
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    #[must_use]
+    pub fn disabled(mut self) -> Self {
+        self.enabled = false;
+        self
+    }
 }
 
 impl Widget for TextInput<'_> {
@@ -49,7 +71,7 @@ impl Widget for TextInput<'_> {
         let theme = theme_for_ui(ui);
         let metrics = resolve_control_metrics(&theme, self.size);
         let mut edit = TextEdit::singleline(self.text)
-            .frame(input_frame(&theme))
+            .frame(input_frame(&theme, self.variant))
             .min_size(egui::vec2(
                 0.0,
                 metrics.min_height.max(theme.components.input.min_height),
@@ -64,8 +86,8 @@ impl Widget for TextInput<'_> {
             edit = edit.desired_width(width);
         }
 
-        let response = ui.add(edit);
-        if response.has_focus() {
+        let response = ui.add_enabled(self.enabled, edit);
+        if self.enabled && response.has_focus() {
             ui.painter().rect_stroke(
                 response.rect,
                 egui::CornerRadius::same(theme.components.input.radius as u8),
@@ -106,6 +128,24 @@ impl<'a> SearchInput<'a> {
     #[must_use]
     pub fn size(mut self, size: Size) -> Self {
         self.inner = self.inner.size(size);
+        self
+    }
+
+    #[must_use]
+    pub fn variant(mut self, variant: Variant) -> Self {
+        self.inner = self.inner.variant(variant);
+        self
+    }
+
+    #[must_use]
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.inner = self.inner.enabled(enabled);
+        self
+    }
+
+    #[must_use]
+    pub fn disabled(mut self) -> Self {
+        self.inner = self.inner.disabled();
         self
     }
 }
