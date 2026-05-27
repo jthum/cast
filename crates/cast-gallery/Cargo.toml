@@ -1,0 +1,13 @@
+[package]
+name = "cast-gallery"
+version = "0.1.0"
+description = "Gallery and visual test bed for cast-ui."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+cast.workspace = true
+eframe.workspace = true
+egui.workspace = true

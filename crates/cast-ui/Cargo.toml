@@ -1,0 +1,19 @@
+[package]
+name = "cast-ui"
+version = "0.1.0"
+description = "A standalone, themeable component library for egui."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+serde = ["dep:serde", "egui/serde"]
+icons = []
+charts = []
+persistence = []
+experimental = []
+
+[dependencies]
+egui.workspace = true
+serde = { workspace = true, optional = true }
