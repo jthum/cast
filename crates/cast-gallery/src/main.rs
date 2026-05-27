@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link, Notice,
     Panel as CastPanel, SearchInput, SemanticColorTokens, Separator, Size, Switch, TextInput,
-    ThemeMode, ThemeSeed, Variant,
+    ThemeMode, ThemeSeed, TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::ScrollBarVisibility,
@@ -37,7 +39,7 @@ struct CastGallery {
 impl CastGallery {
     fn new() -> Self {
         let mode = ThemeMode::Light;
-        let seed = ThemeSeed::for_mode(mode).with_typography(cast::TypographyTokens::inter());
+        let seed = ThemeSeed::for_mode(mode).with_typography(TypographyTokens::inter());
         let theme = seed.clone().resolve();
 
         Self {
@@ -161,6 +163,9 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
     egui::CollapsingHeader::new("Tokens")
         .default_open(true)
         .show(ui, |ui| changed |= show_token_editor(ui, seed));
+    egui::CollapsingHeader::new("Typography")
+        .default_open(false)
+        .show(ui, |ui| changed |= show_typography_editor(ui, seed));
     egui::CollapsingHeader::new("Motion")
         .default_open(false)
         .show(ui, |ui| changed |= show_motion_editor(ui, seed));
@@ -173,7 +178,7 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
 
     ui.horizontal(|ui| {
         if ui.button("Reset").clicked() {
-            *seed = ThemeSeed::for_mode(seed.mode).with_typography(cast::TypographyTokens::inter());
+            *seed = ThemeSeed::for_mode(seed.mode).with_typography(TypographyTokens::inter());
             changed = true;
         }
         if ui.button("Primary only").clicked() {
@@ -260,26 +265,73 @@ fn show_token_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
         seed.stroke.md = seed.stroke.sm + 0.5;
         seed.stroke.lg = seed.stroke.sm + 1.0;
     }
-    let typography_changed = theme_slider(ui, "Text", &mut seed.typography.body.size, 13.0..=20.0);
-    changed |= typography_changed;
-    if typography_changed {
-        seed.typography.xs.size = seed.typography.body.size - 3.0;
-        seed.typography.small.size = seed.typography.body.size - 2.0;
-        seed.typography.label.size = seed.typography.body.size - 2.0;
-        seed.typography.caption.size = seed.typography.body.size - 3.0;
-        seed.typography.body_strong.size = seed.typography.body.size;
-        seed.typography.heading.size = seed.typography.body.size + 7.0;
-        seed.typography.heading_sm.size = seed.typography.body.size + 2.0;
-        seed.typography.heading_lg.size = seed.typography.body.size + 10.0;
-        seed.typography.button.size = seed.typography.body.size;
-        seed.typography.strong.size = seed.typography.body.size;
-        seed.typography.code.size = seed.typography.body.size - 1.0;
-    }
     let controls_changed = theme_slider(ui, "Control", &mut seed.controls.min_height, 26.0..=44.0);
     changed |= controls_changed;
     if controls_changed {
         seed.set_density(seed.controls.min_height, seed.spacing.md);
     }
+    changed
+}
+
+fn show_typography_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
+    let mut changed = false;
+
+    ui.horizontal_wrapped(|ui| {
+        if ui.button("Inter").clicked() {
+            seed.typography = TypographyTokens::inter().with_body_size(seed.typography.body.size);
+            changed = true;
+        }
+        if ui.button("System").clicked() {
+            seed.typography = TypographyTokens::default().with_body_size(seed.typography.body.size);
+            changed = true;
+        }
+        if ui.button("Compact").clicked() {
+            seed.typography.set_body_size(13.0);
+            changed = true;
+        }
+        if ui.button("Comfortable").clicked() {
+            seed.typography.set_body_size(14.0);
+            changed = true;
+        }
+        if ui.button("Large").clicked() {
+            seed.typography.set_body_size(16.0);
+            changed = true;
+        }
+    });
+
+    let mut body_size = seed.typography.body.size;
+    if theme_slider(ui, "Body size", &mut body_size, 12.0..=20.0) {
+        seed.typography.set_body_size(body_size);
+        changed = true;
+    }
+
+    if let Some(family) = font_family_selector(ui, "Body", &seed.typography.body.family) {
+        seed.typography.set_body_family(family);
+        changed = true;
+    }
+    if let Some(family) = font_family_selector(ui, "Heading", &seed.typography.heading.family) {
+        seed.typography.set_heading_family(family);
+        changed = true;
+    }
+    if let Some(family) = font_family_selector(ui, "Controls", &seed.typography.button.family) {
+        seed.typography.set_button_family(family);
+        changed = true;
+    }
+    if let Some(family) = font_family_selector(ui, "Strong", &seed.typography.strong.family) {
+        seed.typography.set_strong_family(family);
+        changed = true;
+    }
+    if let Some(family) = font_family_selector(ui, "Code", &seed.typography.code.family) {
+        seed.typography.set_code_family(family);
+        changed = true;
+    }
+
+    ui.add_space(4.0);
+    ui.monospace(cast::FontStack::google_fonts_css2_url_for_names(&[
+        "Inter",
+        "JetBrains Mono",
+    ]));
+
     changed
 }
 
@@ -426,6 +478,83 @@ fn optional_theme_slider(
     });
 
     changed
+}
+
+fn font_family_selector(
+    ui: &mut egui::Ui,
+    label: &str,
+    current: &egui::FontFamily,
+) -> Option<egui::FontFamily> {
+    let mut selected = current.clone();
+    ui.horizontal(|ui| {
+        ui.label(label);
+        egui::ComboBox::from_id_salt(format!("font_family_{label}"))
+            .selected_text(font_family_label(&selected))
+            .show_ui(ui, |ui| {
+                font_family_option(
+                    ui,
+                    &mut selected,
+                    egui::FontFamily::Proportional,
+                    "System UI",
+                );
+                font_family_option(
+                    ui,
+                    &mut selected,
+                    egui::FontFamily::Monospace,
+                    "System Mono",
+                );
+                font_family_option(
+                    ui,
+                    &mut selected,
+                    inter_family(cast::FontStack::INTER_BODY_FAMILY),
+                    "Inter Regular",
+                );
+                font_family_option(
+                    ui,
+                    &mut selected,
+                    inter_family(cast::FontStack::INTER_BUTTON_FAMILY),
+                    "Inter Medium",
+                );
+                font_family_option(
+                    ui,
+                    &mut selected,
+                    inter_family(cast::FontStack::INTER_STRONG_FAMILY),
+                    "Inter SemiBold",
+                );
+            });
+    });
+
+    (selected != *current).then_some(selected)
+}
+
+fn font_family_option(
+    ui: &mut egui::Ui,
+    selected: &mut egui::FontFamily,
+    family: egui::FontFamily,
+    label: &str,
+) {
+    ui.selectable_value(selected, family, label);
+}
+
+fn inter_family(name: &'static str) -> egui::FontFamily {
+    egui::FontFamily::Name(Arc::from(name))
+}
+
+fn font_family_label(family: &egui::FontFamily) -> String {
+    match family {
+        egui::FontFamily::Proportional => "System UI".to_owned(),
+        egui::FontFamily::Monospace => "System Mono".to_owned(),
+        egui::FontFamily::Name(name) if name.as_ref() == cast::FontStack::INTER_BODY_FAMILY => {
+            "Inter Regular".to_owned()
+        }
+        egui::FontFamily::Name(name) if name.as_ref() == cast::FontStack::INTER_BUTTON_FAMILY => {
+            "Inter Medium".to_owned()
+        }
+        egui::FontFamily::Name(name) if name.as_ref() == cast::FontStack::INTER_STRONG_FAMILY => {
+            "Inter SemiBold".to_owned()
+        }
+        egui::FontFamily::Name(name) => name.to_string(),
+    }
 }
 
 fn color_row(ui: &mut egui::Ui, label: &str, color: &mut Color32) -> bool {

@@ -419,6 +419,11 @@ pub struct FontStack {
 }
 
 impl FontStack {
+    pub const INTER_BODY_FAMILY: &'static str = INTER_REGULAR_FAMILY;
+    pub const INTER_BUTTON_FAMILY: &'static str = INTER_MEDIUM_FAMILY;
+    pub const INTER_STRONG_FAMILY: &'static str = INTER_SEMIBOLD_FAMILY;
+    pub const INTER_HEADING_FAMILY: &'static str = INTER_SEMIBOLD_FAMILY;
+
     #[must_use]
     pub fn inter() -> Self {
         Self {
@@ -1214,6 +1219,55 @@ impl TypographyTokens {
     }
 
     #[must_use]
+    pub fn with_body_size(mut self, body_size: f32) -> Self {
+        self.set_body_size(body_size);
+        self
+    }
+
+    pub fn set_body_size(&mut self, body_size: f32) {
+        let body_size = body_size.max(1.0);
+        self.xs.size = (body_size - 3.0).max(1.0);
+        self.body.size = body_size;
+        self.small.size = (body_size - 2.0).max(1.0);
+        self.label.size = (body_size - 2.0).max(1.0);
+        self.caption.size = (body_size - 3.0).max(1.0);
+        self.body_strong.size = body_size;
+        self.heading.size = body_size + 7.0;
+        self.heading_sm.size = body_size + 2.0;
+        self.heading_lg.size = body_size + 10.0;
+        self.button.size = body_size;
+        self.strong.size = body_size;
+        self.code.size = (body_size - 1.0).max(1.0);
+    }
+
+    pub fn set_body_family(&mut self, family: FontFamily) {
+        self.xs.family = family.clone();
+        self.body.family = family.clone();
+        self.small.family = family.clone();
+        self.caption.family = family;
+    }
+
+    pub fn set_button_family(&mut self, family: FontFamily) {
+        self.label.family = family.clone();
+        self.button.family = family;
+    }
+
+    pub fn set_strong_family(&mut self, family: FontFamily) {
+        self.body_strong.family = family.clone();
+        self.strong.family = family;
+    }
+
+    pub fn set_heading_family(&mut self, family: FontFamily) {
+        self.heading.family = family.clone();
+        self.heading_sm.family = family.clone();
+        self.heading_lg.family = family;
+    }
+
+    pub fn set_code_family(&mut self, family: FontFamily) {
+        self.code.family = family;
+    }
+
+    #[must_use]
     pub fn from_font_stack(stack: &FontStack) -> Self {
         let body = FontFamily::Name(Arc::<str>::from(stack.body_family.as_str()));
         let button = FontFamily::Name(Arc::<str>::from(stack.button_family.as_str()));
@@ -1513,6 +1567,32 @@ mod tests {
         assert_ne!(typography.body.family, typography.button.family);
         assert_ne!(typography.button.family, typography.heading.family);
         assert_eq!(typography.body.size, 14.0);
+    }
+
+    #[test]
+    fn typography_body_size_updates_related_roles() {
+        let typography = TypographyTokens::inter().with_body_size(16.0);
+
+        assert_eq!(typography.body.size, 16.0);
+        assert_eq!(typography.caption.size, 13.0);
+        assert_eq!(typography.heading_lg.size, 26.0);
+        assert_eq!(typography.code.size, 15.0);
+    }
+
+    #[test]
+    fn typography_family_setters_update_role_groups() {
+        let mut typography = TypographyTokens::default();
+        let heading = FontFamily::Name(Arc::from("Heading"));
+        let body = FontFamily::Name(Arc::from("Body"));
+
+        typography.set_heading_family(heading.clone());
+        typography.set_body_family(body.clone());
+
+        assert_eq!(typography.heading.family, heading);
+        assert_eq!(typography.heading_sm.family, heading);
+        assert_eq!(typography.heading_lg.family, heading);
+        assert_eq!(typography.body.family, body);
+        assert_eq!(typography.caption.family, body);
     }
 
     #[test]
