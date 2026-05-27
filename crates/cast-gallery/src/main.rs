@@ -208,6 +208,91 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
         seed.controls.padding_y = seed.controls.min_height * 0.22;
     }
 
+    ui.separator();
+    ui.heading("Motion");
+    changed |= ui
+        .checkbox(&mut seed.animation.enabled, "Animations")
+        .changed();
+    changed |= ui
+        .checkbox(&mut seed.animation.reduced_motion, "Reduced motion")
+        .changed();
+    changed |= theme_slider(
+        ui,
+        "Duration",
+        &mut seed.animation.duration_scale,
+        0.0..=2.0,
+    );
+
+    ui.separator();
+    ui.heading("Presets");
+    ui.horizontal_wrapped(|ui| {
+        if ui.button("Compact").clicked() {
+            apply_density(seed, 28.0, 10.0);
+            changed = true;
+        }
+        if ui.button("Comfortable").clicked() {
+            apply_density(seed, 36.0, 14.0);
+            changed = true;
+        }
+        if ui.button("Sharp").clicked() {
+            apply_radius(seed, 2.0);
+            changed = true;
+        }
+        if ui.button("Soft").clicked() {
+            apply_radius(seed, 10.0);
+            changed = true;
+        }
+    });
+
+    ui.separator();
+    ui.heading("Overrides");
+    changed |= optional_theme_slider(
+        ui,
+        "Button radius",
+        &mut seed.component_overrides.button.radius,
+        seed.radius.md,
+        0.0..=20.0,
+    );
+    changed |= optional_theme_slider(
+        ui,
+        "Button border",
+        &mut seed.component_overrides.button.border_width,
+        seed.stroke.sm,
+        0.0..=4.0,
+    );
+    changed |= optional_theme_slider(
+        ui,
+        "Input radius",
+        &mut seed.component_overrides.input.radius,
+        seed.radius.md,
+        0.0..=20.0,
+    );
+    changed |= optional_theme_slider(
+        ui,
+        "Input height",
+        &mut seed.component_overrides.input.min_height,
+        seed.controls.min_height,
+        24.0..=52.0,
+    );
+    changed |= optional_theme_slider(
+        ui,
+        "Card padding",
+        &mut seed.component_overrides.card.padding,
+        seed.spacing.lg,
+        8.0..=32.0,
+    );
+    changed |= optional_theme_slider(
+        ui,
+        "Card radius",
+        &mut seed.component_overrides.card.radius,
+        seed.radius.lg,
+        0.0..=24.0,
+    );
+    if !seed.component_overrides.is_empty() && ui.button("Clear overrides").clicked() {
+        seed.component_overrides = Default::default();
+        changed = true;
+    }
+
     ui.horizontal(|ui| {
         if ui.button("Reset").clicked() {
             *seed = ThemeSeed::for_mode(seed.mode);
@@ -222,6 +307,23 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
     changed
 }
 
+fn apply_density(seed: &mut ThemeSeed, min_height: f32, spacing: f32) {
+    seed.controls.min_height = min_height;
+    seed.controls.padding_x = min_height * 0.375;
+    seed.controls.padding_y = min_height * 0.22;
+    seed.spacing.md = spacing;
+    seed.spacing.xs = spacing / 3.0;
+    seed.spacing.sm = spacing * 2.0 / 3.0;
+    seed.spacing.lg = spacing * 4.0 / 3.0;
+    seed.spacing.xl = spacing * 2.0;
+}
+
+fn apply_radius(seed: &mut ThemeSeed, radius: f32) {
+    seed.radius.md = radius;
+    seed.radius.sm = (radius - 2.0).max(0.0);
+    seed.radius.lg = radius + 2.0;
+}
+
 fn theme_slider(
     ui: &mut egui::Ui,
     label: &str,
@@ -230,6 +332,29 @@ fn theme_slider(
 ) -> bool {
     ui.add(egui::Slider::new(value, range).text(label))
         .changed()
+}
+
+fn optional_theme_slider(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: &mut Option<f32>,
+    fallback: f32,
+    range: std::ops::RangeInclusive<f32>,
+) -> bool {
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        let mut enabled = value.is_some();
+        if ui.checkbox(&mut enabled, label).changed() {
+            *value = enabled.then_some(fallback);
+            changed = true;
+        }
+
+        if let Some(value) = value {
+            changed |= ui.add(egui::Slider::new(value, range)).changed();
+        }
+    });
+
+    changed
 }
 
 fn color_row(ui: &mut egui::Ui, label: &str, color: &mut Color32) -> bool {
