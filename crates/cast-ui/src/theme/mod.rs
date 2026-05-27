@@ -1,4 +1,6 @@
-use egui::{Color32, Context, FontFamily, FontId, Stroke, Style, Vec2, Visuals};
+use egui::{Color32, Context, FontFamily, FontId, Stroke, Style, Ui, Vec2, Visuals};
+
+const THEME_ID: &str = "cast_theme";
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -133,7 +135,7 @@ impl Default for CastTheme {
 
 pub fn set_theme(ctx: &Context, theme: CastTheme) {
     apply_theme(ctx, &theme);
-    ctx.data_mut(|data| data.insert_temp(egui::Id::new("cast_theme"), theme));
+    ctx.data_mut(|data| data.insert_temp(egui::Id::new(THEME_ID), theme));
 }
 
 pub fn apply_theme(ctx: &Context, theme: &CastTheme) {
@@ -142,7 +144,12 @@ pub fn apply_theme(ctx: &Context, theme: &CastTheme) {
 
 #[must_use]
 pub fn current_theme(ctx: &Context) -> Option<CastTheme> {
-    ctx.data(|data| data.get_temp(egui::Id::new("cast_theme")))
+    ctx.data(|data| data.get_temp(egui::Id::new(THEME_ID)))
+}
+
+#[must_use]
+pub fn theme_for_ui(ui: &Ui) -> CastTheme {
+    current_theme(ui.ctx()).unwrap_or_else(CastTheme::light)
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -390,5 +397,34 @@ impl Default for AnimationTokens {
             fast_ms: 100,
             normal_ms: 160,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_theme_stores_current_theme() {
+        let ctx = Context::default();
+        let theme = CastTheme::dark();
+
+        set_theme(&ctx, theme);
+
+        assert_eq!(
+            current_theme(&ctx).map(|theme| theme.mode),
+            Some(ThemeMode::Dark)
+        );
+    }
+
+    #[test]
+    fn egui_style_uses_theme_spacing_and_visuals() {
+        let theme = CastTheme::light();
+        let style = theme.to_egui_style();
+
+        assert_eq!(style.spacing.item_spacing, Vec2::splat(theme.spacing.sm));
+        assert_eq!(style.spacing.button_padding.x, theme.controls.padding_x);
+        assert_eq!(style.visuals.panel_fill, theme.colors.background);
+        assert_eq!(style.visuals.hyperlink_color, theme.colors.link);
     }
 }

@@ -1,21 +1,17 @@
 use egui::{Response, RichText, Ui, Widget};
 
-use crate::theme::{CastTheme, current_theme};
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Intent {
-    Neutral,
-    Primary,
-    Success,
-    Warning,
-    Danger,
-    Info,
-}
+use crate::{
+    foundation::{Intent, Size, Variant},
+    style::resolve_component_style,
+    theme::theme_for_ui,
+};
 
 #[derive(Clone, Debug)]
 pub struct Badge {
     label: String,
     intent: Intent,
+    variant: Variant,
+    size: Size,
 }
 
 impl Badge {
@@ -24,6 +20,8 @@ impl Badge {
         Self {
             label: label.into(),
             intent: Intent::Neutral,
+            variant: Variant::Subtle,
+            size: Size::Small,
         }
     }
 
@@ -32,25 +30,38 @@ impl Badge {
         self.intent = intent;
         self
     }
+
+    #[must_use]
+    pub fn variant(mut self, variant: Variant) -> Self {
+        self.variant = variant;
+        self
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = size;
+        self
+    }
 }
 
 impl Widget for Badge {
     fn ui(self, ui: &mut Ui) -> Response {
-        let theme = current_theme(ui.ctx()).unwrap_or_else(CastTheme::light);
-        let (fill, text) = match self.intent {
-            Intent::Neutral => (theme.colors.surface_muted, theme.colors.text_muted),
-            Intent::Primary => (theme.colors.primary, theme.colors.primary_fg),
-            Intent::Success => (theme.colors.success, theme.colors.success_fg),
-            Intent::Warning => (theme.colors.warning, theme.colors.warning_fg),
-            Intent::Danger => (theme.colors.danger, theme.colors.danger_fg),
-            Intent::Info => (theme.colors.info, theme.colors.info_fg),
-        };
+        let theme = theme_for_ui(ui);
+        let style = resolve_component_style(&theme, self.intent, self.variant, self.size);
 
         ui.add(
-            egui::Button::new(RichText::new(self.label).color(text).size(12.0))
-                .fill(fill)
-                .stroke(egui::Stroke::new(theme.stroke.sm, fill))
-                .small(),
+            egui::Button::new(
+                RichText::new(self.label)
+                    .color(style.colors.fg)
+                    .size(style.metrics.text_size),
+            )
+            .fill(style.colors.fill)
+            .stroke(style.stroke)
+            .min_size(egui::vec2(
+                style.metrics.padding.x * 2.0,
+                style.metrics.min_height.max(style.metrics.padding.y * 2.0),
+            ))
+            .small(),
         )
     }
 }

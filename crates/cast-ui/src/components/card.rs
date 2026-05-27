@@ -1,6 +1,6 @@
-use egui::{Frame, InnerResponse, Ui};
+use egui::{InnerResponse, Ui};
 
-use crate::theme::{CastTheme, current_theme};
+use crate::{style::card_frame, theme::theme_for_ui};
 
 #[derive(Clone, Debug, Default)]
 pub struct Card;
@@ -12,12 +12,8 @@ impl Card {
     }
 
     pub fn show<R>(self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
-        let theme = current_theme(ui.ctx()).unwrap_or_else(CastTheme::light);
+        let theme = theme_for_ui(ui);
 
-        Frame::new()
-            .fill(theme.colors.surface)
-            .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
-            .inner_margin(egui::Margin::same(theme.spacing.lg as i8))
-            .show(ui, add_contents)
+        card_frame(&theme).show(ui, add_contents)
     }
 }

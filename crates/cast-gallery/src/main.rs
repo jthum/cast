@@ -1,5 +1,5 @@
 use cast::{
-    Badge, Button, Card, CastTheme, Intent, ThemeMode, apply_theme,
+    Badge, Button, Card, CastTheme, Intent, Size, ThemeMode, Variant,
     egui::{self, CentralPanel, Panel, RichText},
 };
 
@@ -11,7 +11,7 @@ fn main() -> eframe::Result {
         native_options,
         Box::new(|cc| {
             let app = CastGallery::new();
-            apply_theme(&cc.egui_ctx, &app.theme);
+            cast::set_theme(&cc.egui_ctx, app.theme.clone());
             Ok(Box::new(app))
         }),
     )
@@ -78,27 +78,85 @@ impl eframe::App for CastGallery {
             ui.label("Runtime theme switching, semantic tokens, and initial primitives.");
             ui.add_space(12.0);
 
-            Card::new().show(ui, |ui| {
-                ui.heading("Buttons and badges");
-                ui.horizontal_wrapped(|ui| {
-                    ui.add(Button::new("Approve"));
-                    ui.add(Badge::new("Running").intent(Intent::Info));
-                    ui.add(Badge::new("Success").intent(Intent::Success));
-                    ui.add(Badge::new("Warning").intent(Intent::Warning));
-                    ui.add(Badge::new("Danger").intent(Intent::Danger));
-                });
-            });
-
+            show_theme_foundation(ui);
             ui.add_space(12.0);
-
-            Card::new().show(ui, |ui| {
-                ui.heading("Form controls");
-                ui.horizontal(|ui| {
-                    ui.label("Search");
-                    ui.text_edit_singleline(&mut self.search);
-                });
-                ui.checkbox(&mut self.enabled, "Enabled");
-            });
+            show_buttons_and_badges(ui);
+            ui.add_space(12.0);
+            show_raw_egui_controls(ui, &mut self.search, &mut self.enabled);
         });
     }
+}
+
+fn show_theme_foundation(ui: &mut egui::Ui) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Theme boundary");
+        ui.label("Cast widgets resolve semantic styling from CastTheme.");
+        ui.label("Raw egui widgets inherit the derived egui::Style fallback.");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Badge::new("CastTheme").intent(Intent::Primary));
+            ui.add(Badge::new("egui::Style fallback").intent(Intent::Neutral));
+            ui.add(Badge::new("runtime switching").intent(Intent::Info));
+        });
+    });
+}
+
+fn show_buttons_and_badges(ui: &mut egui::Ui) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Buttons");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Button::new("Primary"));
+            ui.add(Button::new("Success").intent(Intent::Success));
+            ui.add(Button::new("Warning").intent(Intent::Warning));
+            ui.add(Button::new("Danger").intent(Intent::Danger));
+            ui.add(
+                Button::new("Outline")
+                    .intent(Intent::Primary)
+                    .variant(Variant::Outline),
+            );
+            ui.add(
+                Button::new("Ghost")
+                    .intent(Intent::Primary)
+                    .variant(Variant::Ghost),
+            );
+        });
+
+        ui.add_space(8.0);
+        ui.heading("Sizes");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Button::new("Small").size(Size::Small));
+            ui.add(Button::new("Medium").size(Size::Medium));
+            ui.add(Button::new("Large").size(Size::Large));
+        });
+
+        ui.add_space(8.0);
+        ui.heading("Badges");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Badge::new("Neutral"));
+            ui.add(Badge::new("Primary").intent(Intent::Primary));
+            ui.add(Badge::new("Success").intent(Intent::Success));
+            ui.add(Badge::new("Warning").intent(Intent::Warning));
+            ui.add(Badge::new("Danger").intent(Intent::Danger));
+            ui.add(Badge::new("Info").intent(Intent::Info));
+            ui.add(
+                Badge::new("Outline")
+                    .intent(Intent::Primary)
+                    .variant(Variant::Outline),
+            );
+        });
+    });
+}
+
+fn show_raw_egui_controls(ui: &mut egui::Ui, search: &mut String, enabled: &mut bool) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Raw egui controls");
+        ui.horizontal(|ui| {
+            ui.label("Search");
+            ui.text_edit_singleline(search);
+        });
+        ui.checkbox(enabled, "Enabled");
+        ui.horizontal_wrapped(|ui| {
+            let _ = ui.button("egui button");
+            ui.hyperlink_to("egui link", "https://github.com/emilk/egui");
+        });
+    });
 }
