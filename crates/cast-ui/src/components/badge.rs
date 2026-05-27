@@ -54,6 +54,7 @@ impl Widget for Badge {
             egui::Button::new(
                 RichText::new(self.label)
                     .color(colors.fg)
+                    .family(theme.typography.button.family.clone())
                     .size(metrics.text_size),
             )
             .fill(colors.fill)

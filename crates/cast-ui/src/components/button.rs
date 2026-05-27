@@ -1,4 +1,4 @@
-use egui::{Align2, Color32, FontFamily, FontId, Response, Sense, StrokeKind, Ui, Widget};
+use egui::{Align2, Color32, Response, Sense, StrokeKind, Ui, Widget};
 
 use crate::{
     color::with_alpha,
@@ -104,7 +104,8 @@ impl Widget for Button {
         let style = resolve_component_style(&theme, self.intent, self.variant, self.size);
         let enabled = self.enabled && !self.loading;
         let text = self.display_label();
-        let font_id = FontId::new(style.metrics.text_size, FontFamily::Proportional);
+        let mut font_id = theme.typography.button.clone();
+        font_id.size = style.metrics.text_size;
         let galley = ui
             .painter()
             .layout_no_wrap(text.clone(), font_id.clone(), style.colors.fg);

@@ -40,6 +40,7 @@ impl Widget for Checkbox<'_> {
         let metrics = resolve_control_metrics(&theme, self.size);
         let label = RichText::new(self.label)
             .color(theme.colors.text)
+            .family(theme.typography.body.family.clone())
             .size(metrics.text_size);
 
         ui.add(egui::Checkbox::new(self.checked, label).indeterminate(self.indeterminate))

@@ -48,14 +48,15 @@ impl Widget for Alert {
             .show(ui, |ui| {
                 ui.label(
                     RichText::new(self.title)
-                        .strong()
                         .color(subtle.colors.fg)
+                        .family(theme.typography.strong.family.clone())
                         .size(theme.typography.body.size),
                 );
                 if let Some(body) = self.body {
                     ui.label(
                         RichText::new(body)
                             .color(theme.colors.text_muted)
+                            .family(theme.typography.small.family.clone())
                             .size(theme.typography.small.size),
                     );
                 }

@@ -1,8 +1,19 @@
-use egui::{Color32, Context, FontFamily, FontId, Stroke, Style, TextStyle, Ui, Vec2, Visuals};
+use std::sync::Arc;
+
+use egui::{
+    Color32, Context, FontData, FontDefinitions, FontFamily, FontId, Stroke, Style, TextStyle, Ui,
+    Vec2, Visuals,
+};
 
 use crate::color::{accessible_foreground, mix_oklch, with_alpha};
 
 const THEME_ID: &str = "cast_theme";
+const INTER_REGULAR_FONT: &str = "cast_inter_regular";
+const INTER_MEDIUM_FONT: &str = "cast_inter_medium";
+const INTER_SEMIBOLD_FONT: &str = "cast_inter_semibold";
+const INTER_REGULAR_FAMILY: &str = "Cast Inter";
+const INTER_MEDIUM_FAMILY: &str = "Cast Inter Medium";
+const INTER_SEMIBOLD_FAMILY: &str = "Cast Inter SemiBold";
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -114,6 +125,12 @@ impl ThemeSeed {
     }
 
     #[must_use]
+    pub fn with_typography(mut self, typography: TypographyTokens) -> Self {
+        self.typography = typography;
+        self
+    }
+
+    #[must_use]
     pub fn with_reduced_motion(mut self, reduced_motion: bool) -> Self {
         self.animation.reduced_motion = reduced_motion;
         self
@@ -210,7 +227,7 @@ impl CastTheme {
             .insert(TextStyle::Body, self.typography.body.clone());
         style
             .text_styles
-            .insert(TextStyle::Button, self.typography.body.clone());
+            .insert(TextStyle::Button, self.typography.button.clone());
         style
             .text_styles
             .insert(TextStyle::Small, self.typography.small.clone());
@@ -274,6 +291,65 @@ pub fn set_theme(ctx: &Context, theme: CastTheme) {
 
 pub fn apply_theme(ctx: &Context, theme: &CastTheme) {
     ctx.set_global_style(theme.to_egui_style());
+}
+
+pub fn install_inter_fonts(ctx: &Context) {
+    let mut fonts = FontDefinitions::default();
+    insert_font(
+        &mut fonts,
+        INTER_REGULAR_FONT,
+        include_bytes!("../../assets/fonts/inter/Inter-Regular.ttf"),
+    );
+    insert_font(
+        &mut fonts,
+        INTER_MEDIUM_FONT,
+        include_bytes!("../../assets/fonts/inter/Inter-Medium.ttf"),
+    );
+    insert_font(
+        &mut fonts,
+        INTER_SEMIBOLD_FONT,
+        include_bytes!("../../assets/fonts/inter/Inter-SemiBold.ttf"),
+    );
+
+    prepend_family_font(&mut fonts, FontFamily::Proportional, INTER_REGULAR_FONT);
+    set_named_family(
+        &mut fonts,
+        INTER_REGULAR_FAMILY,
+        &[INTER_REGULAR_FONT, INTER_MEDIUM_FONT, INTER_SEMIBOLD_FONT],
+    );
+    set_named_family(
+        &mut fonts,
+        INTER_MEDIUM_FAMILY,
+        &[INTER_MEDIUM_FONT, INTER_REGULAR_FONT, INTER_SEMIBOLD_FONT],
+    );
+    set_named_family(
+        &mut fonts,
+        INTER_SEMIBOLD_FAMILY,
+        &[INTER_SEMIBOLD_FONT, INTER_MEDIUM_FONT, INTER_REGULAR_FONT],
+    );
+
+    ctx.set_fonts(fonts);
+}
+
+fn insert_font(fonts: &mut FontDefinitions, name: &str, bytes: &'static [u8]) {
+    fonts
+        .font_data
+        .insert(name.to_owned(), Arc::new(FontData::from_static(bytes)));
+}
+
+fn prepend_family_font(fonts: &mut FontDefinitions, family: FontFamily, name: &str) {
+    fonts
+        .families
+        .entry(family)
+        .or_default()
+        .insert(0, name.to_owned());
+}
+
+fn set_named_family(fonts: &mut FontDefinitions, family: &'static str, names: &[&str]) {
+    fonts.families.insert(
+        FontFamily::Name(Arc::from(family)),
+        names.iter().map(|name| (*name).to_owned()).collect(),
+    );
 }
 
 #[must_use]
@@ -948,16 +1024,45 @@ pub struct TypographyTokens {
     pub body: FontId,
     pub small: FontId,
     pub heading: FontId,
+    pub button: FontId,
+    pub strong: FontId,
+}
+
+impl TypographyTokens {
+    #[must_use]
+    pub fn inter() -> Self {
+        Self {
+            body: FontId::new(14.0, inter_regular_family()),
+            small: FontId::new(12.0, inter_regular_family()),
+            heading: FontId::new(20.0, inter_semibold_family()),
+            button: FontId::new(14.0, inter_medium_family()),
+            strong: FontId::new(14.0, inter_semibold_family()),
+        }
+    }
 }
 
 impl Default for TypographyTokens {
     fn default() -> Self {
         Self {
-            body: FontId::new(15.0, FontFamily::Proportional),
-            small: FontId::new(13.0, FontFamily::Proportional),
-            heading: FontId::new(22.0, FontFamily::Proportional),
+            body: FontId::new(14.0, FontFamily::Proportional),
+            small: FontId::new(12.0, FontFamily::Proportional),
+            heading: FontId::new(20.0, FontFamily::Proportional),
+            button: FontId::new(14.0, FontFamily::Proportional),
+            strong: FontId::new(14.0, FontFamily::Proportional),
         }
     }
+}
+
+fn inter_regular_family() -> FontFamily {
+    FontFamily::Name(Arc::from(INTER_REGULAR_FAMILY))
+}
+
+fn inter_medium_family() -> FontFamily {
+    FontFamily::Name(Arc::from(INTER_MEDIUM_FAMILY))
+}
+
+fn inter_semibold_family() -> FontFamily {
+    FontFamily::Name(Arc::from(INTER_SEMIBOLD_FAMILY))
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -1090,7 +1195,10 @@ mod tests {
         assert_eq!(style.visuals.panel_fill, theme.colors.background);
         assert_eq!(style.visuals.hyperlink_color, theme.colors.link);
         assert_eq!(style.text_styles[&TextStyle::Body], theme.typography.body);
-        assert_eq!(style.text_styles[&TextStyle::Button], theme.typography.body);
+        assert_eq!(
+            style.text_styles[&TextStyle::Button],
+            theme.typography.button
+        );
     }
 
     #[test]
@@ -1200,6 +1308,15 @@ mod tests {
         assert_eq!(theme.radius.sm, 7.0);
         assert_eq!(theme.radius.lg, 11.0);
         assert!(!theme.animation.should_animate());
+    }
+
+    #[test]
+    fn inter_typography_uses_distinct_weight_families() {
+        let typography = TypographyTokens::inter();
+
+        assert_ne!(typography.body.family, typography.button.family);
+        assert_ne!(typography.button.family, typography.heading.family);
+        assert_eq!(typography.body.size, 14.0);
     }
 
     #[test]

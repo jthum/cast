@@ -12,6 +12,7 @@ fn main() -> eframe::Result {
         "Cast Gallery",
         native_options,
         Box::new(|cc| {
+            cast::install_inter_fonts(&cc.egui_ctx);
             let app = CastGallery::new();
             cast::set_theme(&cc.egui_ctx, app.theme.clone());
             Ok(Box::new(app))
@@ -33,7 +34,7 @@ struct CastGallery {
 impl CastGallery {
     fn new() -> Self {
         let mode = ThemeMode::Light;
-        let seed = ThemeSeed::for_mode(mode);
+        let seed = ThemeSeed::for_mode(mode).with_typography(cast::TypographyTokens::inter());
         let theme = seed.clone().resolve();
 
         Self {
@@ -247,6 +248,8 @@ fn show_token_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
     if typography_changed {
         seed.typography.small.size = seed.typography.body.size - 2.0;
         seed.typography.heading.size = seed.typography.body.size + 7.0;
+        seed.typography.button.size = seed.typography.body.size;
+        seed.typography.strong.size = seed.typography.body.size;
     }
     let controls_changed = theme_slider(ui, "Control", &mut seed.controls.min_height, 26.0..=44.0);
     changed |= controls_changed;

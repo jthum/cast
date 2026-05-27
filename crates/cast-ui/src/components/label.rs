@@ -45,6 +45,7 @@ impl Widget for Label {
         ui.label(
             RichText::new(self.text)
                 .color(color)
+                .family(theme.typography.body.family.clone())
                 .size(metrics.text_size),
         )
     }

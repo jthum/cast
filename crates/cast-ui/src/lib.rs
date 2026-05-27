@@ -19,5 +19,5 @@ pub use theme::{
     ControlTokens, ElevationTokens, FeedbackTokenOverrides, FeedbackTokens, FocusTokens,
     InputTokenOverrides, InputTokens, RadiusTokens, SemanticColorTokens, SpacingTokens,
     StrokeTokens, SurfaceTokenOverrides, SurfaceTokens, ThemeMode, ThemeSeed, TypographyTokens,
-    apply_theme, set_theme, theme_for_ui,
+    apply_theme, install_inter_fonts, set_theme, theme_for_ui,
 };

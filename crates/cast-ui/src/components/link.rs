@@ -38,6 +38,7 @@ impl Widget for Link {
         let metrics = resolve_control_metrics(&theme, self.size);
         let text = RichText::new(self.label)
             .color(theme.colors.link)
+            .family(theme.typography.body.family.clone())
             .size(metrics.text_size);
 
         if let Some(url) = self.url {
