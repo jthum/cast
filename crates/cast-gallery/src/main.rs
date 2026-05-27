@@ -2,7 +2,10 @@ use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link, Notice,
     Panel as CastPanel, SearchInput, SemanticColorTokens, Separator, Size, Switch, TextInput,
     ThemeMode, ThemeSeed, Variant,
-    egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
+    egui::{
+        self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
+        scroll_area::ScrollBarVisibility,
+    },
 };
 
 fn main() -> eframe::Result {
@@ -90,46 +93,58 @@ impl eframe::App for CastGallery {
             .resizable(false)
             .default_size(220.0)
             .show_inside(ui, |ui| {
-                ui.heading("Components");
-                ui.separator();
-                ui.label("Foundation");
-                ui.label("Button");
-                ui.label("Badge");
-                ui.label("Card");
-                ui.label("Inputs");
-                ui.separator();
-                if show_theme_editor(ui, &mut self.seed) {
-                    self.apply_theme(&ctx);
-                }
+                ScrollArea::vertical()
+                    .id_salt("sidebar_scroll")
+                    .scroll_bar_visibility(ScrollBarVisibility::VisibleWhenNeeded)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.heading("Components");
+                        ui.separator();
+                        ui.label("Foundation");
+                        ui.label("Button");
+                        ui.label("Badge");
+                        ui.label("Card");
+                        ui.label("Inputs");
+                        ui.separator();
+                        if show_theme_editor(ui, &mut self.seed) {
+                            self.apply_theme(&ctx);
+                        }
+                    });
             });
 
         CentralPanel::default().show_inside(ui, |ui| {
-            ui.heading(RichText::new("Foundations").size(24.0));
-            ui.label("Runtime theme switching, live palette editing, semantic tokens, and initial primitives.");
-            ui.add_space(12.0);
+            ScrollArea::vertical()
+                .id_salt("main_scroll")
+                .scroll_bar_visibility(ScrollBarVisibility::VisibleWhenNeeded)
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.heading(RichText::new("Foundations").size(24.0));
+                    ui.label("Runtime theme switching, live palette editing, semantic tokens, and initial primitives.");
+                    ui.add_space(12.0);
 
-            show_theme_foundation(ui);
-            ui.add_space(12.0);
-            show_palette_preview(ui, &self.theme);
-            ui.add_space(12.0);
-            show_override_preview(ui);
-            ui.add_space(12.0);
-            show_buttons_and_badges(ui);
-            ui.add_space(12.0);
-            show_surfaces(ui);
-            ui.add_space(12.0);
-            show_text_and_feedback(ui);
-            ui.add_space(12.0);
-            show_forms(
-                ui,
-                &mut self.search,
-                &mut self.name,
-                &mut self.enabled,
-                &mut self.notifications,
-                &mut self.indeterminate,
-            );
-            ui.add_space(12.0);
-            show_raw_egui_controls(ui, &mut self.search, &mut self.enabled);
+                    show_theme_foundation(ui);
+                    ui.add_space(12.0);
+                    show_palette_preview(ui, &self.theme);
+                    ui.add_space(12.0);
+                    show_override_preview(ui);
+                    ui.add_space(12.0);
+                    show_buttons_and_badges(ui);
+                    ui.add_space(12.0);
+                    show_surfaces(ui);
+                    ui.add_space(12.0);
+                    show_text_and_feedback(ui);
+                    ui.add_space(12.0);
+                    show_forms(
+                        ui,
+                        &mut self.search,
+                        &mut self.name,
+                        &mut self.enabled,
+                        &mut self.notifications,
+                        &mut self.indeterminate,
+                    );
+                    ui.add_space(12.0);
+                    show_raw_egui_controls(ui, &mut self.search, &mut self.enabled);
+                });
         });
     }
 }
