@@ -90,6 +90,77 @@ impl ThemeSeed {
     }
 
     #[must_use]
+    pub fn with_mode(mut self, mode: ThemeMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    #[must_use]
+    pub fn with_palette(mut self, palette: CastPaletteInput) -> Self {
+        self.palette = palette;
+        self
+    }
+
+    #[must_use]
+    pub fn with_primary(mut self, primary: Color32) -> Self {
+        self.palette.primary = primary;
+        self
+    }
+
+    #[must_use]
+    pub fn with_component_overrides(mut self, overrides: ComponentTokenOverrides) -> Self {
+        self.component_overrides = overrides;
+        self
+    }
+
+    #[must_use]
+    pub fn with_reduced_motion(mut self, reduced_motion: bool) -> Self {
+        self.animation.reduced_motion = reduced_motion;
+        self
+    }
+
+    #[must_use]
+    pub fn with_animation_enabled(mut self, enabled: bool) -> Self {
+        self.animation.enabled = enabled;
+        self
+    }
+
+    #[must_use]
+    pub fn with_duration_scale(mut self, duration_scale: f32) -> Self {
+        self.animation.duration_scale = duration_scale.max(0.0);
+        self
+    }
+
+    #[must_use]
+    pub fn with_density(mut self, min_height: f32, spacing: f32) -> Self {
+        self.set_density(min_height, spacing);
+        self
+    }
+
+    pub fn set_density(&mut self, min_height: f32, spacing: f32) {
+        self.controls.min_height = min_height;
+        self.controls.padding_x = min_height * 0.375;
+        self.controls.padding_y = min_height * 0.22;
+        self.spacing.md = spacing;
+        self.spacing.xs = spacing / 3.0;
+        self.spacing.sm = spacing * 2.0 / 3.0;
+        self.spacing.lg = spacing * 4.0 / 3.0;
+        self.spacing.xl = spacing * 2.0;
+    }
+
+    #[must_use]
+    pub fn with_radius(mut self, radius: f32) -> Self {
+        self.set_radius(radius);
+        self
+    }
+
+    pub fn set_radius(&mut self, radius: f32) {
+        self.radius.md = radius;
+        self.radius.sm = (radius - 2.0).max(0.0);
+        self.radius.lg = radius + 2.0;
+    }
+
+    #[must_use]
     pub fn resolve(self) -> CastTheme {
         let colors = ColorTokens::from_palette(self.mode, &self.palette);
         let mut components = ComponentTokens::derive(
@@ -502,15 +573,21 @@ pub struct ComponentTokens {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ComponentTokenOverrides {
     pub button: ButtonTokenOverrides,
+    pub badge: BadgeTokenOverrides,
     pub input: InputTokenOverrides,
     pub card: SurfaceTokenOverrides,
+    pub panel: SurfaceTokenOverrides,
+    pub alert: FeedbackTokenOverrides,
 }
 
 impl ComponentTokenOverrides {
     pub fn apply_to(&self, components: &mut ComponentTokens) {
         self.button.apply_to(&mut components.button);
+        self.badge.apply_to(&mut components.badge);
         self.input.apply_to(&mut components.input);
         self.card.apply_to(&mut components.card);
+        self.panel.apply_to(&mut components.panel);
+        self.alert.apply_to(&mut components.alert);
     }
 
     #[must_use]
@@ -531,6 +608,36 @@ pub struct ButtonTokenOverrides {
 
 impl ButtonTokenOverrides {
     fn apply_to(&self, tokens: &mut ButtonTokens) {
+        if let Some(value) = self.radius {
+            tokens.radius = value;
+        }
+        if let Some(value) = self.border_width {
+            tokens.border_width = value;
+        }
+        if let Some(value) = self.padding_x {
+            tokens.padding_x = value;
+        }
+        if let Some(value) = self.padding_y {
+            tokens.padding_y = value;
+        }
+        if let Some(value) = self.min_height {
+            tokens.min_height = value;
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct BadgeTokenOverrides {
+    pub radius: Option<f32>,
+    pub border_width: Option<f32>,
+    pub padding_x: Option<f32>,
+    pub padding_y: Option<f32>,
+    pub min_height: Option<f32>,
+}
+
+impl BadgeTokenOverrides {
+    fn apply_to(&self, tokens: &mut BadgeTokens) {
         if let Some(value) = self.radius {
             tokens.radius = value;
         }
@@ -572,6 +679,28 @@ impl SurfaceTokenOverrides {
         }
         if let Some(value) = self.radius {
             tokens.radius = value;
+        }
+        if let Some(value) = self.padding {
+            tokens.padding = value;
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct FeedbackTokenOverrides {
+    pub radius: Option<f32>,
+    pub border_width: Option<f32>,
+    pub padding: Option<f32>,
+}
+
+impl FeedbackTokenOverrides {
+    fn apply_to(&self, tokens: &mut FeedbackTokens) {
+        if let Some(value) = self.radius {
+            tokens.radius = value;
+        }
+        if let Some(value) = self.border_width {
+            tokens.border_width = value;
         }
         if let Some(value) = self.padding {
             tokens.padding = value;
@@ -1025,15 +1154,38 @@ mod tests {
         let mut seed = ThemeSeed::for_mode(ThemeMode::Light);
         seed.radius.md = 10.0;
         seed.component_overrides.button.radius = Some(14.0);
+        seed.component_overrides.badge.min_height = Some(18.0);
         seed.component_overrides.input.min_height = Some(42.0);
         seed.component_overrides.card.padding = Some(22.0);
+        seed.component_overrides.panel.radius = Some(16.0);
+        seed.component_overrides.alert.padding = Some(20.0);
 
         let theme = seed.resolve();
 
         assert_eq!(theme.components.button.radius, 14.0);
+        assert_eq!(theme.components.badge.min_height, 18.0);
         assert_eq!(theme.components.input.min_height, 42.0);
         assert_eq!(theme.components.card.padding, 22.0);
+        assert_eq!(theme.components.panel.radius, 16.0);
+        assert_eq!(theme.components.alert.padding, 20.0);
         assert_eq!(theme.radius.md, 10.0);
+    }
+
+    #[test]
+    fn theme_seed_helpers_update_related_tokens() {
+        let theme = ThemeSeed::for_mode(ThemeMode::Light)
+            .with_density(40.0, 15.0)
+            .with_radius(9.0)
+            .with_reduced_motion(true)
+            .resolve();
+
+        assert_eq!(theme.controls.min_height, 40.0);
+        assert_eq!(theme.controls.padding_x, 15.0);
+        assert_eq!(theme.spacing.md, 15.0);
+        assert_eq!(theme.spacing.lg, 20.0);
+        assert_eq!(theme.radius.sm, 7.0);
+        assert_eq!(theme.radius.lg, 11.0);
+        assert!(!theme.animation.should_animate());
     }
 
     #[test]
