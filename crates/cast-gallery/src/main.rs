@@ -124,6 +124,38 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
     let mut changed = false;
     ui.heading("Theme");
 
+    egui::CollapsingHeader::new("Palette")
+        .default_open(true)
+        .show(ui, |ui| changed |= show_palette_editor(ui, seed));
+    egui::CollapsingHeader::new("Tokens")
+        .default_open(true)
+        .show(ui, |ui| changed |= show_token_editor(ui, seed));
+    egui::CollapsingHeader::new("Motion")
+        .default_open(false)
+        .show(ui, |ui| changed |= show_motion_editor(ui, seed));
+    egui::CollapsingHeader::new("Presets")
+        .default_open(false)
+        .show(ui, |ui| changed |= show_preset_editor(ui, seed));
+    egui::CollapsingHeader::new("Overrides")
+        .default_open(false)
+        .show(ui, |ui| changed |= show_override_editor(ui, seed));
+
+    ui.horizontal(|ui| {
+        if ui.button("Reset").clicked() {
+            *seed = ThemeSeed::for_mode(seed.mode);
+            changed = true;
+        }
+        if ui.button("Primary only").clicked() {
+            seed.palette = CastPaletteInput::from_primary(seed.palette.primary);
+            changed = true;
+        }
+    });
+
+    changed
+}
+
+fn show_palette_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
+    let mut changed = false;
     changed |= color_row(ui, "Primary", &mut seed.palette.primary);
     changed |= optional_color_row(
         ui,
@@ -173,8 +205,11 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
             .info
             .unwrap_or(Color32::from_rgb(8, 145, 178)),
     );
+    changed
+}
 
-    ui.separator();
+fn show_token_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
+    let mut changed = false;
     let spacing_changed = theme_slider(ui, "Spacing", &mut seed.spacing.md, 8.0..=20.0);
     changed |= spacing_changed;
     if spacing_changed {
@@ -186,8 +221,7 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
     let radius_changed = theme_slider(ui, "Radius", &mut seed.radius.md, 0.0..=16.0);
     changed |= radius_changed;
     if radius_changed {
-        seed.radius.sm = (seed.radius.md - 2.0).max(0.0);
-        seed.radius.lg = seed.radius.md + 2.0;
+        seed.set_radius(seed.radius.md);
     }
     let stroke_changed = theme_slider(ui, "Border", &mut seed.stroke.sm, 0.0..=3.0);
     changed |= stroke_changed;
@@ -204,12 +238,13 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
     let controls_changed = theme_slider(ui, "Control", &mut seed.controls.min_height, 26.0..=44.0);
     changed |= controls_changed;
     if controls_changed {
-        seed.controls.padding_x = seed.controls.min_height * 0.375;
-        seed.controls.padding_y = seed.controls.min_height * 0.22;
+        seed.set_density(seed.controls.min_height, seed.spacing.md);
     }
+    changed
+}
 
-    ui.separator();
-    ui.heading("Motion");
+fn show_motion_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
+    let mut changed = false;
     changed |= ui
         .checkbox(&mut seed.animation.enabled, "Animations")
         .changed();
@@ -222,30 +257,34 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
         &mut seed.animation.duration_scale,
         0.0..=2.0,
     );
+    changed
+}
 
-    ui.separator();
-    ui.heading("Presets");
+fn show_preset_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
+    let mut changed = false;
     ui.horizontal_wrapped(|ui| {
         if ui.button("Compact").clicked() {
-            apply_density(seed, 28.0, 10.0);
+            seed.set_density(28.0, 10.0);
             changed = true;
         }
         if ui.button("Comfortable").clicked() {
-            apply_density(seed, 36.0, 14.0);
+            seed.set_density(36.0, 14.0);
             changed = true;
         }
         if ui.button("Sharp").clicked() {
-            apply_radius(seed, 2.0);
+            seed.set_radius(2.0);
             changed = true;
         }
         if ui.button("Soft").clicked() {
-            apply_radius(seed, 10.0);
+            seed.set_radius(10.0);
             changed = true;
         }
     });
+    changed
+}
 
-    ui.separator();
-    ui.heading("Overrides");
+fn show_override_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
+    let mut changed = false;
     changed |= optional_theme_slider(
         ui,
         "Button radius",
@@ -259,6 +298,13 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
         &mut seed.component_overrides.button.border_width,
         seed.stroke.sm,
         0.0..=4.0,
+    );
+    changed |= optional_theme_slider(
+        ui,
+        "Badge height",
+        &mut seed.component_overrides.badge.min_height,
+        seed.controls.min_height - 6.0,
+        16.0..=44.0,
     );
     changed |= optional_theme_slider(
         ui,
@@ -288,40 +334,25 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
         seed.radius.lg,
         0.0..=24.0,
     );
+    changed |= optional_theme_slider(
+        ui,
+        "Panel padding",
+        &mut seed.component_overrides.panel.padding,
+        seed.spacing.lg,
+        8.0..=32.0,
+    );
+    changed |= optional_theme_slider(
+        ui,
+        "Alert padding",
+        &mut seed.component_overrides.alert.padding,
+        seed.spacing.md,
+        8.0..=32.0,
+    );
     if !seed.component_overrides.is_empty() && ui.button("Clear overrides").clicked() {
         seed.component_overrides = Default::default();
         changed = true;
     }
-
-    ui.horizontal(|ui| {
-        if ui.button("Reset").clicked() {
-            *seed = ThemeSeed::for_mode(seed.mode);
-            changed = true;
-        }
-        if ui.button("Primary only").clicked() {
-            seed.palette = CastPaletteInput::from_primary(seed.palette.primary);
-            changed = true;
-        }
-    });
-
     changed
-}
-
-fn apply_density(seed: &mut ThemeSeed, min_height: f32, spacing: f32) {
-    seed.controls.min_height = min_height;
-    seed.controls.padding_x = min_height * 0.375;
-    seed.controls.padding_y = min_height * 0.22;
-    seed.spacing.md = spacing;
-    seed.spacing.xs = spacing / 3.0;
-    seed.spacing.sm = spacing * 2.0 / 3.0;
-    seed.spacing.lg = spacing * 4.0 / 3.0;
-    seed.spacing.xl = spacing * 2.0;
-}
-
-fn apply_radius(seed: &mut ThemeSeed, radius: f32) {
-    seed.radius.md = radius;
-    seed.radius.sm = (radius - 2.0).max(0.0);
-    seed.radius.lg = radius + 2.0;
 }
 
 fn theme_slider(
