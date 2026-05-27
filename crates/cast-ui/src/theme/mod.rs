@@ -17,6 +17,7 @@ pub struct CastTheme {
     pub mode: ThemeMode,
     pub palette: CastPaletteInput,
     pub colors: ColorTokens,
+    pub components: ComponentTokens,
     pub spacing: SpacingTokens,
     pub radius: RadiusTokens,
     pub stroke: StrokeTokens,
@@ -47,6 +48,12 @@ impl CastTheme {
     #[must_use]
     pub fn from_palette(mode: ThemeMode, palette: CastPaletteInput) -> Self {
         let colors = ColorTokens::from_palette(mode, &palette);
+        let spacing = SpacingTokens::default();
+        let radius = RadiusTokens::default();
+        let stroke = StrokeTokens::default();
+        let typography = TypographyTokens::default();
+        let controls = ControlTokens::default();
+        let components = ComponentTokens::derive(&colors, &spacing, &radius, &stroke, &controls);
         let focus = FocusTokens {
             width: 2.0,
             color: colors.focus,
@@ -56,11 +63,12 @@ impl CastTheme {
             mode,
             palette,
             colors,
-            spacing: SpacingTokens::default(),
-            radius: RadiusTokens::default(),
-            stroke: StrokeTokens::default(),
-            typography: TypographyTokens::default(),
-            controls: ControlTokens::default(),
+            components,
+            spacing,
+            radius,
+            stroke,
+            typography,
+            controls,
             focus,
             elevation: ElevationTokens::default(),
             animation: AnimationTokens::default(),
@@ -431,6 +439,129 @@ impl SemanticColorTokens {
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug)]
+pub struct ComponentTokens {
+    pub button: ButtonTokens,
+    pub badge: BadgeTokens,
+    pub card: SurfaceTokens,
+    pub panel: SurfaceTokens,
+    pub input: InputTokens,
+    pub alert: FeedbackTokens,
+}
+
+impl ComponentTokens {
+    #[must_use]
+    pub fn derive(
+        colors: &ColorTokens,
+        spacing: &SpacingTokens,
+        radius: &RadiusTokens,
+        stroke: &StrokeTokens,
+        controls: &ControlTokens,
+    ) -> Self {
+        Self {
+            button: ButtonTokens {
+                radius: radius.md,
+                border_width: stroke.sm,
+                padding_x: controls.padding_x,
+                padding_y: controls.padding_y,
+                min_height: controls.min_height,
+            },
+            badge: BadgeTokens {
+                radius: radius.full,
+                border_width: stroke.sm,
+                padding_x: spacing.sm,
+                padding_y: spacing.xs,
+                min_height: controls.min_height - 6.0,
+            },
+            card: SurfaceTokens {
+                fill: colors.surface,
+                border: colors.border,
+                border_width: stroke.sm,
+                radius: radius.lg,
+                padding: spacing.lg,
+            },
+            panel: SurfaceTokens {
+                fill: colors.surface_raised,
+                border: colors.border,
+                border_width: stroke.sm,
+                radius: radius.lg,
+                padding: spacing.lg,
+            },
+            input: InputTokens {
+                fill: colors.surface,
+                fg: colors.text,
+                border: colors.border,
+                focus_border: colors.focus,
+                placeholder: colors.text_subtle,
+                border_width: stroke.sm,
+                radius: radius.md,
+                padding_x: controls.padding_x,
+                padding_y: controls.padding_y,
+                min_height: controls.min_height,
+            },
+            alert: FeedbackTokens {
+                radius: radius.lg,
+                border_width: stroke.sm,
+                padding: spacing.md,
+            },
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ButtonTokens {
+    pub radius: f32,
+    pub border_width: f32,
+    pub padding_x: f32,
+    pub padding_y: f32,
+    pub min_height: f32,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BadgeTokens {
+    pub radius: f32,
+    pub border_width: f32,
+    pub padding_x: f32,
+    pub padding_y: f32,
+    pub min_height: f32,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SurfaceTokens {
+    pub fill: Color32,
+    pub border: Color32,
+    pub border_width: f32,
+    pub radius: f32,
+    pub padding: f32,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InputTokens {
+    pub fill: Color32,
+    pub fg: Color32,
+    pub border: Color32,
+    pub focus_border: Color32,
+    pub placeholder: Color32,
+    pub border_width: f32,
+    pub radius: f32,
+    pub padding_x: f32,
+    pub padding_y: f32,
+    pub min_height: f32,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FeedbackTokens {
+    pub radius: f32,
+    pub border_width: f32,
+    pub padding: f32,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Debug)]
 pub struct SpacingTokens {
     pub xs: f32,
     pub sm: f32,
@@ -646,5 +777,16 @@ mod tests {
         assert_eq!(family.fg, theme.colors.primary_fg);
         assert_ne!(family.subtle, family.base);
         assert_ne!(family.hover, family.active);
+    }
+
+    #[test]
+    fn component_tokens_follow_global_tokens() {
+        let theme = CastTheme::light();
+
+        assert_eq!(theme.components.card.fill, theme.colors.surface);
+        assert_eq!(theme.components.card.border, theme.colors.border);
+        assert_eq!(theme.components.panel.fill, theme.colors.surface_raised);
+        assert_eq!(theme.components.input.fg, theme.colors.text);
+        assert_eq!(theme.components.input.focus_border, theme.colors.focus);
     }
 }

@@ -2,7 +2,7 @@ use egui::{Response, RichText, Ui, Widget};
 
 use crate::{
     foundation::{Intent, Size, Variant},
-    style::resolve_component_style,
+    style::{resolve_badge_metrics, resolve_intent_colors},
     theme::theme_for_ui,
 };
 
@@ -47,19 +47,23 @@ impl Badge {
 impl Widget for Badge {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
-        let style = resolve_component_style(&theme, self.intent, self.variant, self.size);
+        let colors = resolve_intent_colors(&theme, self.intent, self.variant);
+        let metrics = resolve_badge_metrics(&theme, self.size);
 
         ui.add(
             egui::Button::new(
                 RichText::new(self.label)
-                    .color(style.colors.fg)
-                    .size(style.metrics.text_size),
+                    .color(colors.fg)
+                    .size(metrics.text_size),
             )
-            .fill(style.colors.fill)
-            .stroke(style.stroke)
+            .fill(colors.fill)
+            .stroke(egui::Stroke::new(
+                theme.components.badge.border_width,
+                colors.border,
+            ))
             .min_size(egui::vec2(
-                style.metrics.padding.x * 2.0,
-                style.metrics.min_height.max(style.metrics.padding.y * 2.0),
+                metrics.padding.x * 2.0,
+                metrics.min_height.max(metrics.padding.y * 2.0),
             ))
             .small(),
         )

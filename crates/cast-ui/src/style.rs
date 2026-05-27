@@ -2,7 +2,7 @@ use egui::{Color32, Margin, Stroke, Vec2};
 
 use crate::{
     foundation::{Intent, Size, Variant},
-    theme::{CastTheme, SemanticColorTokens},
+    theme::{ButtonTokens, CastTheme, SemanticColorTokens},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -80,19 +80,50 @@ fn semantic_intent_colors(family: SemanticColorTokens, variant: Variant) -> Inte
 }
 
 pub(crate) fn resolve_control_metrics(theme: &CastTheme, size: Size) -> ControlMetrics {
+    button_metrics(theme.components.button, theme, size)
+}
+
+pub(crate) fn resolve_badge_metrics(theme: &CastTheme, size: Size) -> ControlMetrics {
+    let base = theme.components.badge;
+    let metrics = match size {
+        Size::Small => (
+            base.min_height,
+            Vec2::new(base.padding_x, base.padding_y),
+            theme.typography.small.size,
+        ),
+        Size::Medium => (
+            theme.controls.min_height,
+            Vec2::new(theme.controls.padding_x, theme.controls.padding_y),
+            theme.typography.body.size,
+        ),
+        Size::Large => (
+            theme.controls.min_height + 8.0,
+            Vec2::new(theme.spacing.lg, theme.spacing.sm),
+            theme.typography.body.size + 1.0,
+        ),
+    };
+
+    ControlMetrics {
+        min_height: metrics.0,
+        padding: metrics.1,
+        text_size: metrics.2,
+    }
+}
+
+fn button_metrics(tokens: ButtonTokens, theme: &CastTheme, size: Size) -> ControlMetrics {
     match size {
         Size::Small => ControlMetrics {
-            min_height: theme.controls.min_height - 6.0,
+            min_height: tokens.min_height - 6.0,
             padding: Vec2::new(theme.spacing.sm, theme.spacing.xs),
             text_size: theme.typography.small.size,
         },
         Size::Medium => ControlMetrics {
-            min_height: theme.controls.min_height,
-            padding: Vec2::new(theme.controls.padding_x, theme.controls.padding_y),
+            min_height: tokens.min_height,
+            padding: Vec2::new(tokens.padding_x, tokens.padding_y),
             text_size: theme.typography.body.size,
         },
         Size::Large => ControlMetrics {
-            min_height: theme.controls.min_height + 8.0,
+            min_height: tokens.min_height + 8.0,
             padding: Vec2::new(theme.spacing.lg, theme.spacing.sm),
             text_size: theme.typography.body.size + 1.0,
         },
@@ -100,19 +131,32 @@ pub(crate) fn resolve_control_metrics(theme: &CastTheme, size: Size) -> ControlM
 }
 
 pub(crate) fn card_frame(theme: &CastTheme) -> egui::Frame {
+    let tokens = theme.components.card;
     egui::Frame::new()
-        .fill(theme.colors.surface)
-        .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
-        .inner_margin(Margin::same(theme.spacing.lg as i8))
+        .fill(tokens.fill)
+        .stroke(Stroke::new(tokens.border_width, tokens.border))
+        .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
+        .inner_margin(Margin::same(tokens.padding as i8))
+}
+
+pub(crate) fn panel_frame(theme: &CastTheme) -> egui::Frame {
+    let tokens = theme.components.panel;
+    egui::Frame::new()
+        .fill(tokens.fill)
+        .stroke(Stroke::new(tokens.border_width, tokens.border))
+        .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
+        .inner_margin(Margin::same(tokens.padding as i8))
 }
 
 pub(crate) fn input_frame(theme: &CastTheme) -> egui::Frame {
+    let tokens = theme.components.input;
     egui::Frame::new()
-        .fill(theme.colors.surface)
-        .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
+        .fill(tokens.fill)
+        .stroke(Stroke::new(tokens.border_width, tokens.border))
+        .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
         .inner_margin(Margin::symmetric(
-            theme.controls.padding_x as i8,
-            theme.controls.padding_y as i8,
+            tokens.padding_x as i8,
+            tokens.padding_y as i8,
         ))
 }
 
@@ -186,5 +230,15 @@ mod tests {
 
         assert!(small.min_height < medium.min_height);
         assert!(medium.min_height < large.min_height);
+    }
+
+    #[test]
+    fn badge_metrics_use_badge_tokens_for_small_size() {
+        let theme = CastTheme::light();
+        let metrics = resolve_badge_metrics(&theme, Size::Small);
+
+        assert_eq!(metrics.min_height, theme.components.badge.min_height);
+        assert_eq!(metrics.padding.x, theme.components.badge.padding_x);
+        assert_eq!(metrics.padding.y, theme.components.badge.padding_y);
     }
 }

@@ -1,6 +1,6 @@
 use egui::{InnerResponse, Ui};
 
-use crate::{style::card_frame, theme::theme_for_ui};
+use crate::{style::panel_frame, theme::theme_for_ui};
 
 #[derive(Clone, Debug, Default)]
 pub struct Panel;
@@ -14,8 +14,6 @@ impl Panel {
     pub fn show<R>(self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
         let theme = theme_for_ui(ui);
 
-        card_frame(&theme)
-            .fill(theme.colors.surface_raised)
-            .show(ui, add_contents)
+        panel_frame(&theme).show(ui, add_contents)
     }
 }

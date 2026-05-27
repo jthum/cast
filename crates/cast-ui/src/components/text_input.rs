@@ -50,8 +50,11 @@ impl Widget for TextInput<'_> {
         let metrics = resolve_control_metrics(&theme, self.size);
         let mut edit = TextEdit::singleline(self.text)
             .frame(input_frame(&theme))
-            .min_size(egui::vec2(0.0, metrics.min_height))
-            .text_color(theme.colors.text);
+            .min_size(egui::vec2(
+                0.0,
+                metrics.min_height.max(theme.components.input.min_height),
+            ))
+            .text_color(theme.components.input.fg);
 
         if let Some(hint_text) = self.hint_text {
             edit = edit.hint_text(hint_text);
