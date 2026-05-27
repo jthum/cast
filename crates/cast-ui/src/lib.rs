@@ -5,7 +5,9 @@ pub mod foundation;
 mod style;
 pub mod theme;
 
-pub use components::{Badge, Button, Card};
+pub use components::{
+    Badge, Button, Card, Checkbox, Panel, SearchInput, Separator, Switch, TextInput,
+};
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};
 pub use theme::{

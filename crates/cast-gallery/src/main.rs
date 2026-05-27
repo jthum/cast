@@ -1,6 +1,7 @@
 use cast::{
-    Badge, Button, Card, CastTheme, Intent, Size, ThemeMode, Variant,
-    egui::{self, CentralPanel, Panel, RichText},
+    Badge, Button, Card, CastTheme, Checkbox, Intent, Panel as CastPanel, SearchInput, Separator,
+    Size, Switch, TextInput, ThemeMode, Variant,
+    egui::{self, CentralPanel, Panel as EguiPanel, RichText},
 };
 
 fn main() -> eframe::Result {
@@ -21,7 +22,10 @@ struct CastGallery {
     theme: CastTheme,
     mode: ThemeMode,
     search: String,
+    name: String,
     enabled: bool,
+    notifications: bool,
+    indeterminate: bool,
 }
 
 impl CastGallery {
@@ -30,7 +34,10 @@ impl CastGallery {
             theme: CastTheme::light(),
             mode: ThemeMode::Light,
             search: String::new(),
+            name: String::from("Cast"),
             enabled: true,
+            notifications: true,
+            indeterminate: false,
         }
     }
 
@@ -48,7 +55,7 @@ impl eframe::App for CastGallery {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
 
-        Panel::top("top_bar").show_inside(ui, |ui| {
+        EguiPanel::top("top_bar").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Cast Gallery");
                 ui.separator();
@@ -60,7 +67,7 @@ impl eframe::App for CastGallery {
             });
         });
 
-        Panel::left("sidebar")
+        EguiPanel::left("sidebar")
             .resizable(false)
             .default_size(220.0)
             .show_inside(ui, |ui| {
@@ -81,6 +88,17 @@ impl eframe::App for CastGallery {
             show_theme_foundation(ui);
             ui.add_space(12.0);
             show_buttons_and_badges(ui);
+            ui.add_space(12.0);
+            show_surfaces(ui);
+            ui.add_space(12.0);
+            show_forms(
+                ui,
+                &mut self.search,
+                &mut self.name,
+                &mut self.enabled,
+                &mut self.notifications,
+                &mut self.indeterminate,
+            );
             ui.add_space(12.0);
             show_raw_egui_controls(ui, &mut self.search, &mut self.enabled);
         });
@@ -142,6 +160,55 @@ fn show_buttons_and_badges(ui: &mut egui::Ui) {
                     .intent(Intent::Primary)
                     .variant(Variant::Outline),
             );
+        });
+    });
+}
+
+fn show_surfaces(ui: &mut egui::Ui) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Surfaces");
+        ui.label("Card frames primary content. Panel frames secondary or raised content.");
+        ui.add(Separator::new());
+        CastPanel::new().show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.add(Badge::new("Panel").intent(Intent::Neutral));
+                ui.label("A raised surface for dense app UI regions.");
+            });
+        });
+    });
+}
+
+fn show_forms(
+    ui: &mut egui::Ui,
+    search: &mut String,
+    name: &mut String,
+    enabled: &mut bool,
+    notifications: &mut bool,
+    indeterminate: &mut bool,
+) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Forms");
+        ui.horizontal(|ui| {
+            ui.label("Name");
+            ui.add(TextInput::new(name).hint_text("Project name").width(220.0));
+        });
+        ui.horizontal(|ui| {
+            ui.label("Search");
+            ui.add(SearchInput::new(search).width(220.0));
+        });
+        ui.add(Separator::new().spacing(10.0));
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Checkbox::new(enabled, "Enabled"));
+            ui.add(Checkbox::new(indeterminate, "Mixed").indeterminate(true));
+        });
+        ui.horizontal(|ui| {
+            ui.add(Switch::new(notifications));
+            ui.label("Notifications");
+        });
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Switch::new(enabled).size(Size::Small));
+            ui.add(Switch::new(enabled).size(Size::Medium));
+            ui.add(Switch::new(enabled).size(Size::Large));
         });
     });
 }

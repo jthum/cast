@@ -96,6 +96,16 @@ pub(crate) fn card_frame(theme: &CastTheme) -> egui::Frame {
         .inner_margin(Margin::same(theme.spacing.lg as i8))
 }
 
+pub(crate) fn input_frame(theme: &CastTheme) -> egui::Frame {
+    egui::Frame::new()
+        .fill(theme.colors.surface)
+        .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
+        .inner_margin(Margin::symmetric(
+            theme.controls.padding_x as i8,
+            theme.controls.padding_y as i8,
+        ))
+}
+
 fn solid_intent_colors(theme: &CastTheme, intent: Intent) -> IntentColors {
     match intent {
         Intent::Neutral => IntentColors {
