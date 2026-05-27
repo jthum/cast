@@ -953,9 +953,9 @@ pub struct TypographyTokens {
 impl Default for TypographyTokens {
     fn default() -> Self {
         Self {
-            body: FontId::new(14.0, FontFamily::Proportional),
-            small: FontId::new(12.0, FontFamily::Proportional),
-            heading: FontId::new(20.0, FontFamily::Proportional),
+            body: FontId::new(15.0, FontFamily::Proportional),
+            small: FontId::new(13.0, FontFamily::Proportional),
+            heading: FontId::new(22.0, FontFamily::Proportional),
         }
     }
 }

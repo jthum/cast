@@ -4,7 +4,6 @@ use cast::{
     ThemeMode, ThemeSeed, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
-use std::sync::Arc;
 
 fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions::default();
@@ -13,7 +12,6 @@ fn main() -> eframe::Result {
         "Cast Gallery",
         native_options,
         Box::new(|cc| {
-            configure_gallery_fonts(&cc.egui_ctx);
             let app = CastGallery::new();
             cast::set_theme(&cc.egui_ctx, app.theme.clone());
             Ok(Box::new(app))
@@ -21,40 +19,10 @@ fn main() -> eframe::Result {
     )
 }
 
-fn configure_gallery_fonts(ctx: &egui::Context) {
-    let Some(bytes) = load_preferred_font() else {
-        return;
-    };
-
-    let mut fonts = egui::FontDefinitions::default();
-    fonts.font_data.insert(
-        "CastSans".to_owned(),
-        Arc::new(egui::FontData::from_owned(bytes)),
-    );
-    for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
-        fonts
-            .families
-            .entry(family)
-            .or_default()
-            .insert(0, "CastSans".to_owned());
-    }
-    ctx.set_fonts(fonts);
-}
-
-fn load_preferred_font() -> Option<Vec<u8>> {
-    [
-        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "C:\\Windows\\Fonts\\segoeui.ttf",
-    ]
-    .into_iter()
-    .find_map(|path| std::fs::read(path).ok())
-}
-
 struct CastGallery {
     theme: CastTheme,
     seed: ThemeSeed,
+    zoom: f32,
     search: String,
     name: String,
     enabled: bool,
@@ -71,6 +39,7 @@ impl CastGallery {
         Self {
             theme,
             seed,
+            zoom: 1.0,
             search: String::new(),
             name: String::from("Cast"),
             enabled: true,
@@ -93,6 +62,7 @@ impl CastGallery {
 impl eframe::App for CastGallery {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        ctx.set_zoom_factor(self.zoom);
 
         EguiPanel::top("top_bar").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
@@ -103,6 +73,14 @@ impl eframe::App for CastGallery {
                 ui.selectable_value(&mut mode, ThemeMode::Dark, "Dark");
                 if mode != self.seed.mode {
                     self.set_mode(&ctx, mode);
+                }
+                ui.separator();
+                ui.label("Zoom");
+                if ui
+                    .add(egui::Slider::new(&mut self.zoom, 0.9..=1.35).show_value(false))
+                    .changed()
+                {
+                    ctx.set_zoom_factor(self.zoom);
                 }
             });
         });
@@ -264,11 +242,11 @@ fn show_token_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
         seed.stroke.md = seed.stroke.sm + 0.5;
         seed.stroke.lg = seed.stroke.sm + 1.0;
     }
-    let typography_changed = theme_slider(ui, "Text", &mut seed.typography.body.size, 12.0..=18.0);
+    let typography_changed = theme_slider(ui, "Text", &mut seed.typography.body.size, 13.0..=20.0);
     changed |= typography_changed;
     if typography_changed {
         seed.typography.small.size = seed.typography.body.size - 2.0;
-        seed.typography.heading.size = seed.typography.body.size + 6.0;
+        seed.typography.heading.size = seed.typography.body.size + 7.0;
     }
     let controls_changed = theme_slider(ui, "Control", &mut seed.controls.min_height, 26.0..=44.0);
     changed |= controls_changed;
