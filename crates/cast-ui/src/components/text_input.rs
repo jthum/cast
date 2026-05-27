@@ -70,8 +70,11 @@ impl Widget for TextInput<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
         let metrics = resolve_control_metrics(&theme, self.size);
+        let mut font = theme.typography.body.clone();
+        font.size = metrics.text_size;
         let mut edit = TextEdit::singleline(self.text)
             .frame(input_frame(&theme, self.variant))
+            .font(font)
             .min_size(egui::vec2(
                 0.0,
                 metrics.min_height.max(theme.components.input.min_height),

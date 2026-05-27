@@ -126,6 +126,8 @@ impl eframe::App for CastGallery {
                     ui.add_space(12.0);
                     show_palette_preview(ui, &self.theme);
                     ui.add_space(12.0);
+                    show_typography_gallery(ui, &self.theme);
+                    ui.add_space(12.0);
                     show_override_preview(ui);
                     ui.add_space(12.0);
                     show_buttons_and_badges(ui);
@@ -171,7 +173,7 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
 
     ui.horizontal(|ui| {
         if ui.button("Reset").clicked() {
-            *seed = ThemeSeed::for_mode(seed.mode);
+            *seed = ThemeSeed::for_mode(seed.mode).with_typography(cast::TypographyTokens::inter());
             changed = true;
         }
         if ui.button("Primary only").clicked() {
@@ -261,10 +263,17 @@ fn show_token_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
     let typography_changed = theme_slider(ui, "Text", &mut seed.typography.body.size, 13.0..=20.0);
     changed |= typography_changed;
     if typography_changed {
+        seed.typography.xs.size = seed.typography.body.size - 3.0;
         seed.typography.small.size = seed.typography.body.size - 2.0;
+        seed.typography.label.size = seed.typography.body.size - 2.0;
+        seed.typography.caption.size = seed.typography.body.size - 3.0;
+        seed.typography.body_strong.size = seed.typography.body.size;
         seed.typography.heading.size = seed.typography.body.size + 7.0;
+        seed.typography.heading_sm.size = seed.typography.body.size + 2.0;
+        seed.typography.heading_lg.size = seed.typography.body.size + 10.0;
         seed.typography.button.size = seed.typography.body.size;
         seed.typography.strong.size = seed.typography.body.size;
+        seed.typography.code.size = seed.typography.body.size - 1.0;
     }
     let controls_changed = theme_slider(ui, "Control", &mut seed.controls.min_height, 26.0..=44.0);
     changed |= controls_changed;
@@ -472,6 +481,84 @@ fn show_palette_preview(ui: &mut egui::Ui, theme: &CastTheme) {
         palette_family_row(ui, "Warning", theme.colors.warning_family);
         palette_family_row(ui, "Danger", theme.colors.danger_family);
         palette_family_row(ui, "Info", theme.colors.info_family);
+    });
+}
+
+fn show_typography_gallery(ui: &mut egui::Ui, theme: &CastTheme) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Typography");
+        typography_sample(
+            ui,
+            "Heading large",
+            "Build dense Rust interfaces with readable text.",
+            theme.typography.heading_lg.clone(),
+            theme.colors.text,
+        );
+        typography_sample(
+            ui,
+            "Heading",
+            "Themeable components for immediate-mode apps.",
+            theme.typography.heading.clone(),
+            theme.colors.text,
+        );
+        typography_sample(
+            ui,
+            "Heading small",
+            "Forms, surfaces, feedback, and navigation.",
+            theme.typography.heading_sm.clone(),
+            theme.colors.text,
+        );
+        typography_sample(
+            ui,
+            "Body",
+            "Cast uses role-based font tokens so apps can choose separate faces for body text, headings, controls, and code.",
+            theme.typography.body.clone(),
+            theme.colors.text,
+        );
+        typography_sample(
+            ui,
+            "Body strong",
+            "Important text can use a stronger face without changing size.",
+            theme.typography.body_strong.clone(),
+            theme.colors.text,
+        );
+        typography_sample(
+            ui,
+            "Small",
+            "Secondary details should remain legible at small sizes.",
+            theme.typography.small.clone(),
+            theme.colors.text_muted,
+        );
+        typography_sample(
+            ui,
+            "Caption",
+            "Caption text, metadata, and dense row annotations.",
+            theme.typography.caption.clone(),
+            theme.colors.text_subtle,
+        );
+        typography_sample(
+            ui,
+            "Code",
+            "let theme = ThemeSeed::for_mode(mode).with_typography(TypographyTokens::inter());",
+            theme.typography.code.clone(),
+            theme.colors.text,
+        );
+    });
+}
+
+fn typography_sample(
+    ui: &mut egui::Ui,
+    label: &str,
+    text: &str,
+    font: egui::FontId,
+    color: Color32,
+) {
+    ui.horizontal_wrapped(|ui| {
+        ui.add_sized(
+            [92.0, 18.0],
+            egui::Label::new(RichText::new(label).size(11.0)),
+        );
+        ui.label(RichText::new(text).font(font).color(color));
     });
 }
 

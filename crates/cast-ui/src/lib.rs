@@ -16,8 +16,9 @@ pub use foundation::{Intent, Orientation, Placement, Size, Variant};
 pub use theme::{
     AnimationTokens, BadgeTokenOverrides, BadgeTokens, ButtonTokenOverrides, ButtonTokens,
     CastPaletteInput, CastTheme, ColorTokens, ComponentTokenOverrides, ComponentTokens,
-    ControlTokens, ElevationTokens, FeedbackTokenOverrides, FeedbackTokens, FocusTokens,
-    InputTokenOverrides, InputTokens, RadiusTokens, SemanticColorTokens, SpacingTokens,
-    StrokeTokens, SurfaceTokenOverrides, SurfaceTokens, ThemeMode, ThemeSeed, TypographyTokens,
-    apply_theme, install_inter_fonts, set_theme, theme_for_ui,
+    ControlTokens, ElevationTokens, FeedbackTokenOverrides, FeedbackTokens, FocusTokens, FontFace,
+    FontStack, GoogleFontFamily, InputTokenOverrides, InputTokens, RadiusTokens,
+    SemanticColorTokens, SpacingTokens, StrokeTokens, SurfaceTokenOverrides, SurfaceTokens,
+    ThemeMode, ThemeSeed, TypographyTokens, apply_theme, install_font_stack, install_inter_fonts,
+    set_theme, theme_for_ui,
 };

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use egui::{
     Color32, Context, FontData, FontDefinitions, FontFamily, FontId, Stroke, Style, TextStyle, Ui,
@@ -14,6 +14,12 @@ const INTER_SEMIBOLD_FONT: &str = "cast_inter_semibold";
 const INTER_REGULAR_FAMILY: &str = "Cast Inter";
 const INTER_MEDIUM_FAMILY: &str = "Cast Inter Medium";
 const INTER_SEMIBOLD_FAMILY: &str = "Cast Inter SemiBold";
+const CAST_CODE_STYLE: &str = "cast_code";
+const CAST_LABEL_STYLE: &str = "cast_label";
+const CAST_CAPTION_STYLE: &str = "cast_caption";
+const CAST_BODY_STRONG_STYLE: &str = "cast_body_strong";
+const CAST_HEADING_SM_STYLE: &str = "cast_heading_sm";
+const CAST_HEADING_LG_STYLE: &str = "cast_heading_lg";
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -235,6 +241,33 @@ impl CastTheme {
             .text_styles
             .insert(TextStyle::Heading, self.typography.heading.clone());
         style
+            .text_styles
+            .insert(TextStyle::Monospace, self.typography.code.clone());
+        style.text_styles.insert(
+            TextStyle::Name(Arc::from(CAST_CODE_STYLE)),
+            self.typography.code.clone(),
+        );
+        style.text_styles.insert(
+            TextStyle::Name(Arc::from(CAST_LABEL_STYLE)),
+            self.typography.label.clone(),
+        );
+        style.text_styles.insert(
+            TextStyle::Name(Arc::from(CAST_CAPTION_STYLE)),
+            self.typography.caption.clone(),
+        );
+        style.text_styles.insert(
+            TextStyle::Name(Arc::from(CAST_BODY_STRONG_STYLE)),
+            self.typography.body_strong.clone(),
+        );
+        style.text_styles.insert(
+            TextStyle::Name(Arc::from(CAST_HEADING_SM_STYLE)),
+            self.typography.heading_sm.clone(),
+        );
+        style.text_styles.insert(
+            TextStyle::Name(Arc::from(CAST_HEADING_LG_STYLE)),
+            self.typography.heading_lg.clone(),
+        );
+        style
     }
 
     #[must_use]
@@ -294,47 +327,42 @@ pub fn apply_theme(ctx: &Context, theme: &CastTheme) {
 }
 
 pub fn install_inter_fonts(ctx: &Context) {
-    let mut fonts = FontDefinitions::default();
-    insert_font(
-        &mut fonts,
-        INTER_REGULAR_FONT,
-        include_bytes!("../../assets/fonts/inter/Inter-Regular.ttf"),
-    );
-    insert_font(
-        &mut fonts,
-        INTER_MEDIUM_FONT,
-        include_bytes!("../../assets/fonts/inter/Inter-Medium.ttf"),
-    );
-    insert_font(
-        &mut fonts,
-        INTER_SEMIBOLD_FONT,
-        include_bytes!("../../assets/fonts/inter/Inter-SemiBold.ttf"),
-    );
+    install_font_stack(ctx, &FontStack::inter());
+}
 
-    prepend_family_font(&mut fonts, FontFamily::Proportional, INTER_REGULAR_FONT);
-    set_named_family(
-        &mut fonts,
-        INTER_REGULAR_FAMILY,
-        &[INTER_REGULAR_FONT, INTER_MEDIUM_FONT, INTER_SEMIBOLD_FONT],
-    );
-    set_named_family(
-        &mut fonts,
-        INTER_MEDIUM_FAMILY,
-        &[INTER_MEDIUM_FONT, INTER_REGULAR_FONT, INTER_SEMIBOLD_FONT],
-    );
-    set_named_family(
-        &mut fonts,
-        INTER_SEMIBOLD_FAMILY,
-        &[INTER_SEMIBOLD_FONT, INTER_MEDIUM_FONT, INTER_REGULAR_FONT],
-    );
+pub fn install_font_stack(ctx: &Context, stack: &FontStack) {
+    let mut fonts = FontDefinitions::default();
+
+    for face in &stack.faces {
+        insert_font(&mut fonts, face);
+    }
+
+    if let Some(name) = stack.body.first() {
+        prepend_family_font(&mut fonts, FontFamily::Proportional, name);
+    }
+    if let Some(name) = stack.mono.first() {
+        prepend_family_font(&mut fonts, FontFamily::Monospace, name);
+    }
+    set_named_family(&mut fonts, &stack.body_family, &stack.body);
+    set_named_family(&mut fonts, &stack.button_family, &stack.button);
+    set_named_family(&mut fonts, &stack.strong_family, &stack.strong);
+    set_named_family(&mut fonts, &stack.heading_family, &stack.heading);
+    if !stack.mono.is_empty() {
+        set_named_family(&mut fonts, &stack.mono_family, &stack.mono);
+    }
 
     ctx.set_fonts(fonts);
 }
 
-fn insert_font(fonts: &mut FontDefinitions, name: &str, bytes: &'static [u8]) {
-    fonts
-        .font_data
-        .insert(name.to_owned(), Arc::new(FontData::from_static(bytes)));
+fn insert_font(fonts: &mut FontDefinitions, face: &FontFace) {
+    fonts.font_data.insert(
+        face.name.clone(),
+        Arc::new(FontData {
+            font: face.bytes.clone(),
+            index: 0,
+            tweak: Default::default(),
+        }),
+    );
 }
 
 fn prepend_family_font(fonts: &mut FontDefinitions, family: FontFamily, name: &str) {
@@ -345,11 +373,155 @@ fn prepend_family_font(fonts: &mut FontDefinitions, family: FontFamily, name: &s
         .insert(0, name.to_owned());
 }
 
-fn set_named_family(fonts: &mut FontDefinitions, family: &'static str, names: &[&str]) {
-    fonts.families.insert(
-        FontFamily::Name(Arc::from(family)),
-        names.iter().map(|name| (*name).to_owned()).collect(),
-    );
+fn set_named_family(fonts: &mut FontDefinitions, family: &str, names: &[String]) {
+    fonts
+        .families
+        .insert(FontFamily::Name(Arc::<str>::from(family)), names.to_vec());
+}
+
+#[derive(Clone, Debug)]
+pub struct FontFace {
+    pub name: String,
+    pub bytes: Cow<'static, [u8]>,
+}
+
+impl FontFace {
+    #[must_use]
+    pub fn from_static(name: impl Into<String>, bytes: &'static [u8]) -> Self {
+        Self {
+            name: name.into(),
+            bytes: Cow::Borrowed(bytes),
+        }
+    }
+
+    #[must_use]
+    pub fn from_owned(name: impl Into<String>, bytes: impl Into<Vec<u8>>) -> Self {
+        Self {
+            name: name.into(),
+            bytes: Cow::Owned(bytes.into()),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FontStack {
+    pub faces: Vec<FontFace>,
+    pub body_family: String,
+    pub button_family: String,
+    pub strong_family: String,
+    pub heading_family: String,
+    pub mono_family: String,
+    pub body: Vec<String>,
+    pub button: Vec<String>,
+    pub strong: Vec<String>,
+    pub heading: Vec<String>,
+    pub mono: Vec<String>,
+}
+
+impl FontStack {
+    #[must_use]
+    pub fn inter() -> Self {
+        Self {
+            faces: vec![
+                FontFace::from_static(
+                    INTER_REGULAR_FONT,
+                    include_bytes!("../../assets/fonts/inter/Inter-Regular.ttf"),
+                ),
+                FontFace::from_static(
+                    INTER_MEDIUM_FONT,
+                    include_bytes!("../../assets/fonts/inter/Inter-Medium.ttf"),
+                ),
+                FontFace::from_static(
+                    INTER_SEMIBOLD_FONT,
+                    include_bytes!("../../assets/fonts/inter/Inter-SemiBold.ttf"),
+                ),
+            ],
+            body_family: INTER_REGULAR_FAMILY.to_owned(),
+            button_family: INTER_MEDIUM_FAMILY.to_owned(),
+            strong_family: INTER_SEMIBOLD_FAMILY.to_owned(),
+            heading_family: INTER_SEMIBOLD_FAMILY.to_owned(),
+            mono_family: "Cast Mono".to_owned(),
+            body: vec![
+                INTER_REGULAR_FONT.to_owned(),
+                INTER_MEDIUM_FONT.to_owned(),
+                INTER_SEMIBOLD_FONT.to_owned(),
+            ],
+            button: vec![
+                INTER_MEDIUM_FONT.to_owned(),
+                INTER_REGULAR_FONT.to_owned(),
+                INTER_SEMIBOLD_FONT.to_owned(),
+            ],
+            strong: vec![
+                INTER_SEMIBOLD_FONT.to_owned(),
+                INTER_MEDIUM_FONT.to_owned(),
+                INTER_REGULAR_FONT.to_owned(),
+            ],
+            heading: vec![
+                INTER_SEMIBOLD_FONT.to_owned(),
+                INTER_MEDIUM_FONT.to_owned(),
+                INTER_REGULAR_FONT.to_owned(),
+            ],
+            mono: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn google_fonts_css2_url(families: &[GoogleFontFamily]) -> String {
+        let query = families
+            .iter()
+            .map(GoogleFontFamily::query)
+            .collect::<Vec<_>>()
+            .join("&");
+        format!("https://fonts.googleapis.com/css2?{query}&display=swap")
+    }
+
+    #[must_use]
+    pub fn google_fonts_css2_url_for_names(families: &[&str]) -> String {
+        let families = families
+            .iter()
+            .map(|family| GoogleFontFamily::named(*family))
+            .collect::<Vec<_>>();
+        Self::google_fonts_css2_url(&families)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GoogleFontFamily {
+    pub name: String,
+    pub weights: Vec<u16>,
+}
+
+impl GoogleFontFamily {
+    #[must_use]
+    pub fn named(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            weights: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn new(name: impl Into<String>, weights: impl Into<Vec<u16>>) -> Self {
+        Self {
+            name: name.into(),
+            weights: weights.into(),
+        }
+    }
+
+    fn query(&self) -> String {
+        let name = self.name.replace(' ', "+");
+        if self.weights.is_empty() {
+            return format!("family={name}");
+        }
+
+        let weights = self
+            .weights
+            .iter()
+            .map(u16::to_string)
+            .collect::<Vec<_>>()
+            .join(";");
+        format!("family={name}:wght@{weights}")
+    }
 }
 
 #[must_use]
@@ -1021,22 +1193,51 @@ impl Default for StrokeTokens {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug)]
 pub struct TypographyTokens {
+    pub xs: FontId,
     pub body: FontId,
     pub small: FontId,
+    pub label: FontId,
+    pub caption: FontId,
+    pub body_strong: FontId,
     pub heading: FontId,
+    pub heading_sm: FontId,
+    pub heading_lg: FontId,
     pub button: FontId,
     pub strong: FontId,
+    pub code: FontId,
 }
 
 impl TypographyTokens {
     #[must_use]
     pub fn inter() -> Self {
+        Self::from_font_stack(&FontStack::inter())
+    }
+
+    #[must_use]
+    pub fn from_font_stack(stack: &FontStack) -> Self {
+        let body = FontFamily::Name(Arc::<str>::from(stack.body_family.as_str()));
+        let button = FontFamily::Name(Arc::<str>::from(stack.button_family.as_str()));
+        let strong = FontFamily::Name(Arc::<str>::from(stack.strong_family.as_str()));
+        let heading = FontFamily::Name(Arc::<str>::from(stack.heading_family.as_str()));
+        let mono = if stack.mono.is_empty() {
+            FontFamily::Monospace
+        } else {
+            FontFamily::Name(Arc::<str>::from(stack.mono_family.as_str()))
+        };
+
         Self {
-            body: FontId::new(14.0, inter_regular_family()),
-            small: FontId::new(12.0, inter_regular_family()),
-            heading: FontId::new(20.0, inter_semibold_family()),
-            button: FontId::new(14.0, inter_medium_family()),
-            strong: FontId::new(14.0, inter_semibold_family()),
+            xs: FontId::new(11.0, body.clone()),
+            body: FontId::new(14.0, body.clone()),
+            small: FontId::new(12.0, body.clone()),
+            label: FontId::new(12.0, button.clone()),
+            caption: FontId::new(11.0, body),
+            body_strong: FontId::new(14.0, strong.clone()),
+            heading: FontId::new(20.0, heading.clone()),
+            heading_sm: FontId::new(16.0, heading.clone()),
+            heading_lg: FontId::new(24.0, heading),
+            button: FontId::new(14.0, button),
+            strong: FontId::new(14.0, strong),
+            code: FontId::new(13.0, mono),
         }
     }
 }
@@ -1044,25 +1245,20 @@ impl TypographyTokens {
 impl Default for TypographyTokens {
     fn default() -> Self {
         Self {
+            xs: FontId::new(11.0, FontFamily::Proportional),
             body: FontId::new(14.0, FontFamily::Proportional),
             small: FontId::new(12.0, FontFamily::Proportional),
+            label: FontId::new(12.0, FontFamily::Proportional),
+            caption: FontId::new(11.0, FontFamily::Proportional),
+            body_strong: FontId::new(14.0, FontFamily::Proportional),
             heading: FontId::new(20.0, FontFamily::Proportional),
+            heading_sm: FontId::new(16.0, FontFamily::Proportional),
+            heading_lg: FontId::new(24.0, FontFamily::Proportional),
             button: FontId::new(14.0, FontFamily::Proportional),
             strong: FontId::new(14.0, FontFamily::Proportional),
+            code: FontId::new(13.0, FontFamily::Monospace),
         }
     }
-}
-
-fn inter_regular_family() -> FontFamily {
-    FontFamily::Name(Arc::from(INTER_REGULAR_FAMILY))
-}
-
-fn inter_medium_family() -> FontFamily {
-    FontFamily::Name(Arc::from(INTER_MEDIUM_FAMILY))
-}
-
-fn inter_semibold_family() -> FontFamily {
-    FontFamily::Name(Arc::from(INTER_SEMIBOLD_FAMILY))
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -1317,6 +1513,29 @@ mod tests {
         assert_ne!(typography.body.family, typography.button.family);
         assert_ne!(typography.button.family, typography.heading.family);
         assert_eq!(typography.body.size, 14.0);
+    }
+
+    #[test]
+    fn google_fonts_css2_url_encodes_families_and_weights() {
+        let url = FontStack::google_fonts_css2_url(&[
+            GoogleFontFamily::new("Inter", vec![400, 500, 600]),
+            GoogleFontFamily::new("JetBrains Mono", vec![400]),
+        ]);
+
+        assert_eq!(
+            url,
+            "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap"
+        );
+    }
+
+    #[test]
+    fn google_fonts_css2_url_can_be_built_from_names() {
+        let url = FontStack::google_fonts_css2_url_for_names(&["Inter", "JetBrains Mono"]);
+
+        assert_eq!(
+            url,
+            "https://fonts.googleapis.com/css2?family=Inter&family=JetBrains+Mono&display=swap"
+        );
     }
 
     #[test]
