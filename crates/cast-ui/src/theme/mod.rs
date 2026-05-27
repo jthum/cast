@@ -1,4 +1,4 @@
-use egui::{Color32, Context, FontFamily, FontId, Stroke, Style, Ui, Vec2, Visuals};
+use egui::{Color32, Context, FontFamily, FontId, Stroke, Style, TextStyle, Ui, Vec2, Visuals};
 
 use crate::color::{accessible_foreground, mix_oklch, with_alpha};
 
@@ -205,6 +205,18 @@ impl CastTheme {
         style.spacing.item_spacing = Vec2::splat(self.spacing.sm);
         style.spacing.button_padding = Vec2::new(self.controls.padding_x, self.controls.padding_y);
         style.animation_time = self.animation.normal_seconds();
+        style
+            .text_styles
+            .insert(TextStyle::Body, self.typography.body.clone());
+        style
+            .text_styles
+            .insert(TextStyle::Button, self.typography.body.clone());
+        style
+            .text_styles
+            .insert(TextStyle::Small, self.typography.small.clone());
+        style
+            .text_styles
+            .insert(TextStyle::Heading, self.typography.heading.clone());
         style
     }
 
@@ -1077,6 +1089,8 @@ mod tests {
         assert_eq!(style.spacing.button_padding.x, theme.controls.padding_x);
         assert_eq!(style.visuals.panel_fill, theme.colors.background);
         assert_eq!(style.visuals.hyperlink_color, theme.colors.link);
+        assert_eq!(style.text_styles[&TextStyle::Body], theme.typography.body);
+        assert_eq!(style.text_styles[&TextStyle::Button], theme.typography.body);
     }
 
     #[test]

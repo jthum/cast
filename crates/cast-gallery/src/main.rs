@@ -4,6 +4,7 @@ use cast::{
     ThemeMode, ThemeSeed, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
+use std::sync::Arc;
 
 fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions::default();
@@ -12,11 +13,43 @@ fn main() -> eframe::Result {
         "Cast Gallery",
         native_options,
         Box::new(|cc| {
+            configure_gallery_fonts(&cc.egui_ctx);
             let app = CastGallery::new();
             cast::set_theme(&cc.egui_ctx, app.theme.clone());
             Ok(Box::new(app))
         }),
     )
+}
+
+fn configure_gallery_fonts(ctx: &egui::Context) {
+    let Some(bytes) = load_preferred_font() else {
+        return;
+    };
+
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "CastSans".to_owned(),
+        Arc::new(egui::FontData::from_owned(bytes)),
+    );
+    for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
+        fonts
+            .families
+            .entry(family)
+            .or_default()
+            .insert(0, "CastSans".to_owned());
+    }
+    ctx.set_fonts(fonts);
+}
+
+fn load_preferred_font() -> Option<Vec<u8>> {
+    [
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+    ]
+    .into_iter()
+    .find_map(|path| std::fs::read(path).ok())
 }
 
 struct CastGallery {
