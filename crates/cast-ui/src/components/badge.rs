@@ -55,7 +55,8 @@ impl Widget for Badge {
                 RichText::new(self.label)
                     .color(colors.fg)
                     .family(theme.typography.button.family.clone())
-                    .size(metrics.text_size),
+                    .size(metrics.text_size)
+                    .extra_letter_spacing(theme.typography.letter_spacing),
             )
             .fill(colors.fill)
             .stroke(egui::Stroke::new(

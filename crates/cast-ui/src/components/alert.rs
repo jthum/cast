@@ -50,14 +50,16 @@ impl Widget for Alert {
                     RichText::new(self.title)
                         .color(subtle.colors.fg)
                         .family(theme.typography.strong.family.clone())
-                        .size(theme.typography.body.size),
+                        .size(theme.typography.body.size)
+                        .extra_letter_spacing(theme.typography.letter_spacing),
                 );
                 if let Some(body) = self.body {
                     ui.label(
                         RichText::new(body)
                             .color(theme.colors.text_muted)
                             .family(theme.typography.small.family.clone())
-                            .size(theme.typography.small.size),
+                            .size(theme.typography.small.size)
+                            .extra_letter_spacing(theme.typography.letter_spacing),
                     );
                 }
             })

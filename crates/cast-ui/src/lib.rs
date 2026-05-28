@@ -18,7 +18,7 @@ pub use theme::{
     CastPaletteInput, CastTheme, ColorTokens, ComponentTokenOverrides, ComponentTokens,
     ControlTokens, ElevationTokens, FeedbackTokenOverrides, FeedbackTokens, FocusTokens, FontFace,
     FontPathStack, FontStack, FontStackBuilder, GoogleFontFamily, InputTokenOverrides, InputTokens,
-    RadiusTokens, SemanticColorTokens, SpacingTokens, StrokeTokens, SurfaceTokenOverrides,
-    SurfaceTokens, ThemeMode, ThemeSeed, TypographyTokens, apply_theme, install_cast_fonts,
-    install_font_stack, install_inter_fonts, set_theme, theme_for_ui,
+    RadiusTokens, ScrollTokens, SemanticColorTokens, SpacingTokens, StrokeTokens,
+    SurfaceTokenOverrides, SurfaceTokens, ThemeMode, ThemeSeed, TypographyTokens, apply_theme,
+    install_cast_fonts, install_font_stack, install_inter_fonts, set_theme, theme_for_ui,
 };

@@ -6,8 +6,8 @@ use std::{
 };
 
 use egui::{
-    Color32, Context, FontData, FontDefinitions, FontFamily, FontId, Stroke, Style, TextStyle, Ui,
-    Vec2, Visuals,
+    Color32, Context, FontData, FontDefinitions, FontFamily, FontId, Rangef, Stroke, Style,
+    TextStyle, Ui, Vec2, Visuals,
 };
 
 use crate::color::{accessible_foreground, mix_oklch, with_alpha};
@@ -56,6 +56,7 @@ pub struct CastTheme {
     pub focus: FocusTokens,
     pub elevation: ElevationTokens,
     pub animation: AnimationTokens,
+    pub scroll: ScrollTokens,
 }
 
 impl CastTheme {
@@ -94,6 +95,7 @@ pub struct ThemeSeed {
     pub controls: ControlTokens,
     pub elevation: ElevationTokens,
     pub animation: AnimationTokens,
+    pub scroll: ScrollTokens,
 }
 
 impl ThemeSeed {
@@ -110,6 +112,7 @@ impl ThemeSeed {
             controls: ControlTokens::default(),
             elevation: ElevationTokens::default(),
             animation: AnimationTokens::default(),
+            scroll: ScrollTokens::default(),
         }
     }
 
@@ -163,6 +166,12 @@ impl ThemeSeed {
     #[must_use]
     pub fn with_duration_scale(mut self, duration_scale: f32) -> Self {
         self.animation.duration_scale = duration_scale.max(0.0);
+        self
+    }
+
+    #[must_use]
+    pub fn with_scroll(mut self, scroll: ScrollTokens) -> Self {
+        self.scroll = scroll;
         self
     }
 
@@ -225,6 +234,7 @@ impl ThemeSeed {
             focus,
             elevation: self.elevation,
             animation: self.animation,
+            scroll: self.scroll,
         }
     }
 }
@@ -240,6 +250,17 @@ impl CastTheme {
         style.spacing.item_spacing = Vec2::splat(self.spacing.sm);
         style.spacing.button_padding = Vec2::new(self.controls.padding_x, self.controls.padding_y);
         style.animation_time = self.animation.normal_seconds();
+        style.scroll_animation = if self.animation.should_animate() && self.scroll.animated {
+            egui::style::ScrollAnimation::new(
+                self.scroll.points_per_second,
+                Rangef::new(
+                    self.scroll.min_animation_seconds,
+                    self.scroll.max_animation_seconds,
+                ),
+            )
+        } else {
+            egui::style::ScrollAnimation::none()
+        };
         style
             .text_styles
             .insert(TextStyle::Body, self.typography.body.clone());
@@ -1510,6 +1531,7 @@ pub struct TypographyTokens {
     pub button: FontId,
     pub strong: FontId,
     pub code: FontId,
+    pub letter_spacing: f32,
 }
 
 impl TypographyTokens {
@@ -1597,6 +1619,7 @@ impl TypographyTokens {
             button: FontId::new(14.0, button),
             strong: FontId::new(14.0, strong),
             code: FontId::new(13.0, mono),
+            letter_spacing: -0.05,
         }
     }
 }
@@ -1616,6 +1639,31 @@ impl Default for TypographyTokens {
             button: FontId::new(14.0, FontFamily::Proportional),
             strong: FontId::new(14.0, FontFamily::Proportional),
             code: FontId::new(13.0, FontFamily::Monospace),
+            letter_spacing: 0.0,
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Debug)]
+pub struct ScrollTokens {
+    pub wheel_multiplier: f32,
+    pub drag_to_scroll: bool,
+    pub animated: bool,
+    pub points_per_second: f32,
+    pub min_animation_seconds: f32,
+    pub max_animation_seconds: f32,
+}
+
+impl Default for ScrollTokens {
+    fn default() -> Self {
+        Self {
+            wheel_multiplier: 1.35,
+            drag_to_scroll: true,
+            animated: true,
+            points_per_second: 1800.0,
+            min_animation_seconds: 0.06,
+            max_animation_seconds: 0.18,
         }
     }
 }
@@ -1747,6 +1795,10 @@ mod tests {
 
         assert_eq!(style.spacing.item_spacing, Vec2::splat(theme.spacing.sm));
         assert_eq!(style.spacing.button_padding.x, theme.controls.padding_x);
+        assert_eq!(
+            style.scroll_animation.points_per_second,
+            theme.scroll.points_per_second
+        );
         assert_eq!(style.visuals.panel_fill, theme.colors.background);
         assert_eq!(style.visuals.hyperlink_color, theme.colors.link);
         assert_eq!(style.text_styles[&TextStyle::Body], theme.typography.body);
@@ -1895,6 +1947,7 @@ mod tests {
         assert_eq!(typography.caption.size, 13.0);
         assert_eq!(typography.heading_lg.size, 26.0);
         assert_eq!(typography.code.size, 15.0);
+        assert_eq!(typography.letter_spacing, -0.05);
     }
 
     #[test]
@@ -2035,5 +2088,17 @@ mod tests {
 
         assert_eq!(animation.fast_seconds(), 0.0);
         assert!(!animation.should_animate());
+    }
+
+    #[test]
+    fn scroll_animation_respects_reduced_motion() {
+        let mut seed = ThemeSeed::for_mode(ThemeMode::Light);
+        seed.animation.reduced_motion = true;
+        seed.scroll.points_per_second = 2400.0;
+
+        let style = seed.resolve().to_egui_style();
+
+        assert_eq!(style.scroll_animation.duration.min, 0.0);
+        assert_eq!(style.scroll_animation.duration.max, 0.0);
     }
 }

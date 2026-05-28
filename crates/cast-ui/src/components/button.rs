@@ -1,4 +1,7 @@
-use egui::{Align2, Color32, Response, Sense, StrokeKind, Ui, Widget};
+use egui::{
+    Color32, Response, Sense, StrokeKind, Ui, Widget,
+    text::{LayoutJob, TextFormat},
+};
 
 use crate::{
     color::with_alpha,
@@ -106,9 +109,11 @@ impl Widget for Button {
         let text = self.display_label();
         let mut font_id = theme.typography.button.clone();
         font_id.size = style.metrics.text_size;
-        let galley = ui
-            .painter()
-            .layout_no_wrap(text.clone(), font_id.clone(), style.colors.fg);
+        let galley = ui.painter().layout_job(button_layout_job(
+            text.clone(),
+            font_id.clone(),
+            theme.typography.letter_spacing,
+        ));
         let desired_size = egui::vec2(
             (galley.size().x + style.metrics.padding.x * 2.0).max(style.metrics.padding.x * 2.0),
             (galley.size().y + style.metrics.padding.y * 2.0)
@@ -157,17 +162,24 @@ impl Widget for Button {
                 egui::Stroke::new(style.stroke.width, border),
                 StrokeKind::Outside,
             );
-            ui.painter().text(
-                paint_rect.center(),
-                Align2::CENTER_CENTER,
-                text,
-                font_id,
-                fg,
-            );
+            let text_pos = paint_rect.center() - galley.size() / 2.0;
+            ui.painter().galley(text_pos, galley, fg);
         }
 
         response
     }
+}
+
+fn button_layout_job(text: String, font_id: egui::FontId, letter_spacing: f32) -> LayoutJob {
+    LayoutJob::single_section(
+        text,
+        TextFormat {
+            font_id,
+            extra_letter_spacing: letter_spacing,
+            color: Color32::PLACEHOLDER,
+            ..Default::default()
+        },
+    )
 }
 
 fn button_fill(

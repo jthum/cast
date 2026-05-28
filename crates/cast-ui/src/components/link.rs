@@ -39,7 +39,8 @@ impl Widget for Link {
         let text = RichText::new(self.label)
             .color(theme.colors.link)
             .family(theme.typography.body.family.clone())
-            .size(metrics.text_size);
+            .size(metrics.text_size)
+            .extra_letter_spacing(theme.typography.letter_spacing);
 
         if let Some(url) = self.url {
             ui.hyperlink_to(text, url)

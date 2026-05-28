@@ -6,7 +6,7 @@ use cast::{
     ThemeMode, ThemeSeed, TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
-        scroll_area::ScrollBarVisibility,
+        scroll_area::{ScrollBarVisibility, ScrollSource},
     },
 };
 
@@ -95,9 +95,7 @@ impl eframe::App for CastGallery {
             .resizable(false)
             .default_size(220.0)
             .show_inside(ui, |ui| {
-                ScrollArea::vertical()
-                    .id_salt("sidebar_scroll")
-                    .scroll_bar_visibility(ScrollBarVisibility::VisibleWhenNeeded)
+                cast_scroll_area("sidebar_scroll", &self.theme)
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         ui.heading("Components");
@@ -115,9 +113,7 @@ impl eframe::App for CastGallery {
             });
 
         CentralPanel::default().show_inside(ui, |ui| {
-            ScrollArea::vertical()
-                .id_salt("main_scroll")
-                .scroll_bar_visibility(ScrollBarVisibility::VisibleWhenNeeded)
+            cast_scroll_area("main_scroll", &self.theme)
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     ui.heading(RichText::new("Foundations").size(24.0));
@@ -158,6 +154,18 @@ impl eframe::App for CastGallery {
                 });
         });
     }
+}
+
+fn cast_scroll_area(id: &'static str, theme: &CastTheme) -> ScrollArea {
+    ScrollArea::vertical()
+        .id_salt(id)
+        .scroll_bar_visibility(ScrollBarVisibility::VisibleWhenNeeded)
+        .scroll_source(ScrollSource {
+            scroll_bar: true,
+            drag: theme.scroll.drag_to_scroll,
+            mouse_wheel: true,
+        })
+        .wheel_scroll_multiplier(egui::vec2(1.0, theme.scroll.wheel_multiplier))
 }
 
 fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
@@ -315,6 +323,12 @@ fn show_typography_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
         seed.typography.set_body_size(body_size);
         changed = true;
     }
+    changed |= theme_slider(
+        ui,
+        "Letter spacing",
+        &mut seed.typography.letter_spacing,
+        -0.25..=0.25,
+    );
 
     if let Some(family) = font_family_selector(ui, "Body", &seed.typography.body.family) {
         seed.typography.set_body_family(family);
@@ -359,6 +373,15 @@ fn show_motion_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
         "Duration",
         &mut seed.animation.duration_scale,
         0.0..=2.0,
+    );
+    changed |= ui
+        .checkbox(&mut seed.scroll.drag_to_scroll, "Drag to scroll")
+        .changed();
+    changed |= theme_slider(
+        ui,
+        "Wheel speed",
+        &mut seed.scroll.wheel_multiplier,
+        0.5..=3.0,
     );
     changed
 }
@@ -726,6 +749,11 @@ fn show_typography_diagnostics(
                 );
                 diagnostic_row(
                     ui,
+                    "Letter spacing",
+                    format!("{:.2}", theme.typography.letter_spacing),
+                );
+                diagnostic_row(
+                    ui,
                     "Body family",
                     font_family_label(&theme.typography.body.family),
                 );
@@ -742,6 +770,13 @@ fn show_typography_diagnostics(
             "Small",
             "Small text: abcdefghijklmnopqrstuvwxyz 0123456789",
             theme.typography.small.clone(),
+            theme.colors.text,
+        );
+        typography_sample(
+            ui,
+            "Tracking",
+            "Tighter letter spacing is a typography token, not a renderer fix.",
+            theme.typography.body.clone(),
             theme.colors.text,
         );
         typography_sample(
@@ -767,13 +802,15 @@ fn show_typography_diagnostics(
                     egui::Label::new(
                         RichText::new(format!("{:02}", index + 1))
                             .font(theme.typography.caption.clone())
-                            .color(theme.colors.text_subtle),
+                            .color(theme.colors.text_subtle)
+                            .extra_letter_spacing(theme.typography.letter_spacing),
                     ),
                 );
                 ui.label(
                     RichText::new("Render row with mixed weight, muted text, and stable spacing.")
                         .font(theme.typography.body.clone())
-                        .color(theme.colors.text),
+                        .color(theme.colors.text)
+                        .extra_letter_spacing(theme.typography.letter_spacing),
                 );
             });
         }
@@ -781,7 +818,12 @@ fn show_typography_diagnostics(
 }
 
 fn diagnostic_row(ui: &mut egui::Ui, label: &str, value: impl Into<String>) {
-    ui.label(RichText::new(label).size(11.0));
+    let letter_spacing = theme_letter_spacing(ui);
+    ui.label(
+        RichText::new(label)
+            .size(11.0)
+            .extra_letter_spacing(letter_spacing),
+    );
     ui.label(value.into());
     ui.end_row();
 }
@@ -793,13 +835,27 @@ fn typography_sample(
     font: egui::FontId,
     color: Color32,
 ) {
+    let letter_spacing = theme_letter_spacing(ui);
     ui.horizontal_wrapped(|ui| {
         ui.add_sized(
             [92.0, 18.0],
-            egui::Label::new(RichText::new(label).size(11.0)),
+            egui::Label::new(
+                RichText::new(label)
+                    .size(11.0)
+                    .extra_letter_spacing(letter_spacing),
+            ),
         );
-        ui.label(RichText::new(text).font(font).color(color));
+        ui.label(
+            RichText::new(text)
+                .font(font)
+                .color(color)
+                .extra_letter_spacing(letter_spacing),
+        );
     });
+}
+
+fn theme_letter_spacing(ui: &egui::Ui) -> f32 {
+    cast::theme_for_ui(ui).typography.letter_spacing
 }
 
 fn palette_family_row(ui: &mut egui::Ui, label: &str, family: SemanticColorTokens) {

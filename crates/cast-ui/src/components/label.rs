@@ -46,7 +46,8 @@ impl Widget for Label {
             RichText::new(self.text)
                 .color(color)
                 .family(theme.typography.body.family.clone())
-                .size(metrics.text_size),
+                .size(metrics.text_size)
+                .extra_letter_spacing(theme.typography.letter_spacing),
         )
     }
 }
