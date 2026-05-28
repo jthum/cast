@@ -102,47 +102,38 @@ impl<'a> SegmentedControl<'a> {
 impl Widget for SegmentedControl<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
-        let metrics = resolve_control_metrics(&theme, self.size);
-        let height = metrics
-            .min_height
-            .max(theme.components.button.min_height - 4.0);
-        let start = ui.cursor().min;
+        let frame_padding = 3.0;
         let mut combined: Option<Response> = None;
 
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 0.0;
-            for (index, label) in self.labels.iter().enumerate() {
-                let selected = *self.selected == index;
-                let mut response = nav_item(ui, label, self.size, selected, NavStyle::Segmented);
-                if response.clicked() && *self.selected != index {
-                    *self.selected = index;
-                    response.mark_changed();
-                }
-                combined = Some(match combined.take() {
-                    Some(existing) => existing.union(response),
-                    None => response,
+        let frame = egui::Frame::new()
+            .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+            .corner_radius(egui::CornerRadius::same(theme.radius.md as u8))
+            .inner_margin(egui::Margin::symmetric(
+                frame_padding as i8,
+                frame_padding as i8,
+            ))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 0.0;
+                    for (index, label) in self.labels.iter().enumerate() {
+                        let selected = *self.selected == index;
+                        let mut response =
+                            nav_item(ui, label, self.size, selected, NavStyle::Segmented);
+                        if response.clicked() && *self.selected != index {
+                            *self.selected = index;
+                            response.mark_changed();
+                        }
+                        combined = Some(match combined.take() {
+                            Some(existing) => existing.union(response),
+                            None => response,
+                        });
+                    }
                 });
-            }
-        });
 
-        let combined =
-            combined.unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, Sense::hover()));
+                combined.unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, Sense::hover()))
+            });
 
-        if ui.is_rect_visible(combined.rect) && combined.rect.is_positive() {
-            let frame_rect =
-                egui::Rect::from_min_max(start, combined.rect.max).expand2(egui::vec2(
-                    theme.spacing.xs,
-                    ((height - combined.rect.height()) / 2.0).max(0.0),
-                ));
-            ui.painter().rect_stroke(
-                frame_rect,
-                egui::CornerRadius::same(theme.radius.md as u8),
-                egui::Stroke::new(theme.stroke.sm, theme.colors.border),
-                StrokeKind::Outside,
-            );
-        }
-
-        combined
+        frame.response.union(frame.inner)
     }
 }
 
