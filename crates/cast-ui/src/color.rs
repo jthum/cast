@@ -35,6 +35,12 @@ pub(crate) fn mix_oklch(a: Color32, b: Color32, t: f32) -> Color32 {
 }
 
 #[must_use]
+pub fn mix_with_transparent(color: Color32, amount: f32) -> Color32 {
+    let alpha = (amount.clamp(0.0, 1.0) * 255.0).round() as u8;
+    with_alpha(color, alpha)
+}
+
+#[must_use]
 pub(crate) fn with_alpha(color: Color32, alpha: u8) -> Color32 {
     Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
 }
@@ -114,6 +120,18 @@ mod tests {
         );
 
         assert_eq!(mixed.a(), 255);
+    }
+
+    #[test]
+    fn transparent_mix_keeps_hue_and_applies_fractional_alpha() {
+        let primary = Color32::from_rgb(37, 99, 235);
+        let mixed = mix_with_transparent(primary, 0.30);
+        let [r, g, b, a] = mixed.to_srgba_unmultiplied();
+
+        assert!((i16::from(r) - i16::from(primary.r())).abs() <= 2);
+        assert!((i16::from(g) - i16::from(primary.g())).abs() <= 2);
+        assert!((i16::from(b) - i16::from(primary.b())).abs() <= 2);
+        assert_eq!(a, 77);
     }
 
     #[test]

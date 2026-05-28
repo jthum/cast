@@ -4,10 +4,10 @@ use egui::{
 };
 
 use crate::{
-    color::with_alpha,
+    color::{mix_with_transparent, with_alpha},
     foundation::Size,
     style::resolve_control_metrics,
-    theme::{CastTheme, ThemeMode, theme_for_ui},
+    theme::{CastTheme, theme_for_ui},
 };
 
 #[derive(Debug)]
@@ -241,7 +241,7 @@ fn nav_list_item(ui: &mut Ui, label: &str, size: Size, selected: bool) -> Respon
         let pressed = response.is_pointer_button_down_on();
         let fill = nav_fill(&theme, selected, hovered, pressed, NavStyle::Segmented);
         let border = if selected {
-            theme.colors.primary_family.border
+            selected_border(&theme, hovered, pressed)
         } else {
             Color32::TRANSPARENT
         };
@@ -290,7 +290,7 @@ fn paint_nav_item(
     let stroke = match style {
         NavStyle::Tab => egui::Stroke::NONE,
         NavStyle::Segmented if selected => {
-            egui::Stroke::new(theme.stroke.sm, theme.colors.primary_family.border)
+            egui::Stroke::new(theme.stroke.sm, selected_border(theme, hovered, pressed))
         }
         NavStyle::Segmented => egui::Stroke::new(theme.stroke.sm, Color32::TRANSPARENT),
     };
@@ -318,26 +318,38 @@ fn nav_fill(
     pressed: bool,
     style: NavStyle,
 ) -> Color32 {
-    let base = if selected {
+    if selected {
         match style {
             NavStyle::Tab => Color32::TRANSPARENT,
-            NavStyle::Segmented => theme.colors.primary_family.subtle,
+            NavStyle::Segmented => selected_fill(theme, hovered, pressed),
         }
     } else if hovered {
         theme.colors.surface_muted
     } else {
         Color32::TRANSPARENT
-    };
-
-    if pressed {
-        let anchor = match theme.mode {
-            ThemeMode::Light => Color32::BLACK,
-            ThemeMode::Dark => Color32::WHITE,
-        };
-        base.lerp_to_gamma(anchor, 0.10)
-    } else {
-        base
     }
+}
+
+fn selected_fill(theme: &CastTheme, hovered: bool, pressed: bool) -> Color32 {
+    let alpha = if pressed {
+        0.12
+    } else if hovered {
+        0.08
+    } else {
+        0.05
+    };
+    mix_with_transparent(theme.colors.primary_family.base, alpha)
+}
+
+fn selected_border(theme: &CastTheme, hovered: bool, pressed: bool) -> Color32 {
+    let alpha = if pressed {
+        0.46
+    } else if hovered {
+        0.38
+    } else {
+        0.30
+    };
+    mix_with_transparent(theme.colors.primary_family.base, alpha)
 }
 
 fn nav_fg(theme: &CastTheme, selected: bool, hovered: bool) -> Color32 {
@@ -389,5 +401,19 @@ mod tests {
         let nav = NavList::new(&mut selected, ["Workbench", "Components"]);
 
         assert_eq!(nav.labels, ["Workbench", "Components"]);
+    }
+
+    #[test]
+    fn selected_navigation_colors_use_transparent_primary_tints() {
+        let theme = CastTheme::light();
+        let fill = selected_fill(&theme, false, false);
+        let border = selected_border(&theme, false, false);
+        let [fill_r, _, _, fill_a] = fill.to_srgba_unmultiplied();
+        let [border_r, _, _, border_a] = border.to_srgba_unmultiplied();
+
+        assert!((i16::from(fill_r) - i16::from(theme.colors.primary_family.base.r())).abs() <= 3);
+        assert_eq!(fill_a, 13);
+        assert!((i16::from(border_r) - i16::from(theme.colors.primary_family.base.r())).abs() <= 3);
+        assert_eq!(border_a, 77);
     }
 }

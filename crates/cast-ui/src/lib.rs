@@ -6,7 +6,7 @@ pub mod foundation;
 mod style;
 pub mod theme;
 
-pub use color::contrast_ratio;
+pub use color::{contrast_ratio, mix_with_transparent};
 pub use components::{
     Alert, Badge, Button, Card, Checkbox, Label, Link, NavList, Notice, Panel, SearchInput,
     SegmentedControl, Separator, Switch, Tabs, TextInput,
