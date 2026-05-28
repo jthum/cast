@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link,
-    NavList, Notice, Panel as CastPanel, SearchInput, SegmentedControl, SemanticColorTokens,
+    NavList, Notice, Panel as CastPanel, Radio, SearchInput, SegmentedControl, SemanticColorTokens,
     Separator, Size, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, TypographyTokens,
     Variant,
     egui::{
@@ -37,6 +37,7 @@ struct CastGallery {
     enabled: bool,
     notifications: bool,
     indeterminate: bool,
+    form_density: usize,
     foundation_tab: usize,
     workflow_segment: usize,
     sidebar_section: usize,
@@ -59,6 +60,7 @@ impl CastGallery {
             enabled: true,
             notifications: true,
             indeterminate: false,
+            form_density: 1,
             foundation_tab: 0,
             workflow_segment: 0,
             sidebar_section: 0,
@@ -158,6 +160,7 @@ impl eframe::App for CastGallery {
                         &mut self.enabled,
                         &mut self.notifications,
                         &mut self.indeterminate,
+                        &mut self.form_density,
                         &mut self.foundation_tab,
                         &mut self.workflow_segment,
                     );
@@ -192,6 +195,7 @@ fn show_workspace_view(
     enabled: &mut bool,
     notifications: &mut bool,
     indeterminate: &mut bool,
+    form_density: &mut usize,
     foundation_tab: &mut usize,
     workflow_segment: &mut usize,
 ) {
@@ -216,6 +220,7 @@ fn show_workspace_view(
                 enabled,
                 notifications,
                 indeterminate,
+                form_density,
             );
         }
         1 => {
@@ -258,6 +263,7 @@ fn show_workspace_view(
                 enabled,
                 notifications,
                 indeterminate,
+                form_density,
             );
             ui.add_space(12.0);
             show_raw_egui_controls(ui, search, enabled);
@@ -1330,6 +1336,7 @@ fn show_text_and_feedback(ui: &mut egui::Ui) {
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn show_forms(
     ui: &mut egui::Ui,
     search: &mut String,
@@ -1338,6 +1345,7 @@ fn show_forms(
     enabled: &mut bool,
     notifications: &mut bool,
     indeterminate: &mut bool,
+    form_density: &mut usize,
 ) {
     Card::new().show(ui, |ui| {
         ui.heading("Forms");
@@ -1395,6 +1403,12 @@ fn show_forms(
         ui.horizontal_wrapped(|ui| {
             ui.add(Checkbox::new(enabled, "Enabled"));
             ui.add(Checkbox::new(indeterminate, "Mixed").indeterminate(true));
+            ui.add(Checkbox::new(notifications, "Disabled").disabled());
+        });
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Radio::new(form_density, 0, "Compact"));
+            ui.add(Radio::new(form_density, 1, "Comfortable"));
+            ui.add(Radio::new(form_density, 2, "Spacious"));
         });
         ui.horizontal(|ui| {
             ui.add(Switch::new(notifications));

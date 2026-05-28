@@ -16,7 +16,7 @@ pub use alert::{Alert, Notice};
 pub use badge::Badge;
 pub use button::Button;
 pub use card::Card;
-pub use checkbox::Checkbox;
+pub use checkbox::{Checkbox, Radio};
 pub use label::Label;
 pub use link::Link;
 pub use navigation::{NavList, SegmentedControl, Tabs};
