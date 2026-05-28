@@ -4,7 +4,7 @@ use egui::{
 };
 
 use crate::{
-    color::with_alpha,
+    color::{accessible_foreground, mix_with_transparent, with_alpha},
     foundation::{Intent, Size, Variant},
     style::resolve_component_style,
     theme::{ThemeMode, theme_for_ui},
@@ -136,12 +136,14 @@ impl Widget for Button {
             let fg = if enabled {
                 style.colors.fg
             } else {
-                theme.colors.text_subtle
+                disabled_button_fg(fill, &theme)
             };
             let border = if pressed || hovered {
                 theme.colors.border_strong
             } else if enabled {
                 style.colors.border
+            } else if fill != Color32::TRANSPARENT {
+                mix_with_transparent(accessible_foreground(fill), 0.18)
             } else {
                 theme.colors.border
             };
@@ -167,6 +169,14 @@ impl Widget for Button {
         }
 
         response
+    }
+}
+
+fn disabled_button_fg(fill: Color32, theme: &crate::CastTheme) -> Color32 {
+    if fill == Color32::TRANSPARENT {
+        theme.colors.text_subtle
+    } else {
+        accessible_foreground(fill)
     }
 }
 
@@ -244,5 +254,14 @@ mod tests {
             button_fill(Color32::TRANSPARENT, &theme, Variant::Ghost, true, true),
             theme.colors.surface_raised
         );
+    }
+
+    #[test]
+    fn disabled_solid_button_text_contrasts_with_fill() {
+        let theme = crate::CastTheme::light();
+        let fg = disabled_button_fg(theme.colors.primary_family.base, &theme);
+
+        assert_eq!(fg, accessible_foreground(theme.colors.primary_family.base));
+        assert!(crate::contrast_ratio(fg, theme.colors.primary_family.base) >= 4.5);
     }
 }

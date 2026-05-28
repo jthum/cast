@@ -197,9 +197,17 @@ fn nav_item(ui: &mut Ui, label: &str, size: Size, selected: bool, style: NavStyl
         font_id,
         theme.typography.letter_spacing,
     ));
+    let horizontal_padding = match style {
+        NavStyle::Tab => metrics.padding.x,
+        NavStyle::Segmented => metrics.padding.x * 1.25,
+    };
+    let vertical_padding = match style {
+        NavStyle::Tab => metrics.padding.y,
+        NavStyle::Segmented => metrics.padding.y * 1.1,
+    };
     let desired_size = egui::vec2(
-        galley.size().x + metrics.padding.x * 1.7,
-        (galley.size().y + metrics.padding.y * 1.7).max(metrics.min_height - 4.0),
+        galley.size().x + horizontal_padding * 2.0,
+        (galley.size().y + vertical_padding * 2.0).max(metrics.min_height - 4.0),
     );
     let (rect, response) = ui.allocate_exact_size(desired_size, Sense::click());
 
@@ -208,8 +216,12 @@ fn nav_item(ui: &mut Ui, label: &str, size: Size, selected: bool, style: NavStyl
         let pressed = response.is_pointer_button_down_on();
         paint_nav_item(ui, &theme, rect, selected, hovered, pressed, style);
         let fg = nav_fg(&theme, selected, hovered);
+        let text_rect = match style {
+            NavStyle::Tab => egui::Rect::from_min_max(rect.min, rect.max - egui::vec2(0.0, 2.0)),
+            NavStyle::Segmented => rect,
+        };
         ui.painter()
-            .galley(rect.center() - galley.size() / 2.0, galley, fg);
+            .galley(text_rect.center() - galley.size() / 2.0, galley, fg);
     }
 
     response
