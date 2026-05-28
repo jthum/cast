@@ -18,7 +18,7 @@ pub use card::Card;
 pub use checkbox::Checkbox;
 pub use label::Label;
 pub use link::Link;
-pub use navigation::{SegmentedControl, Tabs};
+pub use navigation::{NavList, SegmentedControl, Tabs};
 pub use panel::Panel;
 pub use separator::Separator;
 pub use switch::Switch;

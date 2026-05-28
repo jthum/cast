@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use cast::{
-    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link, Notice,
-    Panel as CastPanel, SearchInput, SegmentedControl, SemanticColorTokens, Separator, Size,
-    Switch, Tabs, TextInput, ThemeMode, ThemeSeed, TypographyTokens, Variant,
+    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link,
+    NavList, Notice, Panel as CastPanel, SearchInput, SegmentedControl, SemanticColorTokens,
+    Separator, Size, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -30,6 +30,7 @@ struct CastGallery {
     seed: ThemeSeed,
     zoom: f32,
     search: String,
+    command: String,
     name: String,
     handle: String,
     enabled: bool,
@@ -37,6 +38,7 @@ struct CastGallery {
     indeterminate: bool,
     foundation_tab: usize,
     workflow_segment: usize,
+    sidebar_section: usize,
 }
 
 impl CastGallery {
@@ -50,6 +52,7 @@ impl CastGallery {
             seed,
             zoom: 1.0,
             search: String::new(),
+            command: String::from("Refine the component gallery into an app-like surface"),
             name: String::from("Cast"),
             handle: String::new(),
             enabled: true,
@@ -57,6 +60,7 @@ impl CastGallery {
             indeterminate: false,
             foundation_tab: 0,
             workflow_segment: 0,
+            sidebar_section: 0,
         }
     }
 
@@ -78,7 +82,8 @@ impl eframe::App for CastGallery {
 
         EguiPanel::top("top_bar").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.heading("Cast Gallery");
+                ui.heading("Cast");
+                ui.add(Badge::new("Gallery").intent(Intent::Info));
                 ui.separator();
                 let mut mode_index = match self.seed.mode {
                     ThemeMode::Light => 0,
@@ -112,13 +117,18 @@ impl eframe::App for CastGallery {
                 cast_scroll_area("sidebar_scroll", &self.theme)
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        ui.heading("Components");
-                        ui.separator();
-                        ui.label("Foundation");
-                        ui.label("Button");
-                        ui.label("Badge");
-                        ui.label("Card");
-                        ui.label("Inputs");
+                        ui.heading("Workspace");
+                        ui.add_space(6.0);
+                        ui.add(
+                            SearchInput::new(&mut self.search)
+                                .hint_text("Search components")
+                                .width(184.0),
+                        );
+                        ui.add_space(10.0);
+                        ui.add(NavList::new(
+                            &mut self.sidebar_section,
+                            ["Workbench", "Foundations", "Components", "Theme lab"],
+                        ));
                         ui.separator();
                         if show_theme_editor(ui, &mut self.seed) {
                             self.apply_theme(&ctx);
@@ -130,44 +140,22 @@ impl eframe::App for CastGallery {
             cast_scroll_area("main_scroll", &self.theme)
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
-                    ui.heading(RichText::new("Foundations").size(24.0));
-                    ui.label("Runtime theme switching, live palette editing, semantic tokens, and initial primitives.");
-                    ui.add_space(12.0);
-
-                    show_theme_foundation(ui);
-                    ui.add_space(12.0);
-                    show_palette_preview(ui, &self.theme);
-                    ui.add_space(12.0);
-                    show_typography_gallery(ui, &self.theme);
-                    ui.add_space(12.0);
-                    show_typography_diagnostics(
+                    show_workspace_view(
                         ui,
+                        self.sidebar_section,
                         &self.theme,
                         ctx.pixels_per_point(),
                         self.zoom,
-                    );
-                    ui.add_space(12.0);
-                    show_override_preview(ui);
-                    ui.add_space(12.0);
-                    show_navigation_layout(ui, &mut self.foundation_tab, &mut self.workflow_segment);
-                    ui.add_space(12.0);
-                    show_buttons_and_badges(ui);
-                    ui.add_space(12.0);
-                    show_surfaces(ui);
-                    ui.add_space(12.0);
-                    show_text_and_feedback(ui);
-                    ui.add_space(12.0);
-                    show_forms(
-                        ui,
+                        &mut self.command,
                         &mut self.search,
                         &mut self.name,
                         &mut self.handle,
                         &mut self.enabled,
                         &mut self.notifications,
                         &mut self.indeterminate,
+                        &mut self.foundation_tab,
+                        &mut self.workflow_segment,
                     );
-                    ui.add_space(12.0);
-                    show_raw_egui_controls(ui, &mut self.search, &mut self.enabled);
                 });
         });
     }
@@ -183,6 +171,270 @@ fn cast_scroll_area(id: &'static str, theme: &CastTheme) -> ScrollArea {
             mouse_wheel: true,
         })
         .wheel_scroll_multiplier(egui::vec2(1.0, theme.scroll.wheel_multiplier))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn show_workspace_view(
+    ui: &mut egui::Ui,
+    section: usize,
+    theme: &CastTheme,
+    pixels_per_point: f32,
+    zoom: f32,
+    command: &mut String,
+    search: &mut String,
+    name: &mut String,
+    handle: &mut String,
+    enabled: &mut bool,
+    notifications: &mut bool,
+    indeterminate: &mut bool,
+    foundation_tab: &mut usize,
+    workflow_segment: &mut usize,
+) {
+    match section {
+        0 => {
+            workspace_header(
+                ui,
+                "Agent workspace",
+                "A composed Cast surface with navigation, forms, status, and feedback.",
+                Intent::Primary,
+            );
+            ui.add_space(12.0);
+            show_workbench_preview(ui, theme, command, workflow_segment);
+            ui.add_space(12.0);
+            show_navigation_layout(ui, foundation_tab, workflow_segment);
+            ui.add_space(12.0);
+            show_forms(
+                ui,
+                search,
+                name,
+                handle,
+                enabled,
+                notifications,
+                indeterminate,
+            );
+        }
+        1 => {
+            workspace_header(
+                ui,
+                "Foundations",
+                "Runtime theme switching, live palette editing, semantic tokens, and typography.",
+                Intent::Info,
+            );
+            ui.add_space(12.0);
+            show_theme_foundation(ui);
+            ui.add_space(12.0);
+            show_palette_preview(ui, theme);
+            ui.add_space(12.0);
+            show_typography_gallery(ui, theme);
+            ui.add_space(12.0);
+            show_typography_diagnostics(ui, theme, pixels_per_point, zoom);
+        }
+        2 => {
+            workspace_header(
+                ui,
+                "Components",
+                "Current primitives with states, variants, forms, and baseline egui comparisons.",
+                Intent::Secondary,
+            );
+            ui.add_space(12.0);
+            show_override_preview(ui);
+            ui.add_space(12.0);
+            show_buttons_and_badges(ui);
+            ui.add_space(12.0);
+            show_surfaces(ui);
+            ui.add_space(12.0);
+            show_text_and_feedback(ui);
+            ui.add_space(12.0);
+            show_forms(
+                ui,
+                search,
+                name,
+                handle,
+                enabled,
+                notifications,
+                indeterminate,
+            );
+            ui.add_space(12.0);
+            show_raw_egui_controls(ui, search, enabled);
+        }
+        _ => {
+            workspace_header(
+                ui,
+                "Theme lab",
+                "A focused view for token derivation, live overrides, type diagnostics, and palette checks.",
+                Intent::Success,
+            );
+            ui.add_space(12.0);
+            show_palette_preview(ui, theme);
+            ui.add_space(12.0);
+            show_typography_diagnostics(ui, theme, pixels_per_point, zoom);
+            ui.add_space(12.0);
+            show_override_preview(ui);
+        }
+    }
+}
+
+fn workspace_header(ui: &mut egui::Ui, title: &str, subtitle: &str, intent: Intent) {
+    let theme = cast::theme_for_ui(ui);
+    ui.horizontal_wrapped(|ui| {
+        ui.heading(RichText::new(title).size(24.0));
+        ui.add(Badge::new("Live").intent(intent));
+    });
+    ui.label(
+        RichText::new(subtitle)
+            .font(theme.typography.body.clone())
+            .color(theme.colors.text_muted)
+            .extra_letter_spacing(theme.typography.letter_spacing),
+    );
+}
+
+fn show_workbench_preview(
+    ui: &mut egui::Ui,
+    theme: &CastTheme,
+    command: &mut String,
+    workflow_segment: &mut usize,
+) {
+    ui.columns(2, |columns| {
+        CastPanel::new().show(&mut columns[0], |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.heading("Run composer");
+                ui.add(Badge::new("Ready").intent(Intent::Success));
+            });
+            ui.add_space(8.0);
+            ui.add(
+                TextInput::new(command)
+                    .label("Instruction")
+                    .hint_text("Ask Cast to refine a surface")
+                    .help_text(
+                        "Previewing field anatomy, status, and actions in one composed pane.",
+                    )
+                    .width(ui.available_width()),
+            );
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.add(Button::new("Run").leading_icon("[>]"));
+                ui.add(
+                    Button::new("Review")
+                        .intent(Intent::Secondary)
+                        .variant(Variant::Outline),
+                );
+                ui.add(Button::new("Save preset").variant(Variant::Ghost));
+            });
+            ui.add(Separator::new().spacing(12.0));
+            activity_row(ui, "01", "Inspect theme tokens", "Done", Intent::Success);
+            activity_row(
+                ui,
+                "02",
+                "Tune input and navigation states",
+                "Active",
+                Intent::Info,
+            );
+            activity_row(
+                ui,
+                "03",
+                "Review widget-specific feedback",
+                "Next",
+                Intent::Neutral,
+            );
+        });
+
+        CastPanel::new().show(&mut columns[1], |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.heading("Interface state");
+                ui.add(SegmentedControl::new(
+                    workflow_segment,
+                    ["Design", "Build", "Ship"],
+                ));
+            });
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                metric_tile(ui, "Accent", "Primary", theme.colors.primary_family.base);
+                metric_tile(
+                    ui,
+                    "Radius",
+                    format!("{:.0}px", theme.radius.md),
+                    theme.colors.border,
+                );
+                metric_tile(
+                    ui,
+                    "Type",
+                    format!("{:.0}px", theme.typography.body.size),
+                    theme.colors.secondary_family.base,
+                );
+            });
+            ui.add(Separator::new().spacing(12.0));
+            ui.add(
+                Alert::new("Theme-safe by default")
+                    .body("The preview is using the same runtime tokens exposed in the editor.")
+                    .intent(Intent::Info),
+            );
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.add(Badge::new("Accessible").intent(Intent::Success));
+                ui.add(Badge::new("Immediate mode").intent(Intent::Secondary));
+                ui.add(Badge::new("Runtime theme").intent(Intent::Primary));
+            });
+        });
+    });
+}
+
+fn activity_row(ui: &mut egui::Ui, number: &str, label: &str, status: &str, intent: Intent) {
+    let theme = cast::theme_for_ui(ui);
+    ui.horizontal_wrapped(|ui| {
+        ui.add_sized(
+            [28.0, 22.0],
+            egui::Label::new(
+                RichText::new(number)
+                    .font(theme.typography.caption.clone())
+                    .color(theme.colors.text_subtle)
+                    .extra_letter_spacing(theme.typography.letter_spacing),
+            ),
+        );
+        ui.label(
+            RichText::new(label)
+                .font(theme.typography.body.clone())
+                .color(theme.colors.text)
+                .extra_letter_spacing(theme.typography.letter_spacing),
+        );
+        ui.add(Badge::new(status).intent(intent).size(Size::Small));
+    });
+}
+
+fn metric_tile(ui: &mut egui::Ui, label: &str, value: impl Into<String>, color: Color32) {
+    let theme = cast::theme_for_ui(ui);
+    let width = 96.0;
+    let height = 58.0;
+    let (rect, _response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+
+    if ui.is_rect_visible(rect) {
+        ui.painter().rect(
+            rect,
+            egui::CornerRadius::same(theme.radius.md as u8),
+            theme.colors.surface,
+            egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+            egui::StrokeKind::Outside,
+        );
+        let swatch = egui::Rect::from_min_size(
+            rect.min + egui::vec2(theme.spacing.sm, theme.spacing.sm),
+            egui::vec2(10.0, 10.0),
+        );
+        ui.painter()
+            .rect_filled(swatch, egui::CornerRadius::same(2), color);
+        ui.painter().text(
+            rect.min + egui::vec2(theme.spacing.sm + 16.0, theme.spacing.xs + 2.0),
+            egui::Align2::LEFT_TOP,
+            label,
+            theme.typography.caption.clone(),
+            theme.colors.text_subtle,
+        );
+        ui.painter().text(
+            rect.min + egui::vec2(theme.spacing.sm, 30.0),
+            egui::Align2::LEFT_TOP,
+            value.into(),
+            theme.typography.strong.clone(),
+            theme.colors.text,
+        );
+    }
 }
 
 fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {

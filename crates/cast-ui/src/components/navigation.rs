@@ -128,6 +128,55 @@ impl Widget for SegmentedControl<'_> {
     }
 }
 
+#[derive(Debug)]
+pub struct NavList<'a> {
+    selected: &'a mut usize,
+    labels: Vec<String>,
+    size: Size,
+}
+
+impl<'a> NavList<'a> {
+    #[must_use]
+    pub fn new<I, L>(selected: &'a mut usize, labels: I) -> Self
+    where
+        I: IntoIterator<Item = L>,
+        L: Into<String>,
+    {
+        Self {
+            selected,
+            labels: labels.into_iter().map(Into::into).collect(),
+            size: Size::Medium,
+        }
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+impl Widget for NavList<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let mut combined = ui.allocate_response(egui::Vec2::ZERO, Sense::hover());
+
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = theme_for_ui(ui).spacing.xs;
+            for (index, label) in self.labels.iter().enumerate() {
+                let selected = *self.selected == index;
+                let mut response = nav_list_item(ui, label, self.size, selected);
+                if response.clicked() && *self.selected != index {
+                    *self.selected = index;
+                    response.mark_changed();
+                }
+                combined = combined.union(response);
+            }
+        });
+
+        combined
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum NavStyle {
     Tab,
@@ -161,6 +210,67 @@ fn nav_item(ui: &mut Ui, label: &str, size: Size, selected: bool, style: NavStyl
         let fg = nav_fg(&theme, selected, hovered);
         ui.painter()
             .galley(rect.center() - galley.size() / 2.0, galley, fg);
+    }
+
+    response
+}
+
+fn nav_list_item(ui: &mut Ui, label: &str, size: Size, selected: bool) -> Response {
+    let theme = theme_for_ui(ui);
+    let metrics = resolve_control_metrics(&theme, size);
+    let mut font_id = theme.typography.button.clone();
+    font_id.size = match size {
+        Size::Small => theme.typography.small.size,
+        Size::Medium => theme.typography.body.size,
+        Size::Large => theme.typography.body.size + 1.0,
+    };
+    let galley = ui.painter().layout_job(nav_layout_job(
+        label.to_owned(),
+        font_id,
+        theme.typography.letter_spacing,
+    ));
+    let desired_size = egui::vec2(
+        ui.available_width()
+            .max(galley.size().x + metrics.padding.x * 2.0),
+        (galley.size().y + metrics.padding.y * 1.5).max(metrics.min_height - 4.0),
+    );
+    let (rect, response) = ui.allocate_exact_size(desired_size, Sense::click());
+
+    if ui.is_rect_visible(rect) {
+        let hovered = response.hovered();
+        let pressed = response.is_pointer_button_down_on();
+        let fill = nav_fill(&theme, selected, hovered, pressed, NavStyle::Segmented);
+        let border = if selected {
+            theme.colors.primary_family.border
+        } else {
+            Color32::TRANSPARENT
+        };
+        ui.painter().rect(
+            rect,
+            egui::CornerRadius::same(theme.radius.md as u8),
+            fill,
+            egui::Stroke::new(theme.stroke.sm, border),
+            StrokeKind::Outside,
+        );
+
+        if selected {
+            let accent = egui::Rect::from_min_max(
+                egui::pos2(rect.min.x, rect.min.y + theme.spacing.xs),
+                egui::pos2(rect.min.x + 2.0, rect.max.y - theme.spacing.xs),
+            );
+            ui.painter().rect_filled(
+                accent,
+                egui::CornerRadius::same(1),
+                theme.colors.primary_family.base,
+            );
+        }
+
+        let text_pos = egui::pos2(
+            rect.min.x + metrics.padding.x,
+            rect.center().y - galley.size().y / 2.0,
+        );
+        ui.painter()
+            .galley(text_pos, galley, nav_fg(&theme, selected, hovered));
     }
 
     response
@@ -271,5 +381,13 @@ mod tests {
         let segmented = SegmentedControl::new(&mut selected, ["Light", "Dark"]).size(Size::Small);
 
         assert_eq!(segmented.size, Size::Small);
+    }
+
+    #[test]
+    fn nav_list_stores_labels() {
+        let mut selected = 0;
+        let nav = NavList::new(&mut selected, ["Workbench", "Components"]);
+
+        assert_eq!(nav.labels, ["Workbench", "Components"]);
     }
 }
