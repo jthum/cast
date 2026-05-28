@@ -229,6 +229,7 @@ fn paint_choice_mark(
     };
     let fill = choice_fill(theme, selected, hovered, pressed, enabled, kind);
     let border = choice_border(theme, selected, hovered, pressed, enabled, kind);
+    let border_width = choice_border_width(theme);
 
     if hovered || pressed {
         ui.painter().rect_filled(
@@ -244,7 +245,7 @@ fn paint_choice_mark(
                 rect,
                 radius,
                 fill,
-                egui::Stroke::new(theme.stroke.sm.max(1.0), border),
+                egui::Stroke::new(border_width, border),
                 StrokeKind::Outside,
             );
         }
@@ -254,7 +255,7 @@ fn paint_choice_mark(
             ui.painter().circle_stroke(
                 rect.center(),
                 rect.width() / 2.0,
-                egui::Stroke::new(theme.stroke.sm.max(1.0), border),
+                egui::Stroke::new(border_width, border),
             );
         }
     }
@@ -361,6 +362,10 @@ fn choice_border(
     }
 }
 
+fn choice_border_width(theme: &CastTheme) -> f32 {
+    theme.stroke.sm.max(1.5)
+}
+
 fn choice_mark_size(size: Size) -> f32 {
     match size {
         Size::Small => 14.0,
@@ -435,5 +440,13 @@ mod tests {
             choice_border(&theme, true, false, false, true, ChoiceKind::Radio),
             theme.colors.primary_family.base
         );
+    }
+
+    #[test]
+    fn choice_border_width_has_a_crisp_floor() {
+        let mut theme = CastTheme::dark();
+        theme.stroke.sm = 1.0;
+
+        assert_eq!(choice_border_width(&theme), 1.5);
     }
 }

@@ -1366,7 +1366,7 @@ impl ComponentTokens {
                 min_height: controls.min_height,
             },
             badge: BadgeTokens {
-                radius: radius.full,
+                radius: radius.md * 2.0,
                 border_width: stroke.sm,
                 padding_x: spacing.sm,
                 padding_y: spacing.xs,
@@ -1902,6 +1902,7 @@ mod tests {
 
         assert_eq!(theme.spacing.md, 18.0);
         assert_eq!(theme.components.card.radius, theme.radius.lg);
+        assert_eq!(theme.components.badge.radius, theme.radius.md * 2.0);
         assert_eq!(theme.components.card.border_width, 2.0);
         assert_eq!(theme.typography.body.size, 16.0);
         assert_eq!(theme.components.button.min_height, 40.0);

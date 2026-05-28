@@ -713,6 +713,13 @@ fn show_override_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
     );
     changed |= optional_theme_slider(
         ui,
+        "Badge radius",
+        &mut seed.component_overrides.badge.radius,
+        seed.radius.md * 2.0,
+        0.0..=28.0,
+    );
+    changed |= optional_theme_slider(
+        ui,
         "Badge height",
         &mut seed.component_overrides.badge.min_height,
         seed.controls.min_height - 6.0,

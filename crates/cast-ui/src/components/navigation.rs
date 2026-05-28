@@ -41,10 +41,14 @@ impl<'a> Tabs<'a> {
 impl Widget for Tabs<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
+        let frame_padding = 3.0;
         let frame = egui::Frame::new()
             .fill(theme.colors.surface_muted)
-            .corner_radius(egui::CornerRadius::same(18))
-            .inner_margin(egui::Margin::symmetric(3, 3))
+            .corner_radius(tab_frame_radius(&theme, frame_padding))
+            .inner_margin(egui::Margin::symmetric(
+                frame_padding as i8,
+                frame_padding as i8,
+            ))
             .show(ui, |ui| {
                 let mut combined: Option<Response> = None;
 
@@ -310,7 +314,7 @@ fn paint_nav_item(
     style: NavStyle,
 ) {
     let radius = match style {
-        NavStyle::Tab => egui::CornerRadius::same((rect.height() / 2.0).round() as u8),
+        NavStyle::Tab => tab_item_radius(theme),
         NavStyle::Segmented => segmented_item_radius(theme),
     };
     let fill = nav_fill(theme, selected, hovered, pressed, style);
@@ -324,6 +328,18 @@ fn paint_nav_item(
 
     ui.painter()
         .rect(rect, radius, fill, stroke, StrokeKind::Outside);
+}
+
+fn tab_frame_radius(theme: &CastTheme, frame_padding: f32) -> egui::CornerRadius {
+    egui::CornerRadius::same((tab_item_radius_px(theme) + frame_padding).round() as u8)
+}
+
+fn tab_item_radius(theme: &CastTheme) -> egui::CornerRadius {
+    egui::CornerRadius::same(tab_item_radius_px(theme).round() as u8)
+}
+
+fn tab_item_radius_px(theme: &CastTheme) -> f32 {
+    theme.radius.md * 2.0
 }
 
 fn segmented_frame_radius(theme: &CastTheme, frame_padding: f32) -> egui::CornerRadius {
@@ -429,6 +445,17 @@ mod tests {
         let segmented = SegmentedControl::new(&mut selected, ["Light", "Dark"]).size(Size::Small);
 
         assert_eq!(segmented.size, Size::Small);
+    }
+
+    #[test]
+    fn tab_radius_follows_theme_radius() {
+        let mut sharp = CastTheme::light();
+        let mut soft = CastTheme::light();
+        sharp.radius.md = 2.0;
+        soft.radius.md = 10.0;
+
+        assert!(tab_item_radius(&soft).nw > tab_item_radius(&sharp).nw);
+        assert!(tab_frame_radius(&soft, 3.0).nw > tab_frame_radius(&sharp, 3.0).nw);
     }
 
     #[test]

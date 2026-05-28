@@ -1,10 +1,10 @@
 use egui::{Response, RichText, Ui, Widget};
 
 use crate::{
-    color::mix_with_transparent,
+    color::{contrast_ratio, mix_oklch, mix_with_transparent},
     foundation::{Intent, Size, Variant},
     style::{IntentColors, resolve_badge_metrics, resolve_intent_colors},
-    theme::{CastTheme, SemanticColorTokens, theme_for_ui},
+    theme::{CastTheme, SemanticColorTokens, ThemeMode, theme_for_ui},
 };
 
 #[derive(Clone, Debug)]
@@ -83,6 +83,26 @@ fn resolve_badge_colors(
 ) -> IntentColors {
     let variant = explicit_variant.unwrap_or_else(|| default_badge_variant(intent));
 
+    if matches!(
+        (theme.mode, intent, variant),
+        (ThemeMode::Dark, Intent::Primary, Variant::Solid)
+    ) {
+        return IntentColors {
+            fill: theme.colors.text,
+            fg: dark_primary_badge_fg(theme),
+            border: theme.colors.text,
+        };
+    }
+
+    if variant == Variant::Outline && intent != Intent::Neutral {
+        let family = badge_semantic_family(theme, intent);
+        return IntentColors {
+            fill: egui::Color32::TRANSPARENT,
+            fg: family.base,
+            border: mix_with_transparent(family.base, 0.30),
+        };
+    }
+
     if variant != Variant::Subtle || matches!(intent, Intent::Neutral) {
         return resolve_intent_colors(theme, intent, variant);
     }
@@ -113,6 +133,15 @@ fn badge_semantic_family(theme: &CastTheme, intent: Intent) -> SemanticColorToke
         Intent::Warning => theme.colors.warning_family,
         Intent::Danger => theme.colors.danger_family,
         Intent::Info => theme.colors.info_family,
+    }
+}
+
+fn dark_primary_badge_fg(theme: &CastTheme) -> egui::Color32 {
+    let base = theme.colors.primary_family.base;
+    if contrast_ratio(theme.colors.text, base) >= 4.5 {
+        base
+    } else {
+        mix_oklch(base, egui::Color32::BLACK, 0.36)
     }
 }
 
@@ -150,5 +179,24 @@ mod tests {
 
         assert_eq!(fill_alpha, 13);
         assert_eq!(colors.fg, theme.colors.primary_family.base);
+    }
+
+    #[test]
+    fn dark_primary_badge_uses_light_fill_with_contrast_adjusted_primary_text() {
+        let theme = CastTheme::dark();
+        let colors = resolve_badge_colors(&theme, Intent::Primary, None);
+
+        assert_eq!(colors.fill, theme.colors.text);
+        assert!(contrast_ratio(colors.fill, colors.fg) >= 4.5);
+    }
+
+    #[test]
+    fn outline_badge_uses_transparent_semantic_border() {
+        let theme = CastTheme::dark();
+        let colors = resolve_badge_colors(&theme, Intent::Primary, Some(Variant::Outline));
+        let [_, _, _, border_alpha] = colors.border.to_srgba_unmultiplied();
+
+        assert_eq!(colors.fill, egui::Color32::TRANSPARENT);
+        assert_eq!(border_alpha, 77);
     }
 }

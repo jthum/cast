@@ -5,7 +5,7 @@ use egui::{Color32, Response, Sense, StrokeKind, Ui, Widget};
 use crate::{
     color::{mix_with_transparent, with_alpha},
     foundation::Size,
-    theme::theme_for_ui,
+    theme::{CastTheme, ThemeMode, theme_for_ui},
 };
 
 #[derive(Debug)]
@@ -227,7 +227,7 @@ fn paint_slider(
         with_alpha(Color32::BLACK, theme.elevation.shadow_alpha / 2),
     );
     ui.painter()
-        .circle_filled(center, thumb_radius, theme.colors.surface);
+        .circle_filled(center, thumb_radius, slider_thumb_fill(&theme));
     ui.painter().circle_stroke(
         center,
         thumb_radius,
@@ -240,6 +240,13 @@ fn paint_slider(
             },
         ),
     );
+}
+
+fn slider_thumb_fill(theme: &CastTheme) -> Color32 {
+    match theme.mode {
+        ThemeMode::Light => theme.colors.surface,
+        ThemeMode::Dark => theme.colors.text,
+    }
 }
 
 fn normalized_value(value: f32, range: &RangeInclusive<f32>) -> f32 {
@@ -282,5 +289,12 @@ mod tests {
     fn slider_value_format_is_compact() {
         assert_eq!(format_slider_value(14.2), "14");
         assert_eq!(format_slider_value(0.75), "0.75");
+    }
+
+    #[test]
+    fn slider_thumb_uses_bright_fill_in_dark_mode() {
+        let theme = CastTheme::dark();
+
+        assert_eq!(slider_thumb_fill(&theme), theme.colors.text);
     }
 }
