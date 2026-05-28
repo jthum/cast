@@ -4,9 +4,8 @@ use egui::{
 };
 
 use crate::{
-    Button,
     color::{mix_with_transparent, with_alpha},
-    foundation::{Intent, Size, Variant},
+    foundation::{Intent, Size},
     style::{IntentColors, menu_frame, resolve_control_metrics},
     theme::{CastTheme, theme_for_ui},
 };
@@ -78,15 +77,7 @@ impl Widget for Dropdown<'_> {
             .map(String::as_str)
             .unwrap_or(&self.placeholder);
         let width = self.width.unwrap_or(180.0);
-        let mut response = ui.add_sized(
-            egui::vec2(width, 0.0),
-            Button::new(label)
-                .intent(Intent::Neutral)
-                .variant(Variant::Outline)
-                .size(self.size)
-                .trailing_icon("v")
-                .enabled(self.enabled),
-        );
+        let mut response = dropdown_trigger(ui, label, width, self.size, self.enabled);
         let mut changed = false;
 
         if self.enabled {
@@ -115,6 +106,97 @@ impl Widget for Dropdown<'_> {
 
         response
     }
+}
+
+fn dropdown_trigger(ui: &mut Ui, label: &str, width: f32, size: Size, enabled: bool) -> Response {
+    let theme = theme_for_ui(ui);
+    let metrics = resolve_control_metrics(&theme, size);
+    let mut font_id = theme.typography.button.clone();
+    font_id.size = match size {
+        Size::Small => theme.typography.small.size,
+        Size::Medium => theme.typography.body.size,
+        Size::Large => theme.typography.body.size + 1.0,
+    };
+    let galley = ui.painter().layout_job(menu_layout_job(
+        label.to_owned(),
+        font_id,
+        theme.typography.letter_spacing,
+    ));
+    let desired_size = egui::vec2(
+        width.max(galley.size().x + metrics.padding.x * 2.0 + dropdown_icon_space(&theme)),
+        metrics.min_height,
+    );
+    let sense = if enabled {
+        Sense::click()
+    } else {
+        Sense::hover()
+    };
+    let (rect, response) = ui.allocate_exact_size(desired_size, sense);
+
+    if ui.is_rect_visible(rect) {
+        let hovered = enabled && response.hovered();
+        let pressed = enabled && response.is_pointer_button_down_on();
+        let fill = if pressed {
+            theme.colors.surface_raised
+        } else if hovered {
+            theme.colors.surface_muted
+        } else {
+            Color32::TRANSPARENT
+        };
+        let fg = if enabled {
+            theme.colors.text
+        } else {
+            theme.colors.text_subtle
+        };
+        let border = if enabled {
+            mix_with_transparent(theme.colors.text, 0.30)
+        } else {
+            theme.colors.border
+        };
+        let radius = egui::CornerRadius::same(theme.components.button.radius.round() as u8);
+
+        ui.painter().rect(
+            rect,
+            radius,
+            fill,
+            egui::Stroke::new(theme.components.button.border_width, border),
+            StrokeKind::Outside,
+        );
+        ui.painter().galley(
+            egui::pos2(
+                rect.min.x + metrics.padding.x,
+                rect.center().y - galley.size().y / 2.0,
+            ),
+            galley,
+            fg,
+        );
+        paint_dropdown_chevron(ui, &theme, rect, fg);
+    }
+
+    response
+}
+
+fn paint_dropdown_chevron(ui: &Ui, theme: &CastTheme, rect: egui::Rect, color: Color32) {
+    let points = dropdown_chevron_points(rect, theme);
+    let stroke = egui::Stroke::new(theme.stroke.md.max(1.5), color);
+
+    ui.painter().line_segment([points[0], points[1]], stroke);
+    ui.painter().line_segment([points[1], points[2]], stroke);
+}
+
+fn dropdown_chevron_points(rect: egui::Rect, theme: &CastTheme) -> [egui::Pos2; 3] {
+    let center = egui::pos2(rect.max.x - theme.spacing.md, rect.center().y);
+    let size = 4.0;
+
+    [
+        egui::pos2(center.x - size, center.y - size * 0.45),
+        egui::pos2(center.x, center.y + size * 0.55),
+        egui::pos2(center.x + size, center.y - size * 0.45),
+    ]
+}
+
+fn dropdown_icon_space(theme: &CastTheme) -> f32 {
+    theme.spacing.lg + theme.spacing.sm
 }
 
 #[derive(Clone, Debug)]
@@ -342,5 +424,26 @@ mod tests {
         let colors = menu_item_colors(&theme, Intent::Danger, false, false, false);
 
         assert_eq!(colors.fg, theme.colors.danger_family.base);
+    }
+
+    #[test]
+    fn dropdown_chevron_points_form_downward_caret() {
+        let theme = CastTheme::light();
+        let rect = egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(180.0, 36.0));
+        let points = dropdown_chevron_points(rect, &theme);
+
+        assert!(points[1].y > points[0].y);
+        assert!(points[1].y > points[2].y);
+        assert_eq!(points[0].y, points[2].y);
+    }
+
+    #[test]
+    fn dropdown_icon_space_uses_theme_spacing() {
+        let theme = CastTheme::light();
+
+        assert_eq!(
+            dropdown_icon_space(&theme),
+            theme.spacing.lg + theme.spacing.sm
+        );
     }
 }
