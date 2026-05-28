@@ -4,9 +4,9 @@ use egui::{
 };
 
 use crate::{
-    color::{accessible_foreground, mix_with_transparent, with_alpha},
+    color::{accessible_foreground, mix_with_transparent},
     foundation::{Intent, Size, Variant},
-    style::resolve_component_style,
+    style::{IntentColors, resolve_component_style},
     theme::{ThemeMode, theme_for_ui},
 };
 
@@ -105,6 +105,7 @@ impl Widget for Button {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
         let style = resolve_component_style(&theme, self.intent, self.variant, self.size);
+        let colors = button_colors(&theme, self.intent, self.variant);
         let enabled = self.enabled && !self.loading;
         let text = self.display_label();
         let mut font_id = theme.typography.button.clone();
@@ -132,36 +133,23 @@ impl Widget for Button {
             let radius = egui::CornerRadius::same(theme.components.button.radius as u8);
             let depth = if pressed { 1.0 } else { 0.0 };
             let paint_rect = rect.translate(egui::vec2(0.0, depth));
-            let fill = button_fill(style.colors.fill, &theme, self.variant, hovered, pressed);
+            let accent = button_accent(&theme, self.intent).0;
+            let fill = button_fill(colors.fill, accent, &theme, self.variant, hovered, pressed);
             let fg = if enabled {
-                style.colors.fg
+                colors.fg
             } else {
                 disabled_button_fg(fill, &theme)
             };
-            let border = if pressed || hovered {
-                theme.colors.border_strong
-            } else if enabled {
-                style.colors.border
-            } else if fill != Color32::TRANSPARENT {
-                mix_with_transparent(accessible_foreground(fill), 0.18)
-            } else {
-                theme.colors.border
-            };
-
-            if enabled && style.colors.fill != Color32::TRANSPARENT && !pressed {
-                let shadow_rect = rect.translate(egui::vec2(0.0, 1.5));
-                ui.painter().rect_filled(
-                    shadow_rect,
-                    radius,
-                    with_alpha(Color32::BLACK, theme.elevation.shadow_alpha / 2),
-                );
-            }
+            let border = button_border(accent, self.variant, enabled, hovered, pressed);
 
             ui.painter().rect(
                 paint_rect,
                 radius,
                 fill,
-                egui::Stroke::new(style.stroke.width, border),
+                egui::Stroke::new(
+                    button_border_width(style.stroke.width, self.variant),
+                    border,
+                ),
                 StrokeKind::Outside,
             );
             let text_pos = paint_rect.center() - galley.size() / 2.0;
@@ -169,6 +157,65 @@ impl Widget for Button {
         }
 
         response
+    }
+}
+
+fn button_colors(theme: &crate::CastTheme, intent: Intent, variant: Variant) -> IntentColors {
+    let (accent, solid_fg) = button_accent(theme, intent);
+
+    match variant {
+        Variant::Solid if intent == Intent::Neutral => IntentColors {
+            fill: theme.colors.surface_muted,
+            fg: theme.colors.text,
+            border: Color32::TRANSPARENT,
+        },
+        Variant::Solid => IntentColors {
+            fill: accent,
+            fg: solid_fg,
+            border: Color32::TRANSPARENT,
+        },
+        Variant::Subtle => IntentColors {
+            fill: mix_with_transparent(accent, 0.05),
+            fg: accent,
+            border: mix_with_transparent(accent, 0.30),
+        },
+        Variant::Outline => IntentColors {
+            fill: Color32::TRANSPARENT,
+            fg: accent,
+            border: mix_with_transparent(accent, 0.30),
+        },
+        Variant::Ghost => IntentColors {
+            fill: Color32::TRANSPARENT,
+            fg: accent,
+            border: Color32::TRANSPARENT,
+        },
+    }
+}
+
+fn button_accent(theme: &crate::CastTheme, intent: Intent) -> (Color32, Color32) {
+    match intent {
+        Intent::Neutral => (theme.colors.text, theme.colors.text),
+        Intent::Primary => (
+            theme.colors.primary_family.base,
+            theme.colors.primary_family.fg,
+        ),
+        Intent::Secondary => (
+            theme.colors.secondary_family.base,
+            theme.colors.secondary_family.fg,
+        ),
+        Intent::Success => (
+            theme.colors.success_family.base,
+            theme.colors.success_family.fg,
+        ),
+        Intent::Warning => (
+            theme.colors.warning_family.base,
+            theme.colors.warning_family.fg,
+        ),
+        Intent::Danger => (
+            theme.colors.danger_family.base,
+            theme.colors.danger_family.fg,
+        ),
+        Intent::Info => (theme.colors.info_family.base, theme.colors.info_family.fg),
     }
 }
 
@@ -194,6 +241,7 @@ fn button_layout_job(text: String, font_id: egui::FontId, letter_spacing: f32) -
 
 fn button_fill(
     fill: Color32,
+    accent: Color32,
     theme: &crate::CastTheme,
     variant: Variant,
     hovered: bool,
@@ -201,11 +249,21 @@ fn button_fill(
 ) -> Color32 {
     if matches!(variant, Variant::Ghost | Variant::Outline) && fill == Color32::TRANSPARENT {
         return if pressed {
-            theme.colors.surface_raised
+            mix_with_transparent(accent, 0.12)
         } else if hovered {
-            theme.colors.surface_muted
+            mix_with_transparent(accent, 0.05)
         } else {
             Color32::TRANSPARENT
+        };
+    }
+
+    if matches!(variant, Variant::Subtle) {
+        return if pressed {
+            mix_with_transparent(accent, 0.12)
+        } else if hovered {
+            mix_with_transparent(accent, 0.08)
+        } else {
+            fill
         };
     }
 
@@ -220,6 +278,29 @@ fn button_fill(
         fill.lerp_to_gamma(anchor, 0.07)
     } else {
         fill
+    }
+}
+
+fn button_border(
+    accent: Color32,
+    variant: Variant,
+    enabled: bool,
+    hovered: bool,
+    pressed: bool,
+) -> Color32 {
+    match variant {
+        Variant::Solid | Variant::Ghost => Color32::TRANSPARENT,
+        Variant::Subtle | Variant::Outline if !enabled => mix_with_transparent(accent, 0.18),
+        Variant::Subtle | Variant::Outline if pressed => mix_with_transparent(accent, 0.46),
+        Variant::Subtle | Variant::Outline if hovered => mix_with_transparent(accent, 0.38),
+        Variant::Subtle | Variant::Outline => mix_with_transparent(accent, 0.30),
+    }
+}
+
+fn button_border_width(width: f32, variant: Variant) -> f32 {
+    match variant {
+        Variant::Solid | Variant::Ghost => 0.0,
+        Variant::Subtle | Variant::Outline => width,
     }
 }
 
@@ -241,18 +322,40 @@ mod tests {
     #[test]
     fn ghost_button_gets_interactive_fill() {
         let theme = crate::CastTheme::light();
+        let accent = theme.colors.primary_family.base;
 
         assert_eq!(
-            button_fill(Color32::TRANSPARENT, &theme, Variant::Ghost, false, false),
+            button_fill(
+                Color32::TRANSPARENT,
+                accent,
+                &theme,
+                Variant::Ghost,
+                false,
+                false
+            ),
             Color32::TRANSPARENT
         );
         assert_eq!(
-            button_fill(Color32::TRANSPARENT, &theme, Variant::Ghost, true, false),
-            theme.colors.surface_muted
+            button_fill(
+                Color32::TRANSPARENT,
+                accent,
+                &theme,
+                Variant::Ghost,
+                true,
+                false
+            ),
+            mix_with_transparent(accent, 0.05)
         );
         assert_eq!(
-            button_fill(Color32::TRANSPARENT, &theme, Variant::Ghost, true, true),
-            theme.colors.surface_raised
+            button_fill(
+                Color32::TRANSPARENT,
+                accent,
+                &theme,
+                Variant::Ghost,
+                true,
+                true
+            ),
+            mix_with_transparent(accent, 0.12)
         );
     }
 
@@ -263,5 +366,36 @@ mod tests {
 
         assert_eq!(fg, accessible_foreground(theme.colors.primary_family.base));
         assert!(crate::contrast_ratio(fg, theme.colors.primary_family.base) >= 4.5);
+    }
+
+    #[test]
+    fn solid_buttons_are_borderless() {
+        let theme = crate::CastTheme::light();
+        let colors = button_colors(&theme, Intent::Primary, Variant::Solid);
+
+        assert_eq!(colors.border, Color32::TRANSPARENT);
+        assert_eq!(
+            button_border(
+                theme.colors.primary_family.base,
+                Variant::Solid,
+                true,
+                true,
+                true
+            ),
+            Color32::TRANSPARENT
+        );
+        assert_eq!(button_border_width(1.0, Variant::Solid), 0.0);
+    }
+
+    #[test]
+    fn subtle_buttons_use_transparent_accent_border() {
+        let theme = crate::CastTheme::light();
+        let colors = button_colors(&theme, Intent::Success, Variant::Subtle);
+        let [_, _, _, fill_alpha] = colors.fill.to_srgba_unmultiplied();
+        let [_, _, _, border_alpha] = colors.border.to_srgba_unmultiplied();
+
+        assert_eq!(fill_alpha, 13);
+        assert_eq!(border_alpha, 77);
+        assert_eq!(colors.fg, theme.colors.success_family.base);
     }
 }

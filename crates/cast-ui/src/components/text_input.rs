@@ -221,12 +221,12 @@ fn input_interaction_halo(theme: &CastTheme, focused: bool, hovered: bool) -> Op
     if focused {
         Some(egui::Stroke::new(
             3.0,
-            mix_with_transparent(theme.colors.primary_family.base, 0.16),
+            mix_with_transparent(theme.colors.border_strong, 0.16),
         ))
     } else if hovered {
         Some(egui::Stroke::new(
             2.0,
-            mix_with_transparent(theme.colors.primary_family.base, 0.08),
+            mix_with_transparent(theme.colors.border_strong, 0.08),
         ))
     } else {
         None
@@ -241,12 +241,12 @@ fn input_interaction_border(
     if focused {
         Some(egui::Stroke::new(
             theme.focus.width,
-            mix_with_transparent(theme.colors.primary_family.base, 0.48),
+            theme.colors.border_strong,
         ))
     } else if hovered {
         Some(egui::Stroke::new(
             theme.components.input.border_width.max(1.0),
-            mix_with_transparent(theme.colors.primary_family.base, 0.32),
+            theme.colors.border_strong,
         ))
     } else {
         None
@@ -385,20 +385,18 @@ mod tests {
     }
 
     #[test]
-    fn input_hover_and_focus_use_primary_tints() {
+    fn input_hover_and_focus_use_muted_chrome() {
         let theme = CastTheme::light();
         let hover = input_interaction_border(&theme, false, true).unwrap();
         let focus = input_interaction_border(&theme, true, true).unwrap();
-        let [_, _, _, hover_alpha] = hover.color.to_srgba_unmultiplied();
-        let [_, _, _, focus_alpha] = focus.color.to_srgba_unmultiplied();
 
-        assert_eq!(hover_alpha, 82);
-        assert_eq!(focus_alpha, 122);
+        assert_eq!(hover.color, theme.colors.border_strong);
+        assert_eq!(focus.color, theme.colors.border_strong);
         assert!(focus.width > hover.width);
     }
 
     #[test]
-    fn input_halo_uses_subtle_primary_tints() {
+    fn input_halo_uses_subtle_muted_tints() {
         let theme = CastTheme::light();
         let hover = input_interaction_halo(&theme, false, true).unwrap();
         let focus = input_interaction_halo(&theme, true, false).unwrap();
