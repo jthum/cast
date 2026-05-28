@@ -1,6 +1,7 @@
 use egui::{Color32, Response, RichText, StrokeKind, TextEdit, Ui, Widget};
 
 use crate::{
+    color::mix_with_transparent,
     foundation::{Intent, Size, Variant},
     style::{input_frame, resolve_control_metrics},
     theme::{CastTheme, theme_for_ui},
@@ -191,28 +192,64 @@ fn paint_input_state(
     status: Option<Intent>,
 ) {
     let theme = theme_for_ui(ui);
-    let stroke = if let Some(status) = status {
-        Some(egui::Stroke::new(
-            theme.components.input.border_width.max(1.25),
-            status_color(&theme, status),
-        ))
-    } else if enabled && response.has_focus() {
-        Some(egui::Stroke::new(
-            theme.focus.width,
-            theme.components.input.focus_border,
-        ))
-    } else if enabled && response.hovered() {
-        Some(egui::Stroke::new(
-            theme.components.input.border_width.max(1.0),
-            theme.colors.border_strong,
-        ))
-    } else {
-        None
-    };
+    let focused = enabled && response.has_focus();
+    let hovered = enabled && response.hovered();
+
+    if status.is_none()
+        && let Some(halo) = input_interaction_halo(&theme, focused, hovered)
+    {
+        ui.painter()
+            .rect_stroke(response.rect.expand(2.0), radius, halo, StrokeKind::Outside);
+    }
+
+    let stroke = status
+        .map(|status| {
+            egui::Stroke::new(
+                theme.components.input.border_width.max(1.25),
+                status_color(&theme, status),
+            )
+        })
+        .or_else(|| input_interaction_border(&theme, focused, hovered));
 
     if let Some(stroke) = stroke {
         ui.painter()
             .rect_stroke(response.rect, radius, stroke, StrokeKind::Outside);
+    }
+}
+
+fn input_interaction_halo(theme: &CastTheme, focused: bool, hovered: bool) -> Option<egui::Stroke> {
+    if focused {
+        Some(egui::Stroke::new(
+            3.0,
+            mix_with_transparent(theme.colors.primary_family.base, 0.16),
+        ))
+    } else if hovered {
+        Some(egui::Stroke::new(
+            2.0,
+            mix_with_transparent(theme.colors.primary_family.base, 0.08),
+        ))
+    } else {
+        None
+    }
+}
+
+fn input_interaction_border(
+    theme: &CastTheme,
+    focused: bool,
+    hovered: bool,
+) -> Option<egui::Stroke> {
+    if focused {
+        Some(egui::Stroke::new(
+            theme.focus.width,
+            mix_with_transparent(theme.colors.primary_family.base, 0.48),
+        ))
+    } else if hovered {
+        Some(egui::Stroke::new(
+            theme.components.input.border_width.max(1.0),
+            mix_with_transparent(theme.colors.primary_family.base, 0.32),
+        ))
+    } else {
+        None
     }
 }
 
@@ -345,5 +382,30 @@ mod tests {
             search.inner.help_text.as_deref(),
             Some("Filters the current view")
         );
+    }
+
+    #[test]
+    fn input_hover_and_focus_use_primary_tints() {
+        let theme = CastTheme::light();
+        let hover = input_interaction_border(&theme, false, true).unwrap();
+        let focus = input_interaction_border(&theme, true, true).unwrap();
+        let [_, _, _, hover_alpha] = hover.color.to_srgba_unmultiplied();
+        let [_, _, _, focus_alpha] = focus.color.to_srgba_unmultiplied();
+
+        assert_eq!(hover_alpha, 82);
+        assert_eq!(focus_alpha, 122);
+        assert!(focus.width > hover.width);
+    }
+
+    #[test]
+    fn input_halo_uses_subtle_primary_tints() {
+        let theme = CastTheme::light();
+        let hover = input_interaction_halo(&theme, false, true).unwrap();
+        let focus = input_interaction_halo(&theme, true, false).unwrap();
+        let [_, _, _, hover_alpha] = hover.color.to_srgba_unmultiplied();
+        let [_, _, _, focus_alpha] = focus.color.to_srgba_unmultiplied();
+
+        assert_eq!(hover_alpha, 20);
+        assert_eq!(focus_alpha, 41);
     }
 }
