@@ -4,7 +4,7 @@ use egui::{
 };
 
 use crate::{
-    color::{accessible_foreground, mix_with_transparent},
+    color::{accessible_foreground, mix_with_transparent, with_alpha},
     foundation::{Intent, Size, Variant},
     style::{IntentColors, resolve_component_style},
     theme::{ThemeMode, theme_for_ui},
@@ -134,11 +134,17 @@ impl Widget for Button {
             let depth = if pressed { 1.0 } else { 0.0 };
             let paint_rect = rect.translate(egui::vec2(0.0, depth));
             let accent = button_accent(&theme, self.intent).0;
-            let fill = button_fill(colors.fill, accent, &theme, self.variant, hovered, pressed);
+            let active_fill =
+                button_fill(colors.fill, accent, &theme, self.variant, hovered, pressed);
+            let fill = if enabled {
+                active_fill
+            } else {
+                disabled_button_fill(active_fill)
+            };
             let fg = if enabled {
                 colors.fg
             } else {
-                disabled_button_fg(fill, &theme)
+                disabled_button_fg(active_fill, &theme)
             };
             let border = button_border(accent, self.variant, enabled, hovered, pressed);
 
@@ -223,8 +229,27 @@ fn disabled_button_fg(fill: Color32, theme: &crate::CastTheme) -> Color32 {
     if fill == Color32::TRANSPARENT {
         theme.colors.text_subtle
     } else {
-        accessible_foreground(fill)
+        with_alpha(accessible_foreground(opaque_color(fill)), 190)
     }
+}
+
+fn disabled_button_fill(fill: Color32) -> Color32 {
+    scale_alpha(fill, 0.62)
+}
+
+fn opaque_color(color: Color32) -> Color32 {
+    let [r, g, b, _] = color.to_srgba_unmultiplied();
+    Color32::from_rgb(r, g, b)
+}
+
+fn scale_alpha(color: Color32, factor: f32) -> Color32 {
+    if color == Color32::TRANSPARENT {
+        return Color32::TRANSPARENT;
+    }
+
+    let [r, g, b, a] = color.to_srgba_unmultiplied();
+    let alpha = (f32::from(a) * factor.clamp(0.0, 1.0)).round() as u8;
+    Color32::from_rgba_unmultiplied(r, g, b, alpha)
 }
 
 fn button_layout_job(text: String, font_id: egui::FontId, letter_spacing: f32) -> LayoutJob {
@@ -364,8 +389,21 @@ mod tests {
         let theme = crate::CastTheme::light();
         let fg = disabled_button_fg(theme.colors.primary_family.base, &theme);
 
-        assert_eq!(fg, accessible_foreground(theme.colors.primary_family.base));
-        assert!(crate::contrast_ratio(fg, theme.colors.primary_family.base) >= 4.5);
+        let [r, g, b, a] = fg.to_srgba_unmultiplied();
+        let expected = accessible_foreground(theme.colors.primary_family.base);
+
+        assert_eq!([r, g, b], [expected.r(), expected.g(), expected.b()]);
+        assert_eq!(a, 190);
+    }
+
+    #[test]
+    fn disabled_button_fill_is_translucent() {
+        let theme = crate::CastTheme::light();
+        let fill = disabled_button_fill(theme.colors.primary_family.base);
+        let [r, _, _, alpha] = fill.to_srgba_unmultiplied();
+
+        assert!((i16::from(r) - i16::from(theme.colors.primary_family.base.r())).abs() <= 2);
+        assert_eq!(alpha, 158);
     }
 
     #[test]

@@ -238,13 +238,26 @@ fn paint_choice_mark(
         );
     }
 
-    ui.painter().rect(
-        rect,
-        radius,
-        fill,
-        egui::Stroke::new(theme.stroke.sm.max(1.0), border),
-        StrokeKind::Outside,
-    );
+    match kind {
+        ChoiceKind::Checkbox { .. } => {
+            ui.painter().rect(
+                rect,
+                radius,
+                fill,
+                egui::Stroke::new(theme.stroke.sm.max(1.0), border),
+                StrokeKind::Outside,
+            );
+        }
+        ChoiceKind::Radio => {
+            ui.painter()
+                .circle_filled(rect.center(), rect.width() / 2.0, fill);
+            ui.painter().circle_stroke(
+                rect.center(),
+                rect.width() / 2.0,
+                egui::Stroke::new(theme.stroke.sm.max(1.0), border),
+            );
+        }
+    }
 
     if !selected {
         return;
@@ -295,7 +308,7 @@ fn paint_choice_mark(
         }
         ChoiceKind::Radio => {
             ui.painter()
-                .circle_filled(rect.center(), rect.width() * 0.28, mark_color);
+                .circle_filled(rect.center(), rect.width() * 0.26, mark_color);
         }
     }
 }

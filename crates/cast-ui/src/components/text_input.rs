@@ -221,9 +221,9 @@ fn input_interaction_halo(
     });
 
     if focused {
-        Some(egui::Stroke::new(3.0, mix_with_transparent(color, 0.16)))
+        Some(egui::Stroke::new(3.0, mix_with_transparent(color, 0.50)))
     } else if hovered || status.is_some() {
-        Some(egui::Stroke::new(2.0, mix_with_transparent(color, 0.08)))
+        Some(egui::Stroke::new(2.0, mix_with_transparent(color, 0.30)))
     } else {
         None
     }
@@ -399,8 +399,8 @@ mod tests {
         let [_, _, _, hover_alpha] = hover.color.to_srgba_unmultiplied();
         let [_, _, _, focus_alpha] = focus.color.to_srgba_unmultiplied();
 
-        assert_eq!(hover_alpha, 20);
-        assert_eq!(focus_alpha, 41);
+        assert_eq!(hover_alpha, 77);
+        assert_eq!(focus_alpha, 128);
     }
 
     #[test]
@@ -414,7 +414,7 @@ mod tests {
         let [halo_r, _, _, halo_alpha] = halo.color.to_srgba_unmultiplied();
 
         assert!((i16::from(halo_r) - i16::from(theme.colors.danger_family.base.r())).abs() <= 3);
-        assert_eq!(halo_alpha, 20);
+        assert_eq!(halo_alpha, 77);
         assert_eq!(border.width, input_border_width(&theme));
     }
 }
