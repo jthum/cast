@@ -1,6 +1,7 @@
 use egui::{Color32, Margin, Stroke, Vec2};
 
 use crate::{
+    color::{mix_with_transparent, with_alpha},
     foundation::{Intent, Size, Variant},
     theme::{ButtonTokens, CastTheme, SemanticColorTokens},
 };
@@ -139,6 +140,8 @@ pub(crate) fn card_frame(theme: &CastTheme) -> egui::Frame {
         .fill(tokens.fill)
         .stroke(Stroke::new(tokens.border_width, tokens.border))
         .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
+        .shadow(surface_shadow(theme, 0.55, 10, 0, 2))
+        .outer_margin(Margin::symmetric(1, 2))
         .inner_margin(Margin::same(tokens.padding as i8))
 }
 
@@ -148,6 +151,8 @@ pub(crate) fn panel_frame(theme: &CastTheme) -> egui::Frame {
         .fill(tokens.fill)
         .stroke(Stroke::new(tokens.border_width, tokens.border))
         .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
+        .shadow(surface_shadow(theme, 0.28, 6, 0, 1))
+        .outer_margin(Margin::symmetric(0, 1))
         .inner_margin(Margin::same(tokens.padding as i8))
 }
 
@@ -176,6 +181,41 @@ pub(crate) fn alert_frame(theme: &CastTheme, border: Color32) -> egui::Frame {
         .stroke(Stroke::new(tokens.border_width, border))
         .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
         .inner_margin(Margin::same(tokens.padding as i8))
+}
+
+pub(crate) fn alert_intent_colors(theme: &CastTheme, intent: Intent) -> IntentColors {
+    if intent == Intent::Neutral {
+        return IntentColors {
+            fill: theme.colors.surface_muted,
+            fg: theme.colors.text,
+            border: theme.colors.border,
+        };
+    }
+
+    let family = semantic_family(theme, intent);
+    IntentColors {
+        fill: mix_with_transparent(family.base, 0.05),
+        fg: family.base,
+        border: mix_with_transparent(family.base, 0.30),
+    }
+}
+
+fn surface_shadow(
+    theme: &CastTheme,
+    opacity: f32,
+    blur: u8,
+    spread: u8,
+    offset_y: i8,
+) -> egui::epaint::Shadow {
+    egui::epaint::Shadow {
+        offset: [0, offset_y],
+        blur,
+        spread,
+        color: with_alpha(
+            Color32::BLACK,
+            (f32::from(theme.elevation.shadow_alpha) * opacity).round() as u8,
+        ),
+    }
 }
 
 fn semantic_family(theme: &CastTheme, intent: Intent) -> SemanticColorTokens {
@@ -284,5 +324,27 @@ mod tests {
 
         assert_eq!(frame.fill, Color32::TRANSPARENT);
         assert_eq!(frame.stroke.color, Color32::TRANSPARENT);
+    }
+
+    #[test]
+    fn surface_frames_have_subtle_elevation() {
+        let theme = CastTheme::light();
+        let card = card_frame(&theme);
+        let panel = panel_frame(&theme);
+
+        assert!(card.shadow.blur > panel.shadow.blur);
+        assert!(card.shadow.color.a() > panel.shadow.color.a());
+    }
+
+    #[test]
+    fn alert_colors_use_transparent_semantic_tints() {
+        let theme = CastTheme::light();
+        let colors = alert_intent_colors(&theme, Intent::Success);
+        let [_, _, _, fill_alpha] = colors.fill.to_srgba_unmultiplied();
+        let [_, _, _, border_alpha] = colors.border.to_srgba_unmultiplied();
+
+        assert_eq!(fill_alpha, 13);
+        assert_eq!(border_alpha, 77);
+        assert_eq!(colors.fg, theme.colors.success_family.base);
     }
 }

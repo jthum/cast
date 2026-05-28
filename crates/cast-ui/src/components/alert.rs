@@ -1,8 +1,8 @@
 use egui::{Response, RichText, Ui, Widget};
 
 use crate::{
-    foundation::{Intent, Variant},
-    style::{alert_frame, resolve_component_style, resolve_intent_colors},
+    foundation::Intent,
+    style::{alert_frame, alert_intent_colors},
     theme::theme_for_ui,
 };
 
@@ -39,16 +39,14 @@ impl Alert {
 impl Widget for Alert {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
-        let subtle =
-            resolve_component_style(&theme, self.intent, Variant::Subtle, Default::default());
-        let solid = resolve_intent_colors(&theme, self.intent, Variant::Solid);
+        let colors = alert_intent_colors(&theme, self.intent);
 
-        alert_frame(&theme, solid.border)
-            .fill(subtle.colors.fill)
+        alert_frame(&theme, colors.border)
+            .fill(colors.fill)
             .show(ui, |ui| {
                 ui.label(
                     RichText::new(self.title)
-                        .color(subtle.colors.fg)
+                        .color(colors.fg)
                         .family(theme.typography.strong.family.clone())
                         .size(theme.typography.body.size)
                         .extra_letter_spacing(theme.typography.letter_spacing),
