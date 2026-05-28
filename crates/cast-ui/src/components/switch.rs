@@ -1,6 +1,6 @@
 use egui::{Response, Sense, StrokeKind, Ui, Widget};
 
-use crate::{foundation::Size, theme::theme_for_ui};
+use crate::{color::mix_with_transparent, foundation::Size, theme::theme_for_ui};
 
 #[derive(Debug)]
 pub struct Switch<'a> {
@@ -52,18 +52,26 @@ impl Widget for Switch<'_> {
                 .colors
                 .surface_muted
                 .lerp_to_gamma(theme.colors.primary, t);
-            let track_stroke = if response.hovered() {
-                theme.colors.border_strong
-            } else {
-                theme.colors.border
-            };
+            let hovered = response.hovered();
+            let pressed = response.is_pointer_button_down_on();
+            if let Some(halo) = switch_interaction_halo(hovered, pressed) {
+                let halo_expand = if pressed { 5.0 } else { 4.0 };
+                ui.painter().rect_filled(
+                    rect.expand(halo_expand),
+                    egui::CornerRadius::same(
+                        ((rect.height() + halo_expand * 2.0) / 2.0).round() as u8
+                    ),
+                    mix_with_transparent(theme.colors.primary_family.base, halo),
+                );
+            }
+
             let radius = (rect.height() / 2.0).round() as u8;
 
             ui.painter().rect(
                 rect,
                 egui::CornerRadius::same(radius),
                 track_fill,
-                egui::Stroke::new(theme.stroke.sm, track_stroke),
+                egui::Stroke::new(theme.stroke.sm, theme.colors.border),
                 StrokeKind::Outside,
             );
 
@@ -86,9 +94,19 @@ impl Widget for Switch<'_> {
 
 fn switch_size(size: Size) -> egui::Vec2 {
     match size {
-        Size::Small => egui::vec2(34.0, 20.0),
-        Size::Medium => egui::vec2(42.0, 24.0),
-        Size::Large => egui::vec2(50.0, 28.0),
+        Size::Small => egui::vec2(32.0, 18.0),
+        Size::Medium => egui::vec2(38.0, 22.0),
+        Size::Large => egui::vec2(46.0, 26.0),
+    }
+}
+
+fn switch_interaction_halo(hovered: bool, pressed: bool) -> Option<f32> {
+    if pressed {
+        Some(0.14)
+    } else if hovered {
+        Some(0.09)
+    } else {
+        None
     }
 }
 
@@ -106,5 +124,17 @@ mod tests {
         assert!(medium.x < large.x);
         assert!(small.y < medium.y);
         assert!(medium.y < large.y);
+    }
+
+    #[test]
+    fn switch_sizes_are_compact() {
+        assert_eq!(switch_size(Size::Medium), egui::vec2(38.0, 22.0));
+    }
+
+    #[test]
+    fn switch_halo_matches_choice_control_interaction_strength() {
+        assert_eq!(switch_interaction_halo(false, false), None);
+        assert_eq!(switch_interaction_halo(true, false), Some(0.09));
+        assert_eq!(switch_interaction_halo(true, true), Some(0.14));
     }
 }
