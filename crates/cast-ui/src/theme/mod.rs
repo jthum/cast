@@ -1,4 +1,9 @@
-use std::{borrow::Cow, fs, io, path::Path, sync::Arc};
+use std::{
+    borrow::Cow,
+    fs, io,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use egui::{
     Color32, Context, FontData, FontDefinitions, FontFamily, FontId, Stroke, Style, TextStyle, Ui,
@@ -11,9 +16,16 @@ const THEME_ID: &str = "cast_theme";
 const INTER_REGULAR_FONT: &str = "cast_inter_regular";
 const INTER_MEDIUM_FONT: &str = "cast_inter_medium";
 const INTER_SEMIBOLD_FONT: &str = "cast_inter_semibold";
+const JETBRAINS_MONO_FONT: &str = "cast_jetbrains_mono";
 const INTER_REGULAR_FAMILY: &str = "Cast Inter";
 const INTER_MEDIUM_FAMILY: &str = "Cast Inter Medium";
 const INTER_SEMIBOLD_FAMILY: &str = "Cast Inter SemiBold";
+const JETBRAINS_MONO_FAMILY_NAME: &str = "Cast JetBrains Mono";
+const EXTERNAL_BODY_FONT: &str = "cast_external_body";
+const EXTERNAL_BUTTON_FONT: &str = "cast_external_button";
+const EXTERNAL_STRONG_FONT: &str = "cast_external_strong";
+const EXTERNAL_HEADING_FONT: &str = "cast_external_heading";
+const EXTERNAL_MONO_FONT: &str = "cast_external_mono";
 const CAST_CODE_STYLE: &str = "cast_code";
 const CAST_LABEL_STYLE: &str = "cast_label";
 const CAST_CAPTION_STYLE: &str = "cast_caption";
@@ -330,6 +342,10 @@ pub fn install_inter_fonts(ctx: &Context) {
     install_font_stack(ctx, &FontStack::inter());
 }
 
+pub fn install_cast_fonts(ctx: &Context) {
+    install_font_stack(ctx, &FontStack::cast());
+}
+
 pub fn install_font_stack(ctx: &Context, stack: &FontStack) {
     let mut fonts = FontDefinitions::default();
 
@@ -427,6 +443,19 @@ impl FontStack {
     pub const INTER_BUTTON_FAMILY: &'static str = INTER_MEDIUM_FAMILY;
     pub const INTER_STRONG_FAMILY: &'static str = INTER_SEMIBOLD_FAMILY;
     pub const INTER_HEADING_FAMILY: &'static str = INTER_SEMIBOLD_FAMILY;
+    pub const JETBRAINS_MONO_FAMILY: &'static str = JETBRAINS_MONO_FAMILY_NAME;
+
+    #[must_use]
+    pub fn cast() -> Self {
+        let mut stack = Self::inter();
+        stack.faces.push(FontFace::from_static(
+            JETBRAINS_MONO_FONT,
+            include_bytes!("../../assets/fonts/jetbrains-mono/JetBrainsMono[wght].ttf"),
+        ));
+        stack.mono_family = JETBRAINS_MONO_FAMILY_NAME.to_owned();
+        stack.mono = vec![JETBRAINS_MONO_FONT.to_owned()];
+        stack
+    }
 
     #[must_use]
     pub fn inter() -> Self {
@@ -479,6 +508,73 @@ impl FontStack {
         FontStackBuilder::default()
     }
 
+    pub fn from_paths(paths: FontPathStack) -> io::Result<Self> {
+        let mut builder =
+            Self::builder().face(FontFace::from_path(EXTERNAL_BODY_FONT, &paths.body)?);
+        let body = vec![EXTERNAL_BODY_FONT.to_owned()];
+
+        if let Some(path) = paths.button.as_ref() {
+            builder = builder.face(FontFace::from_path(EXTERNAL_BUTTON_FONT, path)?);
+        }
+        if let Some(path) = paths.strong.as_ref() {
+            builder = builder.face(FontFace::from_path(EXTERNAL_STRONG_FONT, path)?);
+        }
+        if let Some(path) = paths.heading.as_ref() {
+            builder = builder.face(FontFace::from_path(EXTERNAL_HEADING_FONT, path)?);
+        }
+        if let Some(path) = paths.mono.as_ref() {
+            builder = builder.face(FontFace::from_path(EXTERNAL_MONO_FONT, path)?);
+        }
+
+        let button = paths
+            .button
+            .as_ref()
+            .map(|_| {
+                vec![
+                    EXTERNAL_BUTTON_FONT.to_owned(),
+                    EXTERNAL_BODY_FONT.to_owned(),
+                ]
+            })
+            .unwrap_or_else(|| body.clone());
+        let strong = paths
+            .strong
+            .as_ref()
+            .map(|_| {
+                vec![
+                    EXTERNAL_STRONG_FONT.to_owned(),
+                    EXTERNAL_BODY_FONT.to_owned(),
+                ]
+            })
+            .unwrap_or_else(|| button.clone());
+        let heading = paths
+            .heading
+            .as_ref()
+            .map(|_| {
+                vec![
+                    EXTERNAL_HEADING_FONT.to_owned(),
+                    EXTERNAL_BODY_FONT.to_owned(),
+                ]
+            })
+            .unwrap_or_else(|| strong.clone());
+        let mono = paths
+            .mono
+            .as_ref()
+            .map(|_| vec![EXTERNAL_MONO_FONT.to_owned()])
+            .unwrap_or_default();
+
+        builder = builder
+            .body_family("Cast External Body", body)
+            .button_family("Cast External Button", button)
+            .strong_family("Cast External Strong", strong)
+            .heading_family("Cast External Heading", heading);
+
+        if !mono.is_empty() {
+            builder = builder.mono_family("Cast External Mono", mono);
+        }
+
+        Ok(builder.build())
+    }
+
     #[must_use]
     pub fn google_fonts_css2_url(families: &[GoogleFontFamily]) -> String {
         let query = families
@@ -496,6 +592,52 @@ impl FontStack {
             .map(|family| GoogleFontFamily::named(*family))
             .collect::<Vec<_>>();
         Self::google_fonts_css2_url(&families)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FontPathStack {
+    pub body: PathBuf,
+    pub button: Option<PathBuf>,
+    pub strong: Option<PathBuf>,
+    pub heading: Option<PathBuf>,
+    pub mono: Option<PathBuf>,
+}
+
+impl FontPathStack {
+    #[must_use]
+    pub fn new(body: impl Into<PathBuf>) -> Self {
+        Self {
+            body: body.into(),
+            button: None,
+            strong: None,
+            heading: None,
+            mono: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_button(mut self, path: impl Into<PathBuf>) -> Self {
+        self.button = Some(path.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_strong(mut self, path: impl Into<PathBuf>) -> Self {
+        self.strong = Some(path.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_heading(mut self, path: impl Into<PathBuf>) -> Self {
+        self.heading = Some(path.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_mono(mut self, path: impl Into<PathBuf>) -> Self {
+        self.mono = Some(path.into());
+        self
     }
 }
 
@@ -1372,6 +1514,11 @@ pub struct TypographyTokens {
 
 impl TypographyTokens {
     #[must_use]
+    pub fn cast() -> Self {
+        Self::from_font_stack(&FontStack::cast())
+    }
+
+    #[must_use]
     pub fn inter() -> Self {
         Self::from_font_stack(&FontStack::inter())
     }
@@ -1728,6 +1875,19 @@ mod tests {
     }
 
     #[test]
+    fn cast_typography_uses_bundled_mono_family() {
+        let stack = FontStack::cast();
+        let typography = TypographyTokens::cast();
+
+        assert_eq!(stack.mono_family, FontStack::JETBRAINS_MONO_FAMILY);
+        assert!(!stack.mono.is_empty());
+        assert_eq!(
+            typography.code.family,
+            FontFamily::Name(Arc::from(FontStack::JETBRAINS_MONO_FAMILY))
+        );
+    }
+
+    #[test]
     fn typography_body_size_updates_related_roles() {
         let typography = TypographyTokens::inter().with_body_size(16.0);
 
@@ -1808,6 +1968,38 @@ mod tests {
         assert_eq!(stack.button, expected);
         assert_eq!(stack.heading, expected);
         assert!(stack.mono.is_empty());
+    }
+
+    #[test]
+    fn font_stack_from_paths_loads_external_role_fonts() {
+        let root = std::env::temp_dir().join(format!("cast-ui-path-stack-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let body = root.join("Body.ttf");
+        let heading = root.join("Heading.ttf");
+        let mono = root.join("Mono.ttf");
+        std::fs::write(&body, [1, 2, 3]).unwrap();
+        std::fs::write(&heading, [4, 5, 6]).unwrap();
+        std::fs::write(&mono, [7, 8, 9]).unwrap();
+
+        let stack = FontStack::from_paths(
+            FontPathStack::new(&body)
+                .with_heading(&heading)
+                .with_mono(&mono),
+        )
+        .unwrap();
+
+        assert_eq!(stack.faces.len(), 3);
+        assert_eq!(stack.body, vec![EXTERNAL_BODY_FONT.to_owned()]);
+        assert_eq!(
+            stack.heading,
+            vec![
+                EXTERNAL_HEADING_FONT.to_owned(),
+                EXTERNAL_BODY_FONT.to_owned()
+            ]
+        );
+        assert_eq!(stack.mono, vec![EXTERNAL_MONO_FONT.to_owned()]);
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

@@ -17,7 +17,7 @@ fn main() -> eframe::Result {
         "Cast Gallery",
         native_options,
         Box::new(|cc| {
-            cast::install_inter_fonts(&cc.egui_ctx);
+            cast::install_cast_fonts(&cc.egui_ctx);
             let app = CastGallery::new();
             cast::set_theme(&cc.egui_ctx, app.theme.clone());
             Ok(Box::new(app))
@@ -39,7 +39,7 @@ struct CastGallery {
 impl CastGallery {
     fn new() -> Self {
         let mode = ThemeMode::Light;
-        let seed = ThemeSeed::for_mode(mode).with_typography(TypographyTokens::inter());
+        let seed = ThemeSeed::for_mode(mode).with_typography(TypographyTokens::cast());
         let theme = seed.clone().resolve();
 
         Self {
@@ -130,6 +130,13 @@ impl eframe::App for CastGallery {
                     ui.add_space(12.0);
                     show_typography_gallery(ui, &self.theme);
                     ui.add_space(12.0);
+                    show_typography_diagnostics(
+                        ui,
+                        &self.theme,
+                        ctx.pixels_per_point(),
+                        self.zoom,
+                    );
+                    ui.add_space(12.0);
                     show_override_preview(ui);
                     ui.add_space(12.0);
                     show_buttons_and_badges(ui);
@@ -178,7 +185,7 @@ fn show_theme_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
 
     ui.horizontal(|ui| {
         if ui.button("Reset").clicked() {
-            *seed = ThemeSeed::for_mode(seed.mode).with_typography(TypographyTokens::inter());
+            *seed = ThemeSeed::for_mode(seed.mode).with_typography(TypographyTokens::cast());
             changed = true;
         }
         if ui.button("Primary only").clicked() {
@@ -277,6 +284,10 @@ fn show_typography_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
     let mut changed = false;
 
     ui.horizontal_wrapped(|ui| {
+        if ui.button("Cast").clicked() {
+            seed.typography = TypographyTokens::cast().with_body_size(seed.typography.body.size);
+            changed = true;
+        }
         if ui.button("Inter").clicked() {
             seed.typography = TypographyTokens::inter().with_body_size(seed.typography.body.size);
             changed = true;
@@ -521,6 +532,12 @@ fn font_family_selector(
                     inter_family(cast::FontStack::INTER_STRONG_FAMILY),
                     "Inter SemiBold",
                 );
+                font_family_option(
+                    ui,
+                    &mut selected,
+                    inter_family(cast::FontStack::JETBRAINS_MONO_FAMILY),
+                    "JetBrains Mono",
+                );
             });
     });
 
@@ -552,6 +569,9 @@ fn font_family_label(family: &egui::FontFamily) -> String {
         }
         egui::FontFamily::Name(name) if name.as_ref() == cast::FontStack::INTER_STRONG_FAMILY => {
             "Inter SemiBold".to_owned()
+        }
+        egui::FontFamily::Name(name) if name.as_ref() == cast::FontStack::JETBRAINS_MONO_FAMILY => {
+            "JetBrains Mono".to_owned()
         }
         egui::FontFamily::Name(name) => name.to_string(),
     }
@@ -673,6 +693,97 @@ fn show_typography_gallery(ui: &mut egui::Ui, theme: &CastTheme) {
             theme.colors.text,
         );
     });
+}
+
+fn show_typography_diagnostics(
+    ui: &mut egui::Ui,
+    theme: &CastTheme,
+    pixels_per_point: f32,
+    zoom: f32,
+) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Text diagnostics");
+        egui::Grid::new("typography_diagnostics_grid")
+            .num_columns(2)
+            .spacing(egui::vec2(12.0, 4.0))
+            .show(ui, |ui| {
+                diagnostic_row(ui, "Zoom", format!("{zoom:.2}"));
+                diagnostic_row(ui, "Pixels/point", format!("{pixels_per_point:.2}"));
+                diagnostic_row(
+                    ui,
+                    "Body size",
+                    format!("{:.1}", theme.typography.body.size),
+                );
+                diagnostic_row(
+                    ui,
+                    "Caption size",
+                    format!("{:.1}", theme.typography.caption.size),
+                );
+                diagnostic_row(
+                    ui,
+                    "Code size",
+                    format!("{:.1}", theme.typography.code.size),
+                );
+                diagnostic_row(
+                    ui,
+                    "Body family",
+                    font_family_label(&theme.typography.body.family),
+                );
+                diagnostic_row(
+                    ui,
+                    "Code family",
+                    font_family_label(&theme.typography.code.family),
+                );
+            });
+
+        ui.add(Separator::new().spacing(10.0));
+        typography_sample(
+            ui,
+            "Small",
+            "Small text: abcdefghijklmnopqrstuvwxyz 0123456789",
+            theme.typography.small.clone(),
+            theme.colors.text,
+        );
+        typography_sample(
+            ui,
+            "Caption",
+            "Dense metadata: 2026-05-28 14:32:08 / queued / retry 02",
+            theme.typography.caption.clone(),
+            theme.colors.text_muted,
+        );
+        typography_sample(
+            ui,
+            "Mono",
+            "fn main() { println!(\"Cast\"); }",
+            theme.typography.code.clone(),
+            theme.colors.text,
+        );
+
+        ui.add_space(6.0);
+        for index in 0..3 {
+            ui.horizontal(|ui| {
+                ui.add_sized(
+                    [28.0, 18.0],
+                    egui::Label::new(
+                        RichText::new(format!("{:02}", index + 1))
+                            .font(theme.typography.caption.clone())
+                            .color(theme.colors.text_subtle),
+                    ),
+                );
+                ui.label(
+                    RichText::new("Render row with mixed weight, muted text, and stable spacing.")
+                        .font(theme.typography.body.clone())
+                        .color(theme.colors.text),
+                );
+            });
+        }
+    });
+}
+
+fn diagnostic_row(ui: &mut egui::Ui, label: &str, value: impl Into<String>) {
+    ui.label(RichText::new(label).size(11.0));
+    ui.label(value.into());
+    ui.end_row();
 }
 
 fn typography_sample(
