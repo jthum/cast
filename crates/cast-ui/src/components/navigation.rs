@@ -103,6 +103,7 @@ impl Widget for SegmentedControl<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
         let frame_padding = 3.0;
+        let item_gap = segmented_item_gap(&theme);
         let mut combined: Option<Response> = None;
 
         let frame = egui::Frame::new()
@@ -114,7 +115,7 @@ impl Widget for SegmentedControl<'_> {
             ))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
+                    ui.spacing_mut().item_spacing.x = item_gap;
                     for (index, label) in self.labels.iter().enumerate() {
                         let selected = *self.selected == index;
                         let mut response =
@@ -333,6 +334,10 @@ fn segmented_item_radius(theme: &CastTheme) -> egui::CornerRadius {
     egui::CornerRadius::same(theme.radius.md.round() as u8)
 }
 
+fn segmented_item_gap(theme: &CastTheme) -> f32 {
+    (theme.stroke.sm * 2.0).max(2.0)
+}
+
 fn nav_fill(
     theme: &CastTheme,
     selected: bool,
@@ -433,6 +438,13 @@ mod tests {
         let item_radius = segmented_item_radius(&theme);
 
         assert_eq!(frame_radius.nw, item_radius.nw + 3);
+    }
+
+    #[test]
+    fn segmented_item_gap_separates_neighboring_interaction_fills() {
+        let theme = CastTheme::light();
+
+        assert!(segmented_item_gap(&theme) >= theme.stroke.sm * 2.0);
     }
 
     #[test]
