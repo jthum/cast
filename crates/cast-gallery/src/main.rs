@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use cast::{
-    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link,
-    NavList, Notice, Panel as CastPanel, Radio, SearchInput, SegmentedControl, SemanticColorTokens,
-    Separator, Size, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, TypographyTokens,
-    Variant,
+    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dropdown, Intent, Label,
+    Link, MenuItem, NavList, Notice, Panel as CastPanel, Radio, SearchInput, SegmentedControl,
+    SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed,
+    TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -38,6 +38,7 @@ struct CastGallery {
     notifications: bool,
     indeterminate: bool,
     form_density: usize,
+    menu_choice: usize,
     foundation_tab: usize,
     workflow_segment: usize,
     sidebar_section: usize,
@@ -61,6 +62,7 @@ impl CastGallery {
             notifications: true,
             indeterminate: false,
             form_density: 1,
+            menu_choice: 0,
             foundation_tab: 0,
             workflow_segment: 0,
             sidebar_section: 0,
@@ -161,6 +163,7 @@ impl eframe::App for CastGallery {
                         &mut self.notifications,
                         &mut self.indeterminate,
                         &mut self.form_density,
+                        &mut self.menu_choice,
                         &mut self.foundation_tab,
                         &mut self.workflow_segment,
                     );
@@ -196,6 +199,7 @@ fn show_workspace_view(
     notifications: &mut bool,
     indeterminate: &mut bool,
     form_density: &mut usize,
+    menu_choice: &mut usize,
     foundation_tab: &mut usize,
     workflow_segment: &mut usize,
 ) {
@@ -250,6 +254,8 @@ fn show_workspace_view(
             show_override_preview(ui);
             ui.add_space(12.0);
             show_buttons_and_badges(ui);
+            ui.add_space(12.0);
+            show_menus(ui, menu_choice);
             ui.add_space(12.0);
             show_surfaces(ui);
             ui.add_space(12.0);
@@ -1312,6 +1318,36 @@ fn show_surfaces(ui: &mut egui::Ui) {
                 ui.add(Badge::new("Panel").intent(Intent::Neutral));
                 ui.label("A raised surface for dense app UI regions.");
             });
+        });
+    });
+}
+
+fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Menus and dropdowns");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(
+                Dropdown::new(
+                    menu_choice,
+                    ["Overview", "Components", "Theme lab", "Diagnostics"],
+                )
+                .width(220.0),
+            );
+            ui.add(
+                Dropdown::new(menu_choice, ["Small", "Medium", "Large"])
+                    .size(Size::Small)
+                    .width(144.0),
+            );
+        });
+        ui.add_space(8.0);
+        CastPanel::new().show(ui, |ui| {
+            ui.label("Menu items");
+            ui.add_space(4.0);
+            ui.add(MenuItem::new("Open command palette").selected(true));
+            ui.add(MenuItem::new("Duplicate theme"));
+            ui.add(MenuItem::new("Archive preset").intent(Intent::Warning));
+            ui.add(MenuItem::new("Delete preset").intent(Intent::Danger));
+            ui.add(MenuItem::new("Unavailable action").disabled());
         });
     });
 }
