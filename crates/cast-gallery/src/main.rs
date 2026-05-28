@@ -379,9 +379,15 @@ fn show_motion_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
         .changed();
     changed |= theme_slider(
         ui,
-        "Wheel speed",
+        "Touchpad speed",
         &mut seed.scroll.wheel_multiplier,
-        0.5..=3.0,
+        0.75..=4.0,
+    );
+    changed |= theme_slider(
+        ui,
+        "Wheel line speed",
+        &mut seed.scroll.line_scroll_speed,
+        20.0..=80.0,
     );
     changed
 }
@@ -751,6 +757,16 @@ fn show_typography_diagnostics(
                     ui,
                     "Letter spacing",
                     format!("{:.2}", theme.typography.letter_spacing),
+                );
+                diagnostic_row(
+                    ui,
+                    "Touchpad speed",
+                    format!("{:.2}", theme.scroll.wheel_multiplier),
+                );
+                diagnostic_row(
+                    ui,
+                    "Wheel line speed",
+                    format!("{:.1}", theme.scroll.line_scroll_speed),
                 );
                 diagnostic_row(
                     ui,

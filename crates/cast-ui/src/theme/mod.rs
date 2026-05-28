@@ -357,6 +357,10 @@ pub fn set_theme(ctx: &Context, theme: CastTheme) {
 
 pub fn apply_theme(ctx: &Context, theme: &CastTheme) {
     ctx.set_global_style(theme.to_egui_style());
+    ctx.options_mut(|options| {
+        options.input_options.line_scroll_speed =
+            theme.scroll.effective_line_scroll_speed().max(1.0);
+    });
 }
 
 pub fn install_inter_fonts(ctx: &Context) {
@@ -1647,6 +1651,7 @@ impl Default for TypographyTokens {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug)]
 pub struct ScrollTokens {
+    pub line_scroll_speed: f32,
     pub wheel_multiplier: f32,
     pub drag_to_scroll: bool,
     pub animated: bool,
@@ -1655,10 +1660,19 @@ pub struct ScrollTokens {
     pub max_animation_seconds: f32,
 }
 
+impl ScrollTokens {
+    #[must_use]
+    pub fn effective_line_scroll_speed(&self) -> f32 {
+        let multiplier = self.wheel_multiplier.max(0.01);
+        self.line_scroll_speed / multiplier
+    }
+}
+
 impl Default for ScrollTokens {
     fn default() -> Self {
         Self {
-            wheel_multiplier: 1.35,
+            line_scroll_speed: 40.0,
+            wheel_multiplier: 2.0,
             drag_to_scroll: true,
             animated: true,
             points_per_second: 1800.0,
@@ -1805,6 +1819,21 @@ mod tests {
         assert_eq!(
             style.text_styles[&TextStyle::Button],
             theme.typography.button
+        );
+    }
+
+    #[test]
+    fn apply_theme_compensates_line_scroll_for_touchpad_multiplier() {
+        let ctx = Context::default();
+        let mut seed = ThemeSeed::for_mode(ThemeMode::Light);
+        seed.scroll.line_scroll_speed = 40.0;
+        seed.scroll.wheel_multiplier = 2.0;
+
+        apply_theme(&ctx, &seed.resolve());
+
+        assert_eq!(
+            ctx.options(|options| options.input_options.line_scroll_speed),
+            20.0
         );
     }
 
