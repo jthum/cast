@@ -31,6 +31,7 @@ struct CastGallery {
     seed: ThemeSeed,
     zoom: f32,
     search: String,
+    lead_search: String,
     command: String,
     name: String,
     handle: String,
@@ -41,6 +42,12 @@ struct CastGallery {
     menu_choice: usize,
     list_selection: usize,
     table_selection: usize,
+    lead_date_filter: usize,
+    lead_user_filter: usize,
+    lead_status_filter: usize,
+    lead_payment_filter: usize,
+    lead_rows_per_page: usize,
+    lead_exported_count: Option<usize>,
     foundation_tab: usize,
     workflow_segment: usize,
     sidebar_section: usize,
@@ -57,6 +64,7 @@ impl CastGallery {
             seed,
             zoom: 1.0,
             search: String::new(),
+            lead_search: String::new(),
             command: String::from("Refine the component gallery into an app-like surface"),
             name: String::from("Cast"),
             handle: String::new(),
@@ -67,6 +75,12 @@ impl CastGallery {
             menu_choice: 0,
             list_selection: 0,
             table_selection: 0,
+            lead_date_filter: 1,
+            lead_user_filter: 0,
+            lead_status_filter: 0,
+            lead_payment_filter: 0,
+            lead_rows_per_page: 0,
+            lead_exported_count: None,
             foundation_tab: 0,
             workflow_segment: 0,
             sidebar_section: 0,
@@ -168,8 +182,15 @@ impl eframe::App for CastGallery {
                         &mut self.indeterminate,
                         &mut self.form_density,
                         &mut self.menu_choice,
+                        &mut self.lead_search,
                         &mut self.list_selection,
                         &mut self.table_selection,
+                        &mut self.lead_date_filter,
+                        &mut self.lead_user_filter,
+                        &mut self.lead_status_filter,
+                        &mut self.lead_payment_filter,
+                        &mut self.lead_rows_per_page,
+                        &mut self.lead_exported_count,
                         &mut self.foundation_tab,
                         &mut self.workflow_segment,
                     );
@@ -206,8 +227,15 @@ fn show_workspace_view(
     indeterminate: &mut bool,
     form_density: &mut usize,
     menu_choice: &mut usize,
+    lead_search: &mut String,
     list_selection: &mut usize,
     table_selection: &mut usize,
+    lead_date_filter: &mut usize,
+    lead_user_filter: &mut usize,
+    lead_status_filter: &mut usize,
+    lead_payment_filter: &mut usize,
+    lead_rows_per_page: &mut usize,
+    lead_exported_count: &mut Option<usize>,
     foundation_tab: &mut usize,
     workflow_segment: &mut usize,
 ) {
@@ -265,7 +293,18 @@ fn show_workspace_view(
             ui.add_space(12.0);
             show_menus(ui, menu_choice);
             ui.add_space(12.0);
-            show_lists_and_tables(ui, search, list_selection, table_selection);
+            show_lists_and_tables(
+                ui,
+                lead_search,
+                list_selection,
+                table_selection,
+                lead_date_filter,
+                lead_user_filter,
+                lead_status_filter,
+                lead_payment_filter,
+                lead_rows_per_page,
+                lead_exported_count,
+            );
             ui.add_space(12.0);
             show_surfaces(ui);
             ui.add_space(12.0);
@@ -1362,174 +1401,153 @@ fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize) {
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn show_lists_and_tables(
     ui: &mut egui::Ui,
-    search: &mut String,
+    lead_search: &mut String,
     list_selection: &mut usize,
     table_selection: &mut usize,
+    date_filter: &mut usize,
+    user_filter: &mut usize,
+    status_filter: &mut usize,
+    payment_filter: &mut usize,
+    rows_per_page: &mut usize,
+    exported_count: &mut Option<usize>,
 ) {
+    let filtered_leads = filtered_leads(
+        lead_search,
+        *date_filter,
+        *user_filter,
+        *status_filter,
+        *payment_filter,
+    );
+    let filtered_count = filtered_leads.len();
+    let row_limit = rows_per_page_limit(*rows_per_page);
+    let visible_rows = filtered_leads
+        .iter()
+        .take(row_limit)
+        .map(|lead| lead_table_row(lead))
+        .collect::<Vec<_>>();
+    let visible_count = visible_rows.len();
+
+    if *table_selection >= visible_count && visible_count > 0 {
+        *table_selection = 0;
+    }
+    let mut filters_changed = false;
+
     Card::new().show(ui, |ui| {
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
-                ui.heading("Leads [328]");
-                ui.label("A complete overview of leads in the organization.");
+                ui.heading(format!("Leads [{filtered_count}]"));
+                ui.label(
+                    "Filtered lead records with working search, filters, and export feedback.",
+                );
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                ui.add(
-                    Button::new("Export as CSV")
-                        .intent(Intent::Neutral)
-                        .variant(Variant::Outline)
-                        .leading_icon("[^]"),
-                );
+                if ui
+                    .add(
+                        Button::new("Export as CSV")
+                            .intent(Intent::Neutral)
+                            .variant(Variant::Outline)
+                            .leading_icon("[^]"),
+                    )
+                    .clicked()
+                {
+                    *exported_count = Some(filtered_count);
+                }
             });
         });
         ui.add_space(10.0);
         ui.horizontal_wrapped(|ui| {
-            ui.add(
-                Button::new("Last 7 days")
-                    .intent(Intent::Neutral)
-                    .variant(Variant::Outline),
-            );
-            ui.add(
-                Button::new("All users")
-                    .intent(Intent::Neutral)
-                    .variant(Variant::Outline),
-            );
-            ui.add(
-                Button::new("Any status")
-                    .intent(Intent::Neutral)
-                    .variant(Variant::Outline),
-            );
-            ui.add(
-                Button::new("All payments")
-                    .intent(Intent::Neutral)
-                    .variant(Variant::Outline),
-            );
+            filters_changed |= ui
+                .add(
+                    Dropdown::new(date_filter, ["All time", "Last 7 days", "Last 24 hours"])
+                        .width(150.0)
+                        .size(Size::Small),
+                )
+                .changed();
+            filters_changed |= ui
+                .add(
+                    Dropdown::new(user_filter, LEAD_USER_FILTERS)
+                        .width(150.0)
+                        .size(Size::Small),
+                )
+                .changed();
+            filters_changed |= ui
+                .add(
+                    Dropdown::new(status_filter, LEAD_STATUS_FILTERS)
+                        .width(158.0)
+                        .size(Size::Small),
+                )
+                .changed();
+            filters_changed |= ui
+                .add(
+                    Dropdown::new(payment_filter, LEAD_PAYMENT_FILTERS)
+                        .width(150.0)
+                        .size(Size::Small),
+                )
+                .changed();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add(
-                    SearchInput::new(search)
-                        .hint_text("Search leads by name, email...")
-                        .width(260.0),
-                );
+                filters_changed |= ui
+                    .add(
+                        SearchInput::new(lead_search)
+                            .hint_text("Search leads by name, email...")
+                            .width(260.0),
+                    )
+                    .changed();
             });
         });
+        if filters_changed {
+            *exported_count = None;
+        }
+        if let Some(count) = *exported_count {
+            ui.add_space(8.0);
+            ui.add(
+                Notice::new(format!("{count} leads exported"))
+                    .body("Export feedback is wired to the currently filtered table rows.")
+                    .intent(Intent::Success),
+            );
+        }
         ui.add_space(14.0);
-        ui.add(
-            DataTable::new(
-                table_selection,
-                [
-                    "Lead name",
-                    "Status",
-                    "Interest",
-                    "Source",
-                    "Deal value",
-                    "Assigned to",
-                    "Interacted",
-                ],
-                [
+        if visible_count == 0 {
+            ui.add(
+                Notice::new("No matching leads")
+                    .body("Change the search query or filters to widen the result set."),
+            );
+        } else {
+            ui.add(
+                DataTable::new(
+                    table_selection,
                     [
-                        "Sarah Parker",
-                        "Won",
-                        "Interested",
-                        "Sponsored ad",
-                        "$ 2,500.00",
-                        "Sarah P.",
-                        "2 days ago",
+                        "Lead name",
+                        "Status",
+                        "Interest",
+                        "Source",
+                        "Deal value",
+                        "Assigned to",
+                        "Interacted",
                     ],
-                    [
-                        "Mike Brown",
-                        "Call booked",
-                        "Broke",
-                        "Direct message",
-                        "Pending...",
-                        "Alex W.",
-                        "3 hours ago",
-                    ],
-                    [
-                        "Linda Chen",
-                        "Unqualified",
-                        "Achiever",
-                        "Story replies",
-                        "N/A",
-                        "Jane D.",
-                        "1 week ago",
-                    ],
-                    [
-                        "David Lee",
-                        "Won",
-                        "Interested",
-                        "Story replies",
-                        "$ 5,000.00",
-                        "John S.",
-                        "4 days ago",
-                    ],
-                    [
-                        "Emily White",
-                        "No show",
-                        "Interested",
-                        "Direct message",
-                        "Pending...",
-                        "Ali M.",
-                        "15 mins ago",
-                    ],
-                    [
-                        "Jessica Wong",
-                        "Won",
-                        "Interested",
-                        "Sponsored ad",
-                        "$ 3,000.00",
-                        "Sarah P.",
-                        "1 week ago",
-                    ],
-                    [
-                        "Kevin Harris",
-                        "Qualified",
-                        "N/A",
-                        "Story replies",
-                        "Pending...",
-                        "Jane D.",
-                        "1 day ago",
-                    ],
-                    [
-                        "Tom Clark",
-                        "Lost",
-                        "Broke",
-                        "Direct message",
-                        "N/A",
-                        "John S.",
-                        "6 days ago",
-                    ],
-                ],
-            )
-            .size(Size::Small)
-            .column_weights([1.35, 1.25, 1.15, 1.30, 1.10, 1.10, 1.0])
-            .right_aligned_columns([4]),
-        );
+                    visible_rows,
+                )
+                .size(Size::Small)
+                .column_weights([1.35, 1.25, 1.15, 1.30, 1.10, 1.10, 1.0])
+                .right_aligned_columns([4]),
+            );
+        }
         ui.add_space(10.0);
         ui.horizontal(|ui| {
             ui.label("Rows per page:");
-            ui.add(Badge::new("25").intent(Intent::Neutral));
+            ui.add(
+                Dropdown::new(rows_per_page, ["5", "10", "25"])
+                    .width(82.0)
+                    .size(Size::Small),
+            );
+            ui.add(Badge::new(format!("Showing {visible_count}")).intent(Intent::Neutral));
+            ui.add(Badge::new(format!("of {filtered_count}")).intent(Intent::Neutral));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add(
-                    Button::new(">")
-                        .intent(Intent::Neutral)
-                        .variant(Variant::Outline),
-                );
-                ui.add(
-                    Button::new("3")
-                        .intent(Intent::Neutral)
-                        .variant(Variant::Outline),
-                );
-                ui.add(
-                    Button::new("2")
-                        .intent(Intent::Neutral)
-                        .variant(Variant::Outline),
-                );
-                ui.add(
-                    Button::new("1")
-                        .intent(Intent::Primary)
-                        .variant(Variant::Subtle),
-                );
+                ui.add(Badge::new(
+                    "Page controls omitted until pagination state exists.",
+                ));
             });
         });
         ui.add_space(12.0);
@@ -1557,6 +1575,236 @@ fn show_lists_and_tables(
             }
         });
     });
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LeadRecord {
+    name: &'static str,
+    status: &'static str,
+    interest: &'static str,
+    source: &'static str,
+    deal_value: &'static str,
+    payment: &'static str,
+    assigned_to: &'static str,
+    interacted: &'static str,
+    days_ago: u8,
+}
+
+const LEAD_USER_FILTERS: [&str; 6] = [
+    "All users",
+    "Sarah P.",
+    "Alex W.",
+    "Jane D.",
+    "John S.",
+    "Ali M.",
+];
+const LEAD_STATUS_FILTERS: [&str; 7] = [
+    "Any status",
+    "Won",
+    "Call booked",
+    "Qualified",
+    "Unqualified",
+    "Lost",
+    "No show",
+];
+const LEAD_PAYMENT_FILTERS: [&str; 4] = ["All payments", "Paid", "Pending", "No value"];
+
+const LEADS: [LeadRecord; 12] = [
+    LeadRecord {
+        name: "Sarah Parker",
+        status: "Won",
+        interest: "Interested",
+        source: "Sponsored ad",
+        deal_value: "$ 2,500.00",
+        payment: "Paid",
+        assigned_to: "Sarah P.",
+        interacted: "2 days ago",
+        days_ago: 2,
+    },
+    LeadRecord {
+        name: "Mike Brown",
+        status: "Call booked",
+        interest: "Broke",
+        source: "Direct message",
+        deal_value: "Pending...",
+        payment: "Pending",
+        assigned_to: "Alex W.",
+        interacted: "3 hours ago",
+        days_ago: 0,
+    },
+    LeadRecord {
+        name: "Linda Chen",
+        status: "Unqualified",
+        interest: "Achiever",
+        source: "Story replies",
+        deal_value: "N/A",
+        payment: "No value",
+        assigned_to: "Jane D.",
+        interacted: "1 week ago",
+        days_ago: 7,
+    },
+    LeadRecord {
+        name: "David Lee",
+        status: "Won",
+        interest: "Interested",
+        source: "Story replies",
+        deal_value: "$ 5,000.00",
+        payment: "Paid",
+        assigned_to: "John S.",
+        interacted: "4 days ago",
+        days_ago: 4,
+    },
+    LeadRecord {
+        name: "Emily White",
+        status: "No show",
+        interest: "Interested",
+        source: "Direct message",
+        deal_value: "Pending...",
+        payment: "Pending",
+        assigned_to: "Ali M.",
+        interacted: "15 mins ago",
+        days_ago: 0,
+    },
+    LeadRecord {
+        name: "Jessica Wong",
+        status: "Won",
+        interest: "Interested",
+        source: "Sponsored ad",
+        deal_value: "$ 3,000.00",
+        payment: "Paid",
+        assigned_to: "Sarah P.",
+        interacted: "1 week ago",
+        days_ago: 7,
+    },
+    LeadRecord {
+        name: "Kevin Harris",
+        status: "Qualified",
+        interest: "N/A",
+        source: "Story replies",
+        deal_value: "Pending...",
+        payment: "Pending",
+        assigned_to: "Jane D.",
+        interacted: "1 day ago",
+        days_ago: 1,
+    },
+    LeadRecord {
+        name: "Tom Clark",
+        status: "Lost",
+        interest: "Broke",
+        source: "Direct message",
+        deal_value: "N/A",
+        payment: "No value",
+        assigned_to: "John S.",
+        interacted: "6 days ago",
+        days_ago: 6,
+    },
+    LeadRecord {
+        name: "Laura Lewis",
+        status: "Qualified",
+        interest: "Achiever",
+        source: "Story replies",
+        deal_value: "Pending...",
+        payment: "Pending",
+        assigned_to: "Ali M.",
+        interacted: "30 mins ago",
+        days_ago: 0,
+    },
+    LeadRecord {
+        name: "Brian Walker",
+        status: "Call booked",
+        interest: "Interested",
+        source: "Story replies",
+        deal_value: "Pending...",
+        payment: "Pending",
+        assigned_to: "Alex W.",
+        interacted: "2 days ago",
+        days_ago: 2,
+    },
+    LeadRecord {
+        name: "Daniel Hall",
+        status: "Won",
+        interest: "Interested",
+        source: "Direct message",
+        deal_value: "$ 1,500.00",
+        payment: "Paid",
+        assigned_to: "John S.",
+        interacted: "5 days ago",
+        days_ago: 5,
+    },
+    LeadRecord {
+        name: "Nancy Allen",
+        status: "Unqualified",
+        interest: "Interested",
+        source: "Sponsored ad",
+        deal_value: "N/A",
+        payment: "No value",
+        assigned_to: "Jane D.",
+        interacted: "2 weeks ago",
+        days_ago: 14,
+    },
+];
+
+fn filtered_leads(
+    query: &str,
+    date_filter: usize,
+    user_filter: usize,
+    status_filter: usize,
+    payment_filter: usize,
+) -> Vec<&'static LeadRecord> {
+    let query = query.trim().to_lowercase();
+    LEADS
+        .iter()
+        .filter(|lead| lead_matches_date_filter(lead, date_filter))
+        .filter(|lead| lead_matches_choice(lead.assigned_to, LEAD_USER_FILTERS, user_filter))
+        .filter(|lead| lead_matches_choice(lead.status, LEAD_STATUS_FILTERS, status_filter))
+        .filter(|lead| lead_matches_choice(lead.payment, LEAD_PAYMENT_FILTERS, payment_filter))
+        .filter(|lead| {
+            query.is_empty()
+                || [
+                    lead.name,
+                    lead.status,
+                    lead.interest,
+                    lead.source,
+                    lead.deal_value,
+                    lead.assigned_to,
+                    lead.interacted,
+                ]
+                .iter()
+                .any(|value| value.to_lowercase().contains(&query))
+        })
+        .collect()
+}
+
+fn lead_matches_date_filter(lead: &LeadRecord, filter: usize) -> bool {
+    match filter {
+        1 => lead.days_ago <= 7,
+        2 => lead.days_ago == 0,
+        _ => true,
+    }
+}
+
+fn lead_matches_choice<const N: usize>(value: &str, labels: [&str; N], index: usize) -> bool {
+    index == 0 || labels.get(index).is_some_and(|label| *label == value)
+}
+
+fn rows_per_page_limit(index: usize) -> usize {
+    match index {
+        1 => 10,
+        2 => 25,
+        _ => 5,
+    }
+}
+
+fn lead_table_row(lead: &LeadRecord) -> [String; 7] {
+    [
+        lead.name.to_owned(),
+        lead.status.to_owned(),
+        lead.interest.to_owned(),
+        lead.source.to_owned(),
+        lead.deal_value.to_owned(),
+        lead.assigned_to.to_owned(),
+        lead.interacted.to_owned(),
+    ]
 }
 
 fn show_text_and_feedback(ui: &mut egui::Ui) {
@@ -1685,4 +1933,41 @@ fn show_raw_egui_controls(ui: &mut egui::Ui, search: &mut String, enabled: &mut 
             ui.hyperlink_to("egui link", "https://github.com/emilk/egui");
         });
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lead_filters_apply_status_and_payment() {
+        let filtered = filtered_leads("", 0, 0, 1, 1);
+
+        assert!(!filtered.is_empty());
+        assert!(filtered.iter().all(|lead| lead.status == "Won"));
+        assert!(filtered.iter().all(|lead| lead.payment == "Paid"));
+    }
+
+    #[test]
+    fn lead_search_matches_visible_table_fields() {
+        let filtered = filtered_leads("alex", 0, 0, 0, 0);
+
+        assert!(!filtered.is_empty());
+        assert!(filtered.iter().all(|lead| lead.assigned_to == "Alex W."));
+    }
+
+    #[test]
+    fn last_twenty_four_hours_filter_uses_recent_rows() {
+        let filtered = filtered_leads("", 2, 0, 0, 0);
+
+        assert!(!filtered.is_empty());
+        assert!(filtered.iter().all(|lead| lead.days_ago == 0));
+    }
+
+    #[test]
+    fn rows_per_page_limit_is_state_backed() {
+        assert_eq!(rows_per_page_limit(0), 5);
+        assert_eq!(rows_per_page_limit(1), 10);
+        assert_eq!(rows_per_page_limit(2), 25);
+    }
 }
