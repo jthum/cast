@@ -8,8 +8,8 @@ pub mod theme;
 
 pub use color::contrast_ratio;
 pub use components::{
-    Alert, Badge, Button, Card, Checkbox, Label, Link, Notice, Panel, SearchInput, Separator,
-    Switch, TextInput,
+    Alert, Badge, Button, Card, Checkbox, Label, Link, Notice, Panel, SearchInput,
+    SegmentedControl, Separator, Switch, Tabs, TextInput,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};

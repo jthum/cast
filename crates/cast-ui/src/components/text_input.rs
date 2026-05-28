@@ -1,15 +1,19 @@
-use egui::{Response, StrokeKind, TextEdit, Ui, Widget};
+use egui::{Color32, Response, RichText, StrokeKind, TextEdit, Ui, Widget};
 
 use crate::{
-    foundation::{Size, Variant},
+    foundation::{Intent, Size, Variant},
     style::{input_frame, resolve_control_metrics},
-    theme::theme_for_ui,
+    theme::{CastTheme, theme_for_ui},
 };
 
 #[derive(Debug)]
 pub struct TextInput<'a> {
     text: &'a mut String,
+    label: Option<String>,
     hint_text: Option<String>,
+    help_text: Option<String>,
+    status_text: Option<String>,
+    status_intent: Option<Intent>,
     width: Option<f32>,
     size: Size,
     variant: Variant,
@@ -21,7 +25,11 @@ impl<'a> TextInput<'a> {
     pub fn new(text: &'a mut String) -> Self {
         Self {
             text,
+            label: None,
             hint_text: None,
+            help_text: None,
+            status_text: None,
+            status_intent: None,
             width: None,
             size: Size::Medium,
             variant: Variant::Solid,
@@ -30,9 +38,43 @@ impl<'a> TextInput<'a> {
     }
 
     #[must_use]
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    #[must_use]
     pub fn hint_text(mut self, hint_text: impl Into<String>) -> Self {
         self.hint_text = Some(hint_text.into());
         self
+    }
+
+    #[must_use]
+    pub fn help_text(mut self, help_text: impl Into<String>) -> Self {
+        self.help_text = Some(help_text.into());
+        self
+    }
+
+    #[must_use]
+    pub fn status_text(mut self, intent: Intent, status_text: impl Into<String>) -> Self {
+        self.status_intent = Some(intent);
+        self.status_text = Some(status_text.into());
+        self
+    }
+
+    #[must_use]
+    pub fn success_text(self, status_text: impl Into<String>) -> Self {
+        self.status_text(Intent::Success, status_text)
+    }
+
+    #[must_use]
+    pub fn warning_text(self, status_text: impl Into<String>) -> Self {
+        self.status_text(Intent::Warning, status_text)
+    }
+
+    #[must_use]
+    pub fn error_text(self, status_text: impl Into<String>) -> Self {
+        self.status_text(Intent::Danger, status_text)
     }
 
     #[must_use]
@@ -72,34 +114,117 @@ impl Widget for TextInput<'_> {
         let metrics = resolve_control_metrics(&theme, self.size);
         let mut font = theme.typography.body.clone();
         font.size = metrics.text_size;
+        let label = self.label;
+        let help_text = self.help_text;
+        let status_text = self.status_text;
+        let status_intent = self.status_intent;
+        let enabled = self.enabled;
+        let input_radius = egui::CornerRadius::same(theme.components.input.radius as u8);
         let mut edit = TextEdit::singleline(self.text)
             .frame(input_frame(&theme, self.variant))
-            .font(font)
+            .font(font.clone())
             .min_size(egui::vec2(
                 0.0,
                 metrics.min_height.max(theme.components.input.min_height),
             ))
-            .text_color(theme.components.input.fg);
+            .text_color(if enabled {
+                theme.components.input.fg
+            } else {
+                theme.colors.text_subtle
+            });
 
         if let Some(hint_text) = self.hint_text {
-            edit = edit.hint_text(hint_text);
+            edit = edit.hint_text(
+                RichText::new(hint_text)
+                    .font(font.clone())
+                    .color(theme.components.input.placeholder)
+                    .extra_letter_spacing(theme.typography.letter_spacing),
+            );
         }
 
         if let Some(width) = self.width {
             edit = edit.desired_width(width);
         }
 
-        let response = ui.add_enabled(self.enabled, edit);
-        if self.enabled && response.has_focus() {
-            ui.painter().rect_stroke(
-                response.rect,
-                egui::CornerRadius::same(theme.components.input.radius as u8),
-                egui::Stroke::new(theme.focus.width, theme.components.input.focus_border),
-                StrokeKind::Outside,
-            );
-        }
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = theme.spacing.xs;
 
-        response
+            if let Some(label) = label {
+                ui.label(
+                    RichText::new(label)
+                        .font(theme.typography.label.clone())
+                        .color(if enabled {
+                            theme.colors.text
+                        } else {
+                            theme.colors.text_subtle
+                        })
+                        .extra_letter_spacing(theme.typography.letter_spacing),
+                );
+            }
+
+            let response = ui.add_enabled(enabled, edit);
+            paint_input_state(ui, &response, input_radius, enabled, status_intent);
+
+            if let Some(message) = status_text.or(help_text) {
+                let color = status_intent.map_or(theme.colors.text_muted, |intent| {
+                    status_color(&theme, intent)
+                });
+                ui.label(
+                    RichText::new(message)
+                        .font(theme.typography.small.clone())
+                        .color(color)
+                        .extra_letter_spacing(theme.typography.letter_spacing),
+                );
+            }
+
+            response
+        })
+        .inner
+    }
+}
+
+fn paint_input_state(
+    ui: &Ui,
+    response: &Response,
+    radius: egui::CornerRadius,
+    enabled: bool,
+    status: Option<Intent>,
+) {
+    let theme = theme_for_ui(ui);
+    let stroke = if let Some(status) = status {
+        Some(egui::Stroke::new(
+            theme.components.input.border_width.max(1.25),
+            status_color(&theme, status),
+        ))
+    } else if enabled && response.has_focus() {
+        Some(egui::Stroke::new(
+            theme.focus.width,
+            theme.components.input.focus_border,
+        ))
+    } else if enabled && response.hovered() {
+        Some(egui::Stroke::new(
+            theme.components.input.border_width.max(1.0),
+            theme.colors.border_strong,
+        ))
+    } else {
+        None
+    };
+
+    if let Some(stroke) = stroke {
+        ui.painter()
+            .rect_stroke(response.rect, radius, stroke, StrokeKind::Outside);
+    }
+}
+
+fn status_color(theme: &CastTheme, intent: Intent) -> Color32 {
+    match intent {
+        Intent::Neutral => theme.colors.border_strong,
+        Intent::Primary => theme.colors.primary_family.base,
+        Intent::Secondary => theme.colors.secondary_family.base,
+        Intent::Success => theme.colors.success_family.base,
+        Intent::Warning => theme.colors.warning_family.base,
+        Intent::Danger => theme.colors.danger_family.base,
+        Intent::Info => theme.colors.info_family.base,
     }
 }
 
@@ -119,6 +244,42 @@ impl<'a> SearchInput<'a> {
     #[must_use]
     pub fn hint_text(mut self, hint_text: impl Into<String>) -> Self {
         self.inner = self.inner.hint_text(hint_text);
+        self
+    }
+
+    #[must_use]
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.inner = self.inner.label(label);
+        self
+    }
+
+    #[must_use]
+    pub fn help_text(mut self, help_text: impl Into<String>) -> Self {
+        self.inner = self.inner.help_text(help_text);
+        self
+    }
+
+    #[must_use]
+    pub fn status_text(mut self, intent: Intent, status_text: impl Into<String>) -> Self {
+        self.inner = self.inner.status_text(intent, status_text);
+        self
+    }
+
+    #[must_use]
+    pub fn success_text(mut self, status_text: impl Into<String>) -> Self {
+        self.inner = self.inner.success_text(status_text);
+        self
+    }
+
+    #[must_use]
+    pub fn warning_text(mut self, status_text: impl Into<String>) -> Self {
+        self.inner = self.inner.warning_text(status_text);
+        self
+    }
+
+    #[must_use]
+    pub fn error_text(mut self, status_text: impl Into<String>) -> Self {
+        self.inner = self.inner.error_text(status_text);
         self
     }
 
@@ -156,5 +317,33 @@ impl<'a> SearchInput<'a> {
 impl Widget for SearchInput<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         self.inner.ui(ui)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_input_status_helpers_set_intent_and_message() {
+        let mut value = String::new();
+        let input = TextInput::new(&mut value).error_text("Required field");
+
+        assert_eq!(input.status_intent, Some(Intent::Danger));
+        assert_eq!(input.status_text.as_deref(), Some("Required field"));
+    }
+
+    #[test]
+    fn search_input_can_carry_field_metadata() {
+        let mut value = String::new();
+        let search = SearchInput::new(&mut value)
+            .label("Search")
+            .help_text("Filters the current view");
+
+        assert_eq!(search.inner.label.as_deref(), Some("Search"));
+        assert_eq!(
+            search.inner.help_text.as_deref(),
+            Some("Filters the current view")
+        );
     }
 }

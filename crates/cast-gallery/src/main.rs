@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link, Notice,
-    Panel as CastPanel, SearchInput, SemanticColorTokens, Separator, Size, Switch, TextInput,
-    ThemeMode, ThemeSeed, TypographyTokens, Variant,
+    Panel as CastPanel, SearchInput, SegmentedControl, SemanticColorTokens, Separator, Size,
+    Switch, Tabs, TextInput, ThemeMode, ThemeSeed, TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -31,9 +31,12 @@ struct CastGallery {
     zoom: f32,
     search: String,
     name: String,
+    handle: String,
     enabled: bool,
     notifications: bool,
     indeterminate: bool,
+    foundation_tab: usize,
+    workflow_segment: usize,
 }
 
 impl CastGallery {
@@ -48,9 +51,12 @@ impl CastGallery {
             zoom: 1.0,
             search: String::new(),
             name: String::from("Cast"),
+            handle: String::new(),
             enabled: true,
             notifications: true,
             indeterminate: false,
+            foundation_tab: 0,
+            workflow_segment: 0,
         }
     }
 
@@ -74,10 +80,18 @@ impl eframe::App for CastGallery {
             ui.horizontal(|ui| {
                 ui.heading("Cast Gallery");
                 ui.separator();
-                let mut mode = self.seed.mode;
-                ui.selectable_value(&mut mode, ThemeMode::Light, "Light");
-                ui.selectable_value(&mut mode, ThemeMode::Dark, "Dark");
-                if mode != self.seed.mode {
+                let mut mode_index = match self.seed.mode {
+                    ThemeMode::Light => 0,
+                    ThemeMode::Dark => 1,
+                };
+                let previous_mode_index = mode_index;
+                ui.add(SegmentedControl::new(&mut mode_index, ["Light", "Dark"]).size(Size::Small));
+                if mode_index != previous_mode_index {
+                    let mode = if mode_index == 0 {
+                        ThemeMode::Light
+                    } else {
+                        ThemeMode::Dark
+                    };
                     self.set_mode(&ctx, mode);
                 }
                 ui.separator();
@@ -135,6 +149,8 @@ impl eframe::App for CastGallery {
                     ui.add_space(12.0);
                     show_override_preview(ui);
                     ui.add_space(12.0);
+                    show_navigation_layout(ui, &mut self.foundation_tab, &mut self.workflow_segment);
+                    ui.add_space(12.0);
                     show_buttons_and_badges(ui);
                     ui.add_space(12.0);
                     show_surfaces(ui);
@@ -145,6 +161,7 @@ impl eframe::App for CastGallery {
                         ui,
                         &mut self.search,
                         &mut self.name,
+                        &mut self.handle,
                         &mut self.enabled,
                         &mut self.notifications,
                         &mut self.indeterminate,
@@ -892,6 +909,52 @@ fn color_swatch(ui: &mut egui::Ui, color: Color32, label: &str) {
     response.on_hover_text(label);
 }
 
+fn show_navigation_layout(
+    ui: &mut egui::Ui,
+    foundation_tab: &mut usize,
+    workflow_segment: &mut usize,
+) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Navigation and layout");
+        ui.add(Tabs::new(
+            foundation_tab,
+            ["Overview", "Components", "Theme", "Diagnostics"],
+        ));
+        ui.add_space(10.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.add(SegmentedControl::new(
+                workflow_segment,
+                ["Design", "Build", "Ship"],
+            ));
+            ui.add(Badge::new(match *workflow_segment {
+                0 => "Design review",
+                1 => "Implementation",
+                _ => "Release check",
+            }));
+        });
+        ui.add_space(10.0);
+        CastPanel::new().show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.add(
+                    Badge::new(match *foundation_tab {
+                        0 => "Overview",
+                        1 => "Components",
+                        2 => "Theme",
+                        _ => "Diagnostics",
+                    })
+                    .intent(Intent::Info),
+                );
+                ui.label(match *foundation_tab {
+                    0 => "A compact route bar for switching between app sections.",
+                    1 => "Tabs and segmented controls share sizing, tracking, and colors.",
+                    2 => "Navigation follows runtime theme changes without extra setup.",
+                    _ => "Focused state and hover affordances are painted by Cast.",
+                });
+            });
+        });
+    });
+}
+
 fn show_buttons_and_badges(ui: &mut egui::Ui) {
     Card::new().show(ui, |ui| {
         ui.heading("Buttons");
@@ -1013,44 +1076,60 @@ fn show_forms(
     ui: &mut egui::Ui,
     search: &mut String,
     name: &mut String,
+    handle: &mut String,
     enabled: &mut bool,
     notifications: &mut bool,
     indeterminate: &mut bool,
 ) {
     Card::new().show(ui, |ui| {
         ui.heading("Forms");
-        ui.horizontal(|ui| {
-            ui.label("Name");
-            ui.add(TextInput::new(name).hint_text("Project name").width(220.0));
-        });
-        ui.horizontal(|ui| {
-            ui.label("Search");
-            ui.add(SearchInput::new(search).width(220.0));
-        });
-        ui.horizontal(|ui| {
-            ui.label("Outline");
+        ui.horizontal_wrapped(|ui| {
             ui.add(
                 TextInput::new(name)
+                    .label("Project name")
+                    .hint_text("Project name")
+                    .help_text("Shown in window titles and saved presets.")
+                    .width(240.0),
+            );
+            ui.add(
+                SearchInput::new(search)
+                    .label("Search")
+                    .help_text("Filters the current gallery view.")
+                    .width(240.0),
+            );
+        });
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.add(
+                TextInput::new(handle)
+                    .label("Handle")
+                    .hint_text("theme-handle")
+                    .variant(Variant::Subtle)
+                    .error_text("Required before publishing.")
+                    .width(220.0),
+            );
+            ui.add(
+                TextInput::new(name)
+                    .label("Outline")
                     .hint_text("Outline input")
                     .variant(Variant::Outline)
+                    .success_text("Looks ready.")
                     .width(220.0),
             );
-        });
-        ui.horizontal(|ui| {
-            ui.label("Ghost");
             ui.add(
                 TextInput::new(search)
+                    .label("Ghost")
                     .hint_text("Ghost input")
                     .variant(Variant::Ghost)
+                    .warning_text("Use sparingly in dense forms.")
                     .width(220.0),
             );
-        });
-        ui.horizontal(|ui| {
-            ui.label("Disabled");
             ui.add(
                 TextInput::new(name)
+                    .label("Disabled")
                     .hint_text("Disabled input")
                     .disabled()
+                    .help_text("Disabled state remains legible.")
                     .width(220.0),
             );
         });
