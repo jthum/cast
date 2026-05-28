@@ -195,20 +195,13 @@ fn paint_input_state(
     let focused = enabled && response.has_focus();
     let hovered = enabled && response.hovered();
 
-    if status.is_none()
-        && let Some(halo) = input_interaction_halo(&theme, focused, hovered)
-    {
+    if let Some(halo) = input_interaction_halo(&theme, status, focused, hovered) {
         ui.painter()
             .rect_stroke(response.rect.expand(2.0), radius, halo, StrokeKind::Outside);
     }
 
     let stroke = status
-        .map(|status| {
-            egui::Stroke::new(
-                theme.components.input.border_width.max(1.25),
-                status_color(&theme, status),
-            )
-        })
+        .map(|status| egui::Stroke::new(input_border_width(&theme), status_color(&theme, status)))
         .or_else(|| input_interaction_border(&theme, focused, hovered));
 
     if let Some(stroke) = stroke {
@@ -217,17 +210,20 @@ fn paint_input_state(
     }
 }
 
-fn input_interaction_halo(theme: &CastTheme, focused: bool, hovered: bool) -> Option<egui::Stroke> {
+fn input_interaction_halo(
+    theme: &CastTheme,
+    status: Option<Intent>,
+    focused: bool,
+    hovered: bool,
+) -> Option<egui::Stroke> {
+    let color = status.map_or(theme.colors.border_strong, |status| {
+        status_color(theme, status)
+    });
+
     if focused {
-        Some(egui::Stroke::new(
-            3.0,
-            mix_with_transparent(theme.colors.border_strong, 0.16),
-        ))
-    } else if hovered {
-        Some(egui::Stroke::new(
-            2.0,
-            mix_with_transparent(theme.colors.border_strong, 0.08),
-        ))
+        Some(egui::Stroke::new(3.0, mix_with_transparent(color, 0.16)))
+    } else if hovered || status.is_some() {
+        Some(egui::Stroke::new(2.0, mix_with_transparent(color, 0.08)))
     } else {
         None
     }
@@ -238,19 +234,18 @@ fn input_interaction_border(
     focused: bool,
     hovered: bool,
 ) -> Option<egui::Stroke> {
-    if focused {
+    if focused || hovered {
         Some(egui::Stroke::new(
-            theme.focus.width,
-            theme.colors.border_strong,
-        ))
-    } else if hovered {
-        Some(egui::Stroke::new(
-            theme.components.input.border_width.max(1.0),
+            input_border_width(theme),
             theme.colors.border_strong,
         ))
     } else {
         None
     }
+}
+
+fn input_border_width(theme: &CastTheme) -> f32 {
+    theme.components.input.border_width.max(1.0)
 }
 
 fn status_color(theme: &CastTheme, intent: Intent) -> Color32 {
@@ -392,18 +387,34 @@ mod tests {
 
         assert_eq!(hover.color, theme.colors.border_strong);
         assert_eq!(focus.color, theme.colors.border_strong);
-        assert!(focus.width > hover.width);
+        assert_eq!(hover.width, input_border_width(&theme));
+        assert_eq!(focus.width, input_border_width(&theme));
     }
 
     #[test]
     fn input_halo_uses_subtle_muted_tints() {
         let theme = CastTheme::light();
-        let hover = input_interaction_halo(&theme, false, true).unwrap();
-        let focus = input_interaction_halo(&theme, true, false).unwrap();
+        let hover = input_interaction_halo(&theme, None, false, true).unwrap();
+        let focus = input_interaction_halo(&theme, None, true, false).unwrap();
         let [_, _, _, hover_alpha] = hover.color.to_srgba_unmultiplied();
         let [_, _, _, focus_alpha] = focus.color.to_srgba_unmultiplied();
 
         assert_eq!(hover_alpha, 20);
         assert_eq!(focus_alpha, 41);
+    }
+
+    #[test]
+    fn status_inputs_use_semantic_halo_and_stable_border_width() {
+        let theme = CastTheme::light();
+        let halo = input_interaction_halo(&theme, Some(Intent::Danger), false, false).unwrap();
+        let border = egui::Stroke::new(
+            input_border_width(&theme),
+            status_color(&theme, Intent::Danger),
+        );
+        let [halo_r, _, _, halo_alpha] = halo.color.to_srgba_unmultiplied();
+
+        assert!((i16::from(halo_r) - i16::from(theme.colors.danger_family.base.r())).abs() <= 3);
+        assert_eq!(halo_alpha, 20);
+        assert_eq!(border.width, input_border_width(&theme));
     }
 }
