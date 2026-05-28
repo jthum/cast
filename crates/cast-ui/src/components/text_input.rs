@@ -197,7 +197,7 @@ fn paint_input_state(
 
     if let Some(halo) = input_interaction_halo(&theme, status, focused, hovered) {
         ui.painter()
-            .rect_stroke(response.rect.expand(2.0), radius, halo, StrokeKind::Outside);
+            .rect_stroke(response.rect, radius, halo, StrokeKind::Outside);
     }
 
     let stroke = status

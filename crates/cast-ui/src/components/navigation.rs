@@ -40,22 +40,31 @@ impl<'a> Tabs<'a> {
 
 impl Widget for Tabs<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
-        let mut combined = ui.allocate_response(egui::Vec2::ZERO, Sense::hover());
+        let theme = theme_for_ui(ui);
+        let frame = egui::Frame::new()
+            .fill(theme.colors.surface_muted)
+            .corner_radius(egui::CornerRadius::same(18))
+            .inner_margin(egui::Margin::symmetric(3, 3))
+            .show(ui, |ui| {
+                let mut combined = ui.allocate_response(egui::Vec2::ZERO, Sense::hover());
 
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = theme_for_ui(ui).spacing.xs;
-            for (index, label) in self.labels.iter().enumerate() {
-                let selected = *self.selected == index;
-                let mut response = nav_item(ui, label, self.size, selected, NavStyle::Tab);
-                if response.clicked() && *self.selected != index {
-                    *self.selected = index;
-                    response.mark_changed();
-                }
-                combined = combined.union(response);
-            }
-        });
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.spacing.xs / 2.0;
+                    for (index, label) in self.labels.iter().enumerate() {
+                        let selected = *self.selected == index;
+                        let mut response = nav_item(ui, label, self.size, selected, NavStyle::Tab);
+                        if response.clicked() && *self.selected != index {
+                            *self.selected = index;
+                            response.mark_changed();
+                        }
+                        combined = combined.union(response);
+                    }
+                });
 
-        combined
+                combined
+            });
+
+        frame.response.union(frame.inner)
     }
 }
 
@@ -296,11 +305,13 @@ fn paint_nav_item(
     pressed: bool,
     style: NavStyle,
 ) {
-    let radius = egui::CornerRadius::same(theme.radius.md as u8);
+    let radius = match style {
+        NavStyle::Tab => egui::CornerRadius::same((rect.height() / 2.0).round() as u8),
+        NavStyle::Segmented => egui::CornerRadius::same(theme.radius.md as u8),
+    };
     let fill = nav_fill(theme, selected, hovered, pressed, style);
     let stroke = match style {
-        NavStyle::Tab if selected => egui::Stroke::new(theme.stroke.sm, theme.colors.primary),
-        NavStyle::Tab => egui::Stroke::new(theme.stroke.sm, Color32::TRANSPARENT),
+        NavStyle::Tab => egui::Stroke::NONE,
         NavStyle::Segmented if selected => {
             egui::Stroke::new(theme.stroke.sm, selected_border(theme, hovered, pressed))
         }
@@ -320,9 +331,11 @@ fn nav_fill(
 ) -> Color32 {
     if selected {
         match style {
-            NavStyle::Tab => theme.colors.primary_family.base,
+            NavStyle::Tab => theme.colors.surface,
             NavStyle::Segmented => selected_fill(theme, hovered, pressed),
         }
+    } else if hovered && style == NavStyle::Tab {
+        theme.colors.surface_raised
     } else if hovered {
         theme.colors.surface_muted
     } else {
@@ -355,9 +368,13 @@ fn selected_border(theme: &CastTheme, hovered: bool, pressed: bool) -> Color32 {
 fn nav_fg(theme: &CastTheme, selected: bool, hovered: bool, style: NavStyle) -> Color32 {
     if selected {
         match style {
-            NavStyle::Tab => theme.colors.primary_family.fg,
+            NavStyle::Tab => theme.colors.text,
             NavStyle::Segmented => theme.colors.primary_family.base,
         }
+    } else if style == NavStyle::Tab && hovered {
+        theme.colors.text
+    } else if style == NavStyle::Tab {
+        theme.colors.text_muted
     } else if hovered {
         theme.colors.text
     } else {
@@ -421,16 +438,20 @@ mod tests {
     }
 
     #[test]
-    fn selected_tabs_use_solid_primary_colors() {
+    fn selected_tabs_use_surface_pill_colors() {
         let theme = CastTheme::light();
 
         assert_eq!(
             nav_fill(&theme, true, false, false, NavStyle::Tab),
-            theme.colors.primary_family.base
+            theme.colors.surface
         );
         assert_eq!(
             nav_fg(&theme, true, false, NavStyle::Tab),
-            theme.colors.primary_family.fg
+            theme.colors.text
+        );
+        assert_eq!(
+            nav_fg(&theme, false, false, NavStyle::Tab),
+            theme.colors.text_muted
         );
         assert_eq!(
             nav_fg(&theme, true, false, NavStyle::Segmented),
