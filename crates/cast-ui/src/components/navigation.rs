@@ -4,10 +4,10 @@ use egui::{
 };
 
 use crate::{
-    color::{mix_with_transparent, with_alpha},
+    color::{contrast_ratio, mix_oklch, mix_with_transparent, with_alpha},
     foundation::Size,
     style::resolve_control_metrics,
-    theme::{CastTheme, theme_for_ui},
+    theme::{CastTheme, ThemeMode, theme_for_ui},
 };
 
 #[derive(Debug)]
@@ -198,6 +198,7 @@ impl Widget for NavList<'_> {
 enum NavStyle {
     Tab,
     Segmented,
+    List,
 }
 
 fn nav_item(ui: &mut Ui, label: &str, size: Size, selected: bool, style: NavStyle) -> Response {
@@ -216,11 +217,11 @@ fn nav_item(ui: &mut Ui, label: &str, size: Size, selected: bool, style: NavStyl
     ));
     let horizontal_padding = match style {
         NavStyle::Tab => metrics.padding.x * 1.15,
-        NavStyle::Segmented => metrics.padding.x * 1.25,
+        NavStyle::Segmented | NavStyle::List => metrics.padding.x * 1.25,
     };
     let vertical_padding = match style {
         NavStyle::Tab => metrics.padding.y * 1.15,
-        NavStyle::Segmented => metrics.padding.y * 1.1,
+        NavStyle::Segmented | NavStyle::List => metrics.padding.y * 1.1,
     };
     let desired_size = egui::vec2(
         galley.size().x + horizontal_padding * 2.0,
@@ -264,7 +265,7 @@ fn nav_list_item(ui: &mut Ui, label: &str, size: Size, selected: bool) -> Respon
     if ui.is_rect_visible(rect) {
         let hovered = response.hovered();
         let pressed = response.is_pointer_button_down_on();
-        let fill = nav_fill(&theme, selected, hovered, pressed, NavStyle::Segmented);
+        let fill = nav_fill(&theme, selected, hovered, pressed, NavStyle::List);
         let border = if selected {
             selected_border(&theme, hovered, pressed)
         } else {
@@ -297,7 +298,7 @@ fn nav_list_item(ui: &mut Ui, label: &str, size: Size, selected: bool) -> Respon
         ui.painter().galley(
             text_pos,
             galley,
-            nav_fg(&theme, selected, hovered, NavStyle::Segmented),
+            nav_fg(&theme, selected, hovered, NavStyle::List),
         );
     }
 
@@ -315,7 +316,7 @@ fn paint_nav_item(
 ) {
     let radius = match style {
         NavStyle::Tab => tab_item_radius(theme),
-        NavStyle::Segmented => segmented_item_radius(theme),
+        NavStyle::Segmented | NavStyle::List => segmented_item_radius(theme),
     };
     let fill = nav_fill(theme, selected, hovered, pressed, style);
     let stroke = match style {
@@ -323,7 +324,9 @@ fn paint_nav_item(
         NavStyle::Segmented if selected => {
             egui::Stroke::new(theme.stroke.sm, selected_border(theme, hovered, pressed))
         }
-        NavStyle::Segmented => egui::Stroke::new(theme.stroke.sm, Color32::TRANSPARENT),
+        NavStyle::Segmented | NavStyle::List => {
+            egui::Stroke::new(theme.stroke.sm, Color32::TRANSPARENT)
+        }
     };
 
     ui.painter()
@@ -364,7 +367,8 @@ fn nav_fill(
     if selected {
         match style {
             NavStyle::Tab => theme.colors.surface,
-            NavStyle::Segmented => selected_fill(theme, hovered, pressed),
+            NavStyle::Segmented if theme.mode == ThemeMode::Dark => theme.colors.text,
+            NavStyle::Segmented | NavStyle::List => selected_fill(theme, hovered, pressed),
         }
     } else if hovered && style == NavStyle::Tab {
         theme.colors.surface_raised
@@ -401,7 +405,10 @@ fn nav_fg(theme: &CastTheme, selected: bool, hovered: bool, style: NavStyle) -> 
     if selected {
         match style {
             NavStyle::Tab => theme.colors.text,
-            NavStyle::Segmented => theme.colors.primary_family.base,
+            NavStyle::Segmented if theme.mode == ThemeMode::Dark => {
+                dark_segmented_selected_fg(theme)
+            }
+            NavStyle::Segmented | NavStyle::List => theme.colors.primary_family.base,
         }
     } else if style == NavStyle::Tab && hovered {
         theme.colors.text
@@ -411,6 +418,15 @@ fn nav_fg(theme: &CastTheme, selected: bool, hovered: bool, style: NavStyle) -> 
         theme.colors.text
     } else {
         with_alpha(theme.colors.text, 225)
+    }
+}
+
+fn dark_segmented_selected_fg(theme: &CastTheme) -> Color32 {
+    let base = theme.colors.primary_family.base;
+    if contrast_ratio(theme.colors.text, base) >= 4.5 {
+        base
+    } else {
+        mix_oklch(base, Color32::BLACK, 0.36)
     }
 }
 
@@ -494,6 +510,26 @@ mod tests {
         assert_eq!(fill_a, 13);
         assert!((i16::from(border_r) - i16::from(theme.colors.primary_family.base.r())).abs() <= 3);
         assert_eq!(border_a, 77);
+    }
+
+    #[test]
+    fn dark_segmented_selection_uses_light_pill_with_primary_text() {
+        let theme = CastTheme::dark();
+        let fill = nav_fill(&theme, true, false, false, NavStyle::Segmented);
+        let fg = nav_fg(&theme, true, false, NavStyle::Segmented);
+
+        assert_eq!(fill, theme.colors.text);
+        assert!(contrast_ratio(fill, fg) >= 4.5);
+    }
+
+    #[test]
+    fn dark_nav_list_keeps_subtle_selected_tint() {
+        let theme = CastTheme::dark();
+        let fill = nav_fill(&theme, true, false, false, NavStyle::List);
+        let [_, _, _, alpha] = fill.to_srgba_unmultiplied();
+
+        assert_ne!(fill, theme.colors.text);
+        assert_eq!(alpha, 13);
     }
 
     #[test]
