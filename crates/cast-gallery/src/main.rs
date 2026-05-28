@@ -265,7 +265,7 @@ fn show_workspace_view(
             ui.add_space(12.0);
             show_menus(ui, menu_choice);
             ui.add_space(12.0);
-            show_lists_and_tables(ui, list_selection, table_selection);
+            show_lists_and_tables(ui, search, list_selection, table_selection);
             ui.add_space(12.0);
             show_surfaces(ui);
             ui.add_space(12.0);
@@ -1364,50 +1364,197 @@ fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize) {
 
 fn show_lists_and_tables(
     ui: &mut egui::Ui,
+    search: &mut String,
     list_selection: &mut usize,
     table_selection: &mut usize,
 ) {
     Card::new().show(ui, |ui| {
-        ui.heading("Lists and tables");
-        ui.columns(2, |columns| {
-            CastPanel::new().show(&mut columns[0], |ui| {
-                ui.label("Selectable rows");
-                ui.add_space(4.0);
-                for (index, (title, subtitle, trailing)) in [
-                    ("Model planning", "4 tool calls queued", "Active"),
-                    ("Patch review", "2 files changed", "Ready"),
-                    ("Gallery smoke", "Last run passed", "Done"),
-                ]
-                .into_iter()
-                .enumerate()
-                {
-                    let response = ui.add(
-                        ListRow::new(title)
-                            .subtitle(subtitle)
-                            .leading(">")
-                            .trailing(trailing)
-                            .selected(*list_selection == index),
-                    );
-                    if response.clicked() {
-                        *list_selection = index;
-                    }
-                }
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.heading("Leads [328]");
+                ui.label("A complete overview of leads in the organization.");
             });
-
-            CastPanel::new().show(&mut columns[1], |ui| {
-                ui.label("Data table");
-                ui.add_space(4.0);
-                ui.add(DataTable::new(
-                    table_selection,
-                    ["Step", "Owner", "State"],
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                ui.add(
+                    Button::new("Export as CSV")
+                        .intent(Intent::Neutral)
+                        .variant(Variant::Outline)
+                        .leading_icon("[^]"),
+                );
+            });
+        });
+        ui.add_space(10.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.add(
+                Button::new("Last 7 days")
+                    .intent(Intent::Neutral)
+                    .variant(Variant::Outline),
+            );
+            ui.add(
+                Button::new("All users")
+                    .intent(Intent::Neutral)
+                    .variant(Variant::Outline),
+            );
+            ui.add(
+                Button::new("Any status")
+                    .intent(Intent::Neutral)
+                    .variant(Variant::Outline),
+            );
+            ui.add(
+                Button::new("All payments")
+                    .intent(Intent::Neutral)
+                    .variant(Variant::Outline),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add(
+                    SearchInput::new(search)
+                        .hint_text("Search leads by name, email...")
+                        .width(260.0),
+                );
+            });
+        });
+        ui.add_space(14.0);
+        ui.add(
+            DataTable::new(
+                table_selection,
+                [
+                    "Lead name",
+                    "Status",
+                    "Interest",
+                    "Source",
+                    "Deal value",
+                    "Assigned to",
+                    "Interacted",
+                ],
+                [
                     [
-                        ["Tokens", "Theme", "Done"],
-                        ["Inputs", "Forms", "Done"],
-                        ["Menus", "Navigation", "New"],
-                        ["Tables", "Data", "New"],
+                        "Sarah Parker",
+                        "Won",
+                        "Interested",
+                        "Sponsored ad",
+                        "$ 2,500.00",
+                        "Sarah P.",
+                        "2 days ago",
                     ],
-                ));
+                    [
+                        "Mike Brown",
+                        "Call booked",
+                        "Broke",
+                        "Direct message",
+                        "Pending...",
+                        "Alex W.",
+                        "3 hours ago",
+                    ],
+                    [
+                        "Linda Chen",
+                        "Unqualified",
+                        "Achiever",
+                        "Story replies",
+                        "N/A",
+                        "Jane D.",
+                        "1 week ago",
+                    ],
+                    [
+                        "David Lee",
+                        "Won",
+                        "Interested",
+                        "Story replies",
+                        "$ 5,000.00",
+                        "John S.",
+                        "4 days ago",
+                    ],
+                    [
+                        "Emily White",
+                        "No show",
+                        "Interested",
+                        "Direct message",
+                        "Pending...",
+                        "Ali M.",
+                        "15 mins ago",
+                    ],
+                    [
+                        "Jessica Wong",
+                        "Won",
+                        "Interested",
+                        "Sponsored ad",
+                        "$ 3,000.00",
+                        "Sarah P.",
+                        "1 week ago",
+                    ],
+                    [
+                        "Kevin Harris",
+                        "Qualified",
+                        "N/A",
+                        "Story replies",
+                        "Pending...",
+                        "Jane D.",
+                        "1 day ago",
+                    ],
+                    [
+                        "Tom Clark",
+                        "Lost",
+                        "Broke",
+                        "Direct message",
+                        "N/A",
+                        "John S.",
+                        "6 days ago",
+                    ],
+                ],
+            )
+            .size(Size::Small)
+            .column_weights([1.35, 1.25, 1.15, 1.30, 1.10, 1.10, 1.0])
+            .right_aligned_columns([4]),
+        );
+        ui.add_space(10.0);
+        ui.horizontal(|ui| {
+            ui.label("Rows per page:");
+            ui.add(Badge::new("25").intent(Intent::Neutral));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add(
+                    Button::new(">")
+                        .intent(Intent::Neutral)
+                        .variant(Variant::Outline),
+                );
+                ui.add(
+                    Button::new("3")
+                        .intent(Intent::Neutral)
+                        .variant(Variant::Outline),
+                );
+                ui.add(
+                    Button::new("2")
+                        .intent(Intent::Neutral)
+                        .variant(Variant::Outline),
+                );
+                ui.add(
+                    Button::new("1")
+                        .intent(Intent::Primary)
+                        .variant(Variant::Subtle),
+                );
             });
+        });
+        ui.add_space(12.0);
+        CastPanel::new().show(ui, |ui| {
+            ui.label("Related activity");
+            ui.add_space(4.0);
+            for (index, (title, subtitle, trailing)) in [
+                ("Model planning", "4 tool calls queued", "Active"),
+                ("Patch review", "2 files changed", "Ready"),
+                ("Gallery smoke", "Last run passed", "Done"),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let response = ui.add(
+                    ListRow::new(title)
+                        .subtitle(subtitle)
+                        .leading(">")
+                        .trailing(trailing)
+                        .selected(*list_selection == index),
+                );
+                if response.clicked() {
+                    *list_selection = index;
+                }
+            }
         });
     });
 }
