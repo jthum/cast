@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use cast::{
-    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dropdown, Intent, Label,
-    Link, MenuItem, NavList, Notice, Panel as CastPanel, Radio, SearchInput, SegmentedControl,
-    SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed,
-    TypographyTokens, Variant,
+    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, DataTable, Dropdown, Intent,
+    Label, Link, ListRow, MenuItem, NavList, Notice, Panel as CastPanel, Radio, SearchInput,
+    SegmentedControl, SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput,
+    ThemeMode, ThemeSeed, TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -39,6 +39,8 @@ struct CastGallery {
     indeterminate: bool,
     form_density: usize,
     menu_choice: usize,
+    list_selection: usize,
+    table_selection: usize,
     foundation_tab: usize,
     workflow_segment: usize,
     sidebar_section: usize,
@@ -63,6 +65,8 @@ impl CastGallery {
             indeterminate: false,
             form_density: 1,
             menu_choice: 0,
+            list_selection: 0,
+            table_selection: 0,
             foundation_tab: 0,
             workflow_segment: 0,
             sidebar_section: 0,
@@ -164,6 +168,8 @@ impl eframe::App for CastGallery {
                         &mut self.indeterminate,
                         &mut self.form_density,
                         &mut self.menu_choice,
+                        &mut self.list_selection,
+                        &mut self.table_selection,
                         &mut self.foundation_tab,
                         &mut self.workflow_segment,
                     );
@@ -200,6 +206,8 @@ fn show_workspace_view(
     indeterminate: &mut bool,
     form_density: &mut usize,
     menu_choice: &mut usize,
+    list_selection: &mut usize,
+    table_selection: &mut usize,
     foundation_tab: &mut usize,
     workflow_segment: &mut usize,
 ) {
@@ -256,6 +264,8 @@ fn show_workspace_view(
             show_buttons_and_badges(ui);
             ui.add_space(12.0);
             show_menus(ui, menu_choice);
+            ui.add_space(12.0);
+            show_lists_and_tables(ui, list_selection, table_selection);
             ui.add_space(12.0);
             show_surfaces(ui);
             ui.add_space(12.0);
@@ -1348,6 +1358,56 @@ fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize) {
             ui.add(MenuItem::new("Archive preset").intent(Intent::Warning));
             ui.add(MenuItem::new("Delete preset").intent(Intent::Danger));
             ui.add(MenuItem::new("Unavailable action").disabled());
+        });
+    });
+}
+
+fn show_lists_and_tables(
+    ui: &mut egui::Ui,
+    list_selection: &mut usize,
+    table_selection: &mut usize,
+) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Lists and tables");
+        ui.columns(2, |columns| {
+            CastPanel::new().show(&mut columns[0], |ui| {
+                ui.label("Selectable rows");
+                ui.add_space(4.0);
+                for (index, (title, subtitle, trailing)) in [
+                    ("Model planning", "4 tool calls queued", "Active"),
+                    ("Patch review", "2 files changed", "Ready"),
+                    ("Gallery smoke", "Last run passed", "Done"),
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    let response = ui.add(
+                        ListRow::new(title)
+                            .subtitle(subtitle)
+                            .leading(">")
+                            .trailing(trailing)
+                            .selected(*list_selection == index),
+                    );
+                    if response.clicked() {
+                        *list_selection = index;
+                    }
+                }
+            });
+
+            CastPanel::new().show(&mut columns[1], |ui| {
+                ui.label("Data table");
+                ui.add_space(4.0);
+                ui.add(DataTable::new(
+                    table_selection,
+                    ["Step", "Owner", "State"],
+                    [
+                        ["Tokens", "Theme", "Done"],
+                        ["Inputs", "Forms", "Done"],
+                        ["Menus", "Navigation", "New"],
+                        ["Tables", "Data", "New"],
+                    ],
+                ));
+            });
         });
     });
 }
