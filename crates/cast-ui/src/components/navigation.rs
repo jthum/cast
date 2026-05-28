@@ -46,7 +46,7 @@ impl Widget for Tabs<'_> {
             .corner_radius(egui::CornerRadius::same(18))
             .inner_margin(egui::Margin::symmetric(3, 3))
             .show(ui, |ui| {
-                let mut combined = ui.allocate_response(egui::Vec2::ZERO, Sense::hover());
+                let mut combined: Option<Response> = None;
 
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = theme.spacing.xs / 2.0;
@@ -57,11 +57,14 @@ impl Widget for Tabs<'_> {
                             *self.selected = index;
                             response.mark_changed();
                         }
-                        combined = combined.union(response);
+                        combined = Some(match combined.take() {
+                            Some(existing) => existing.union(response),
+                            None => response,
+                        });
                     }
                 });
 
-                combined
+                combined.unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, Sense::hover()))
             });
 
         frame.response.union(frame.inner)
@@ -104,7 +107,7 @@ impl Widget for SegmentedControl<'_> {
             .min_height
             .max(theme.components.button.min_height - 4.0);
         let start = ui.cursor().min;
-        let mut combined = ui.allocate_response(egui::Vec2::ZERO, Sense::hover());
+        let mut combined: Option<Response> = None;
 
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
@@ -115,9 +118,15 @@ impl Widget for SegmentedControl<'_> {
                     *self.selected = index;
                     response.mark_changed();
                 }
-                combined = combined.union(response);
+                combined = Some(match combined.take() {
+                    Some(existing) => existing.union(response),
+                    None => response,
+                });
             }
         });
+
+        let combined =
+            combined.unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, Sense::hover()));
 
         if ui.is_rect_visible(combined.rect) && combined.rect.is_positive() {
             let frame_rect =
@@ -167,7 +176,7 @@ impl<'a> NavList<'a> {
 
 impl Widget for NavList<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
-        let mut combined = ui.allocate_response(egui::Vec2::ZERO, Sense::hover());
+        let mut combined: Option<Response> = None;
 
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = theme_for_ui(ui).spacing.xs;
@@ -178,11 +187,14 @@ impl Widget for NavList<'_> {
                     *self.selected = index;
                     response.mark_changed();
                 }
-                combined = combined.union(response);
+                combined = Some(match combined.take() {
+                    Some(existing) => existing.union(response),
+                    None => response,
+                });
             }
         });
 
-        combined
+        combined.unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, Sense::hover()))
     }
 }
 
