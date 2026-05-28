@@ -107,7 +107,7 @@ impl Widget for SegmentedControl<'_> {
 
         let frame = egui::Frame::new()
             .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
-            .corner_radius(egui::CornerRadius::same(theme.radius.md as u8))
+            .corner_radius(segmented_frame_radius(&theme, frame_padding))
             .inner_margin(egui::Margin::symmetric(
                 frame_padding as i8,
                 frame_padding as i8,
@@ -310,7 +310,7 @@ fn paint_nav_item(
 ) {
     let radius = match style {
         NavStyle::Tab => egui::CornerRadius::same((rect.height() / 2.0).round() as u8),
-        NavStyle::Segmented => egui::CornerRadius::same(theme.radius.md as u8),
+        NavStyle::Segmented => segmented_item_radius(theme),
     };
     let fill = nav_fill(theme, selected, hovered, pressed, style);
     let stroke = match style {
@@ -323,6 +323,14 @@ fn paint_nav_item(
 
     ui.painter()
         .rect(rect, radius, fill, stroke, StrokeKind::Outside);
+}
+
+fn segmented_frame_radius(theme: &CastTheme, frame_padding: f32) -> egui::CornerRadius {
+    egui::CornerRadius::same((theme.radius.md + frame_padding).round() as u8)
+}
+
+fn segmented_item_radius(theme: &CastTheme) -> egui::CornerRadius {
+    egui::CornerRadius::same(theme.radius.md.round() as u8)
 }
 
 fn nav_fill(
@@ -416,6 +424,15 @@ mod tests {
         let segmented = SegmentedControl::new(&mut selected, ["Light", "Dark"]).size(Size::Small);
 
         assert_eq!(segmented.size, Size::Small);
+    }
+
+    #[test]
+    fn segmented_frame_radius_accounts_for_inner_padding() {
+        let theme = CastTheme::light();
+        let frame_radius = segmented_frame_radius(&theme, 3.0);
+        let item_radius = segmented_item_radius(&theme);
+
+        assert_eq!(frame_radius.nw, item_radius.nw + 3);
     }
 
     #[test]
