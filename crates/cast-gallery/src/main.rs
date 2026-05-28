@@ -3,7 +3,8 @@ use std::sync::Arc;
 use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Intent, Label, Link,
     NavList, Notice, Panel as CastPanel, SearchInput, SegmentedControl, SemanticColorTokens,
-    Separator, Size, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, TypographyTokens, Variant,
+    Separator, Size, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, TypographyTokens,
+    Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -102,7 +103,11 @@ impl eframe::App for CastGallery {
                 ui.separator();
                 ui.label("Zoom");
                 if ui
-                    .add(egui::Slider::new(&mut self.zoom, 0.9..=1.35).show_value(false))
+                    .add(
+                        Slider::new(&mut self.zoom, 0.9..=1.35)
+                            .show_value(false)
+                            .width(140.0),
+                    )
                     .changed()
                 {
                     ctx.set_zoom_factor(self.zoom);
@@ -762,8 +767,7 @@ fn theme_slider(
     value: &mut f32,
     range: std::ops::RangeInclusive<f32>,
 ) -> bool {
-    ui.add(egui::Slider::new(value, range).text(label))
-        .changed()
+    ui.add(Slider::new(value, range).text(label)).changed()
 }
 
 fn optional_theme_slider(
@@ -782,7 +786,9 @@ fn optional_theme_slider(
         }
 
         if let Some(value) = value {
-            changed |= ui.add(egui::Slider::new(value, range)).changed();
+            changed |= ui
+                .add(Slider::new(value, range).show_value(false).width(148.0))
+                .changed();
         }
     });
 

@@ -8,6 +8,7 @@ mod link;
 mod navigation;
 mod panel;
 mod separator;
+mod slider;
 mod switch;
 mod text_input;
 
@@ -21,5 +22,6 @@ pub use link::Link;
 pub use navigation::{NavList, SegmentedControl, Tabs};
 pub use panel::Panel;
 pub use separator::Separator;
+pub use slider::Slider;
 pub use switch::Switch;
 pub use text_input::{SearchInput, TextInput};

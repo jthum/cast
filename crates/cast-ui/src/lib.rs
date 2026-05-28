@@ -9,7 +9,7 @@ pub mod theme;
 pub use color::{contrast_ratio, mix_with_transparent};
 pub use components::{
     Alert, Badge, Button, Card, Checkbox, Label, Link, NavList, Notice, Panel, SearchInput,
-    SegmentedControl, Separator, Switch, Tabs, TextInput,
+    SegmentedControl, Separator, Slider, Switch, Tabs, TextInput,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};

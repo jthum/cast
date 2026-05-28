@@ -198,11 +198,11 @@ fn nav_item(ui: &mut Ui, label: &str, size: Size, selected: bool, style: NavStyl
         theme.typography.letter_spacing,
     ));
     let horizontal_padding = match style {
-        NavStyle::Tab => metrics.padding.x,
+        NavStyle::Tab => metrics.padding.x * 1.15,
         NavStyle::Segmented => metrics.padding.x * 1.25,
     };
     let vertical_padding = match style {
-        NavStyle::Tab => metrics.padding.y,
+        NavStyle::Tab => metrics.padding.y * 1.15,
         NavStyle::Segmented => metrics.padding.y * 1.1,
     };
     let desired_size = egui::vec2(
@@ -215,13 +215,9 @@ fn nav_item(ui: &mut Ui, label: &str, size: Size, selected: bool, style: NavStyl
         let hovered = response.hovered();
         let pressed = response.is_pointer_button_down_on();
         paint_nav_item(ui, &theme, rect, selected, hovered, pressed, style);
-        let fg = nav_fg(&theme, selected, hovered);
-        let text_rect = match style {
-            NavStyle::Tab => egui::Rect::from_min_max(rect.min, rect.max - egui::vec2(0.0, 2.0)),
-            NavStyle::Segmented => rect,
-        };
+        let fg = nav_fg(&theme, selected, hovered, style);
         ui.painter()
-            .galley(text_rect.center() - galley.size() / 2.0, galley, fg);
+            .galley(rect.center() - galley.size() / 2.0, galley, fg);
     }
 
     response
@@ -281,8 +277,11 @@ fn nav_list_item(ui: &mut Ui, label: &str, size: Size, selected: bool) -> Respon
             rect.min.x + metrics.padding.x,
             rect.center().y - galley.size().y / 2.0,
         );
-        ui.painter()
-            .galley(text_pos, galley, nav_fg(&theme, selected, hovered));
+        ui.painter().galley(
+            text_pos,
+            galley,
+            nav_fg(&theme, selected, hovered, NavStyle::Segmented),
+        );
     }
 
     response
@@ -300,7 +299,8 @@ fn paint_nav_item(
     let radius = egui::CornerRadius::same(theme.radius.md as u8);
     let fill = nav_fill(theme, selected, hovered, pressed, style);
     let stroke = match style {
-        NavStyle::Tab => egui::Stroke::NONE,
+        NavStyle::Tab if selected => egui::Stroke::new(theme.stroke.sm, theme.colors.primary),
+        NavStyle::Tab => egui::Stroke::new(theme.stroke.sm, Color32::TRANSPARENT),
         NavStyle::Segmented if selected => {
             egui::Stroke::new(theme.stroke.sm, selected_border(theme, hovered, pressed))
         }
@@ -309,18 +309,6 @@ fn paint_nav_item(
 
     ui.painter()
         .rect(rect, radius, fill, stroke, StrokeKind::Outside);
-
-    if style == NavStyle::Tab && selected {
-        let line = egui::Rect::from_min_max(
-            egui::pos2(rect.min.x + theme.spacing.xs, rect.max.y - 2.0),
-            egui::pos2(rect.max.x - theme.spacing.xs, rect.max.y),
-        );
-        ui.painter().rect_filled(
-            line,
-            egui::CornerRadius::same(1),
-            theme.colors.primary_family.base,
-        );
-    }
 }
 
 fn nav_fill(
@@ -332,7 +320,7 @@ fn nav_fill(
 ) -> Color32 {
     if selected {
         match style {
-            NavStyle::Tab => Color32::TRANSPARENT,
+            NavStyle::Tab => theme.colors.primary_family.base,
             NavStyle::Segmented => selected_fill(theme, hovered, pressed),
         }
     } else if hovered {
@@ -364,9 +352,12 @@ fn selected_border(theme: &CastTheme, hovered: bool, pressed: bool) -> Color32 {
     mix_with_transparent(theme.colors.primary_family.base, alpha)
 }
 
-fn nav_fg(theme: &CastTheme, selected: bool, hovered: bool) -> Color32 {
+fn nav_fg(theme: &CastTheme, selected: bool, hovered: bool, style: NavStyle) -> Color32 {
     if selected {
-        theme.colors.primary_family.base
+        match style {
+            NavStyle::Tab => theme.colors.primary_family.fg,
+            NavStyle::Segmented => theme.colors.primary_family.base,
+        }
     } else if hovered {
         theme.colors.text
     } else {
@@ -427,5 +418,23 @@ mod tests {
         assert_eq!(fill_a, 13);
         assert!((i16::from(border_r) - i16::from(theme.colors.primary_family.base.r())).abs() <= 3);
         assert_eq!(border_a, 77);
+    }
+
+    #[test]
+    fn selected_tabs_use_solid_primary_colors() {
+        let theme = CastTheme::light();
+
+        assert_eq!(
+            nav_fill(&theme, true, false, false, NavStyle::Tab),
+            theme.colors.primary_family.base
+        );
+        assert_eq!(
+            nav_fg(&theme, true, false, NavStyle::Tab),
+            theme.colors.primary_family.fg
+        );
+        assert_eq!(
+            nav_fg(&theme, true, false, NavStyle::Segmented),
+            theme.colors.primary_family.base
+        );
     }
 }
