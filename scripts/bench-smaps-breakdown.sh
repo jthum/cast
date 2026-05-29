@@ -196,6 +196,13 @@ rollup_summary="$(
   echo "- Path CSV: smaps-by-path.sorted.csv"
   echo "- Category CSV: smaps-by-category.sorted.csv"
   echo
+  echo "## Environment"
+  echo
+  echo "- WGPU_BACKEND: ${WGPU_BACKEND:-}"
+  echo "- VK_ICD_FILENAMES: ${VK_ICD_FILENAMES:-}"
+  echo "- VK_DRIVER_FILES: ${VK_DRIVER_FILES:-}"
+  echo "- WINIT_UNIX_BACKEND: ${WINIT_UNIX_BACKEND:-}"
+  echo
   echo "## Rollup"
   echo
   while IFS='=' read -r key value; do
