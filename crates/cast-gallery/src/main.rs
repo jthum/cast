@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, DataTable, Dropdown,
-    FilterBar, Intent, Label, Link, ListRow, MenuItem, NavList, Notice, Panel as CastPanel, Radio,
+    FilterBar, Intent, Label, Link, ListRow, MenuItem, Notice, Panel as CastPanel, Radio,
     SearchInput, SegmentedControl, SemanticColorTokens, Separator, Size, Slider, Switch, Tabs,
     TextInput, ThemeMode, ThemeSeed, TypographyTokens, Variant,
     egui::{
@@ -89,11 +89,6 @@ impl CastGallery {
         }
     }
 
-    fn set_mode(&mut self, ctx: &egui::Context, mode: ThemeMode) {
-        self.seed.mode = mode;
-        self.apply_theme(ctx);
-    }
-
     fn apply_theme(&mut self, ctx: &egui::Context) {
         self.theme = self.seed.clone().resolve();
         cast::set_theme(ctx, self.theme.clone());
@@ -105,101 +100,294 @@ impl eframe::App for CastGallery {
         let ctx = ui.ctx().clone();
         ctx.set_zoom_factor(self.zoom);
 
-        EguiPanel::top("top_bar").show_inside(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading("Cast");
-                ui.add(Badge::new("Gallery").intent(Intent::Info));
-                ui.separator();
-                let mut mode_index = match self.seed.mode {
-                    ThemeMode::Light => 0,
-                    ThemeMode::Dark => 1,
-                };
-                let previous_mode_index = mode_index;
-                ui.add(SegmentedControl::new(&mut mode_index, ["Light", "Dark"]).size(Size::Small));
-                if mode_index != previous_mode_index {
-                    let mode = if mode_index == 0 {
-                        ThemeMode::Light
-                    } else {
-                        ThemeMode::Dark
-                    };
-                    self.set_mode(&ctx, mode);
-                }
-                ui.separator();
-                ui.label("Zoom");
-                if ui
-                    .add(
-                        Slider::new(&mut self.zoom, 0.9..=1.35)
-                            .show_value(false)
-                            .width(140.0),
-                    )
-                    .changed()
-                {
-                    ctx.set_zoom_factor(self.zoom);
-                }
-            });
-        });
-
         EguiPanel::left("sidebar")
             .resizable(false)
-            .default_size(220.0)
+            .default_size(248.0)
+            .frame(
+                egui::Frame::new()
+                    .fill(shell_sidebar_fill(&self.theme))
+                    .inner_margin(egui::Margin::symmetric(18, 18)),
+            )
             .show_inside(ui, |ui| {
                 cast_scroll_area("sidebar_scroll", &self.theme)
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        ui.heading("Workspace");
-                        ui.add_space(6.0);
-                        ui.add(
-                            SearchInput::new(&mut self.search)
-                                .hint_text("Search components")
-                                .width(184.0),
-                        );
-                        ui.add_space(10.0);
-                        ui.add(NavList::new(
-                            &mut self.sidebar_section,
-                            ["Workbench", "Foundations", "Components", "Theme lab"],
-                        ));
-                        ui.separator();
-                        if show_theme_editor(ui, &mut self.seed) {
-                            self.apply_theme(&ctx);
-                        }
+                        show_shell_sidebar(ui, &self.theme, &mut self.sidebar_section);
                     });
             });
 
-        CentralPanel::default().show_inside(ui, |ui| {
-            cast_scroll_area("main_scroll", &self.theme)
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    show_workspace_view(
-                        ui,
-                        self.sidebar_section,
-                        &self.theme,
-                        ctx.pixels_per_point(),
-                        self.zoom,
-                        &mut self.command,
-                        &mut self.search,
-                        &mut self.name,
-                        &mut self.handle,
-                        &mut self.enabled,
-                        &mut self.notifications,
-                        &mut self.indeterminate,
-                        &mut self.form_density,
-                        &mut self.menu_choice,
-                        &mut self.lead_search,
-                        &mut self.list_selection,
-                        &mut self.table_selection,
-                        &mut self.lead_date_filter,
-                        &mut self.lead_user_filter,
-                        &mut self.lead_status_filter,
-                        &mut self.lead_payment_filter,
-                        &mut self.lead_rows_per_page,
-                        &mut self.lead_page,
-                        &mut self.lead_exported_count,
-                        &mut self.foundation_tab,
-                        &mut self.workflow_segment,
-                    );
-                });
-        });
+        let mut theme_changed = false;
+        CentralPanel::default()
+            .frame(
+                egui::Frame::new()
+                    .fill(self.theme.colors.background)
+                    .inner_margin(egui::Margin::same(0)),
+            )
+            .show_inside(ui, |ui| {
+                egui::Frame::new()
+                    .fill(self.theme.colors.surface)
+                    .inner_margin(egui::Margin::symmetric(28, 18))
+                    .show(ui, |ui| {
+                        theme_changed |= show_shell_top_bar(
+                            ui,
+                            &ctx,
+                            &self.theme,
+                            &mut self.seed,
+                            &mut self.zoom,
+                        );
+                    });
+                ui.painter().line_segment(
+                    [
+                        egui::pos2(ui.min_rect().min.x, ui.cursor().top()),
+                        egui::pos2(ui.min_rect().max.x, ui.cursor().top()),
+                    ],
+                    egui::Stroke::new(self.theme.stroke.sm, shell_rule_color(&self.theme)),
+                );
+
+                egui::Frame::new()
+                    .fill(self.theme.colors.background)
+                    .inner_margin(egui::Margin::symmetric(28, 24))
+                    .show(ui, |ui| {
+                        cast_scroll_area("main_scroll", &self.theme)
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| {
+                                theme_changed |= show_workspace_view(
+                                    ui,
+                                    self.sidebar_section,
+                                    &self.theme,
+                                    &mut self.seed,
+                                    ctx.pixels_per_point(),
+                                    self.zoom,
+                                    &mut self.command,
+                                    &mut self.search,
+                                    &mut self.name,
+                                    &mut self.handle,
+                                    &mut self.enabled,
+                                    &mut self.notifications,
+                                    &mut self.indeterminate,
+                                    &mut self.form_density,
+                                    &mut self.menu_choice,
+                                    &mut self.lead_search,
+                                    &mut self.list_selection,
+                                    &mut self.table_selection,
+                                    &mut self.lead_date_filter,
+                                    &mut self.lead_user_filter,
+                                    &mut self.lead_status_filter,
+                                    &mut self.lead_payment_filter,
+                                    &mut self.lead_rows_per_page,
+                                    &mut self.lead_page,
+                                    &mut self.lead_exported_count,
+                                    &mut self.foundation_tab,
+                                    &mut self.workflow_segment,
+                                );
+                            });
+                    });
+            });
+
+        if theme_changed {
+            self.apply_theme(&ctx);
+            ctx.set_zoom_factor(self.zoom);
+        }
     }
+}
+
+fn show_shell_top_bar(
+    ui: &mut egui::Ui,
+    ctx: &egui::Context,
+    theme: &CastTheme,
+    seed: &mut ThemeSeed,
+    zoom: &mut f32,
+) -> bool {
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        ui.add(
+            Button::new("All teams")
+                .variant(Variant::Subtle)
+                .size(Size::Small),
+        );
+        ui.label(RichText::new(">").color(theme.colors.text_subtle));
+        ui.label("Cast Gallery");
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.add(Badge::new("Gallery").intent(Intent::Info));
+            let mut mode_index = match seed.mode {
+                ThemeMode::Light => 0,
+                ThemeMode::Dark => 1,
+            };
+            let previous_mode_index = mode_index;
+            ui.add(SegmentedControl::new(&mut mode_index, ["Light", "Dark"]).size(Size::Small));
+            if mode_index != previous_mode_index {
+                seed.mode = if mode_index == 0 {
+                    ThemeMode::Light
+                } else {
+                    ThemeMode::Dark
+                };
+                changed = true;
+            }
+            ui.add_space(10.0);
+            ui.label("Zoom");
+            if ui
+                .add(Slider::new(zoom, 0.9..=1.35).show_value(false).width(118.0))
+                .changed()
+            {
+                ctx.set_zoom_factor(*zoom);
+            }
+        });
+    });
+    changed
+}
+
+fn show_shell_sidebar(ui: &mut egui::Ui, theme: &CastTheme, selected: &mut usize) {
+    ui.add_space(6.0);
+    ui.label(
+        RichText::new("Cast")
+            .strong()
+            .size(theme.typography.heading.size + 2.0)
+            .color(Color32::WHITE),
+    );
+    ui.label(RichText::new("Themeable egui components").color(sidebar_muted_text()));
+    ui.add_space(18.0);
+
+    sidebar_workspace_switcher(ui, theme);
+    ui.add_space(18.0);
+    sidebar_group_label(ui, "Workspace");
+    for (index, label) in ["Workbench", "Foundations", "Components", "Theme lab"]
+        .iter()
+        .enumerate()
+    {
+        if sidebar_nav_item(ui, theme, label, *selected == index).clicked() {
+            *selected = index;
+        }
+    }
+
+    ui.add_space(18.0);
+    sidebar_group_label(ui, "Status");
+    sidebar_status_row(ui, theme, "Runtime theme", "Live");
+    sidebar_status_row(ui, theme, "Components", "Ready");
+}
+
+fn sidebar_workspace_switcher(ui: &mut egui::Ui, theme: &CastTheme) {
+    let width = ui.available_width();
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 44.0), egui::Sense::hover());
+    if ui.is_rect_visible(rect) {
+        ui.painter().rect(
+            rect,
+            egui::CornerRadius::same(theme.radius.md.round() as u8),
+            Color32::from_rgba_unmultiplied(255, 255, 255, 20),
+            egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 28)),
+            egui::StrokeKind::Outside,
+        );
+        ui.painter().text(
+            rect.left_center() + egui::vec2(14.0, 0.0),
+            egui::Align2::LEFT_CENTER,
+            "Cast UI",
+            theme.typography.button.clone(),
+            Color32::WHITE,
+        );
+        ui.painter().text(
+            rect.right_center() - egui::vec2(14.0, 0.0),
+            egui::Align2::RIGHT_CENTER,
+            "v0.1",
+            theme.typography.caption.clone(),
+            sidebar_muted_text(),
+        );
+    }
+}
+
+fn sidebar_group_label(ui: &mut egui::Ui, label: &str) {
+    ui.add_space(4.0);
+    ui.label(
+        RichText::new(label)
+            .size(12.0)
+            .color(Color32::from_rgba_unmultiplied(255, 255, 255, 128)),
+    );
+    ui.add_space(4.0);
+}
+
+fn sidebar_nav_item(
+    ui: &mut egui::Ui,
+    theme: &CastTheme,
+    label: &str,
+    selected: bool,
+) -> egui::Response {
+    let width = ui.available_width();
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 36.0), egui::Sense::click());
+    if ui.is_rect_visible(rect) {
+        let fill = if selected {
+            Color32::from_rgba_unmultiplied(255, 255, 255, 44)
+        } else if response.hovered() {
+            Color32::from_rgba_unmultiplied(255, 255, 255, 24)
+        } else {
+            Color32::TRANSPARENT
+        };
+        let fg = if selected {
+            Color32::WHITE
+        } else {
+            Color32::from_rgba_unmultiplied(255, 255, 255, 190)
+        };
+        ui.painter().rect_filled(
+            rect.shrink2(egui::vec2(0.0, 2.0)),
+            egui::CornerRadius::same(theme.radius.md.round() as u8),
+            fill,
+        );
+        ui.painter().text(
+            rect.left_center() + egui::vec2(14.0, 0.0),
+            egui::Align2::LEFT_CENTER,
+            label,
+            theme.typography.button.clone(),
+            fg,
+        );
+    }
+    response
+}
+
+fn sidebar_status_row(ui: &mut egui::Ui, theme: &CastTheme, label: &str, value: &str) {
+    let width = ui.available_width();
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 28.0), egui::Sense::hover());
+    if ui.is_rect_visible(rect) {
+        ui.painter().text(
+            rect.left_center() + egui::vec2(14.0, 0.0),
+            egui::Align2::LEFT_CENTER,
+            label,
+            theme.typography.caption.clone(),
+            sidebar_muted_text(),
+        );
+        ui.painter().text(
+            rect.right_center() - egui::vec2(14.0, 0.0),
+            egui::Align2::RIGHT_CENTER,
+            value,
+            theme.typography.caption.clone(),
+            Color32::from_rgba_unmultiplied(255, 255, 255, 210),
+        );
+    }
+}
+
+fn shell_sidebar_fill(theme: &CastTheme) -> Color32 {
+    match theme.mode {
+        ThemeMode::Light => shell_mix(theme.colors.primary_family.base, Color32::BLACK, 0.78),
+        ThemeMode::Dark => shell_mix(theme.colors.surface, Color32::BLACK, 0.40),
+    }
+}
+
+fn shell_rule_color(theme: &CastTheme) -> Color32 {
+    match theme.mode {
+        ThemeMode::Light => shell_mix(theme.colors.border, theme.colors.surface, 0.36),
+        ThemeMode::Dark => shell_mix(theme.colors.border, theme.colors.surface, 0.16),
+    }
+}
+
+fn sidebar_muted_text() -> Color32 {
+    Color32::from_rgba_unmultiplied(255, 255, 255, 150)
+}
+
+fn shell_mix(a: Color32, b: Color32, t: f32) -> Color32 {
+    let t = t.clamp(0.0, 1.0);
+    let channel = |a: u8, b: u8| f32::from(a).mul_add(1.0 - t, f32::from(b) * t).round() as u8;
+    Color32::from_rgb(
+        channel(a.r(), b.r()),
+        channel(a.g(), b.g()),
+        channel(a.b(), b.b()),
+    )
 }
 
 fn cast_scroll_area(id: &'static str, theme: &CastTheme) -> ScrollArea {
@@ -219,6 +407,7 @@ fn show_workspace_view(
     ui: &mut egui::Ui,
     section: usize,
     theme: &CastTheme,
+    seed: &mut ThemeSeed,
     pixels_per_point: f32,
     zoom: f32,
     command: &mut String,
@@ -242,7 +431,8 @@ fn show_workspace_view(
     lead_exported_count: &mut Option<usize>,
     foundation_tab: &mut usize,
     workflow_segment: &mut usize,
-) {
+) -> bool {
+    let mut theme_changed = false;
     match section {
         0 => {
             workspace_header(
@@ -336,13 +526,20 @@ fn show_workspace_view(
                 Intent::Success,
             );
             ui.add_space(12.0);
+            Card::new().show(ui, |ui| {
+                if show_theme_editor(ui, seed) {
+                    theme_changed = true;
+                }
+            });
+            ui.add_space(12.0);
             show_palette_preview(ui, theme);
             ui.add_space(12.0);
             show_typography_diagnostics(ui, theme, pixels_per_point, zoom);
             ui.add_space(12.0);
             show_override_preview(ui);
         }
-    }
+    };
+    theme_changed
 }
 
 fn workspace_header(ui: &mut egui::Ui, title: &str, subtitle: &str, intent: Intent) {
