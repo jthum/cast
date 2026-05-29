@@ -637,15 +637,8 @@ fn table_rule_color(theme: &CastTheme) -> Color32 {
 }
 
 fn table_hover_fill(theme: &CastTheme, pressed: bool) -> Color32 {
-    let surface_mix = if pressed { 0.52 } else { 0.72 };
-    match theme.mode {
-        ThemeMode::Light => mix_oklch(
-            theme.colors.surface_raised,
-            theme.colors.surface,
-            surface_mix,
-        ),
-        ThemeMode::Dark => mix_oklch(theme.colors.surface_raised, theme.colors.surface, 0.32),
-    }
+    let surface_mix = if pressed { 0.52 } else { 0.68 };
+    mix_oklch(table_header_fill(theme), theme.colors.surface, surface_mix)
 }
 
 fn table_row_colors(
@@ -657,9 +650,9 @@ fn table_row_colors(
     if selected {
         IntentColors {
             fill: if pressed {
-                mix_with_transparent(theme.colors.primary_family.base, 0.08)
+                table_hover_fill(theme, true)
             } else if hovered {
-                mix_with_transparent(theme.colors.primary_family.base, 0.07)
+                table_hover_fill(theme, false)
             } else {
                 mix_with_transparent(theme.colors.primary_family.base, 0.05)
             },
@@ -857,9 +850,26 @@ mod tests {
         let colors = table_row_colors(&theme, false, true, false);
 
         assert_eq!(colors.fill, table_hover_fill(&theme, false));
+        assert_eq!(
+            colors.fill,
+            mix_oklch(table_header_fill(&theme), theme.colors.surface, 0.68)
+        );
         assert_ne!(
             colors.fill,
             mix_with_transparent(theme.colors.primary_family.base, 0.025)
+        );
+        assert_eq!(colors.fg, theme.colors.text);
+    }
+
+    #[test]
+    fn selected_table_hover_keeps_neutral_hover_fill() {
+        let theme = CastTheme::light();
+        let colors = table_row_colors(&theme, true, true, false);
+
+        assert_eq!(colors.fill, table_hover_fill(&theme, false));
+        assert_ne!(
+            colors.fill,
+            mix_with_transparent(theme.colors.primary_family.base, 0.07)
         );
         assert_eq!(colors.fg, theme.colors.text);
     }
