@@ -47,6 +47,7 @@ struct CastGallery {
     lead_status_filter: usize,
     lead_payment_filter: usize,
     lead_rows_per_page: usize,
+    lead_page: usize,
     lead_exported_count: Option<usize>,
     foundation_tab: usize,
     workflow_segment: usize,
@@ -80,6 +81,7 @@ impl CastGallery {
             lead_status_filter: 0,
             lead_payment_filter: 0,
             lead_rows_per_page: 0,
+            lead_page: 0,
             lead_exported_count: None,
             foundation_tab: 0,
             workflow_segment: 0,
@@ -190,6 +192,7 @@ impl eframe::App for CastGallery {
                         &mut self.lead_status_filter,
                         &mut self.lead_payment_filter,
                         &mut self.lead_rows_per_page,
+                        &mut self.lead_page,
                         &mut self.lead_exported_count,
                         &mut self.foundation_tab,
                         &mut self.workflow_segment,
@@ -235,6 +238,7 @@ fn show_workspace_view(
     lead_status_filter: &mut usize,
     lead_payment_filter: &mut usize,
     lead_rows_per_page: &mut usize,
+    lead_page: &mut usize,
     lead_exported_count: &mut Option<usize>,
     foundation_tab: &mut usize,
     workflow_segment: &mut usize,
@@ -303,6 +307,7 @@ fn show_workspace_view(
                 lead_status_filter,
                 lead_payment_filter,
                 lead_rows_per_page,
+                lead_page,
                 lead_exported_count,
             );
             ui.add_space(12.0);
@@ -1412,6 +1417,7 @@ fn show_lists_and_tables(
     status_filter: &mut usize,
     payment_filter: &mut usize,
     rows_per_page: &mut usize,
+    page: &mut usize,
     exported_count: &mut Option<usize>,
 ) {
     let filtered_leads = filtered_leads(
@@ -1423,8 +1429,14 @@ fn show_lists_and_tables(
     );
     let filtered_count = filtered_leads.len();
     let row_limit = rows_per_page_limit(*rows_per_page);
+    let page_count = filtered_count.div_ceil(row_limit).max(1);
+    if *page >= page_count {
+        *page = page_count - 1;
+    }
+    let row_offset = *page * row_limit;
     let visible_rows = filtered_leads
         .iter()
+        .skip(row_offset)
         .take(row_limit)
         .map(|lead| lead_table_row(lead))
         .collect::<Vec<_>>();
@@ -1485,6 +1497,7 @@ fn show_lists_and_tables(
             });
         });
         if filters_changed {
+            *page = 0;
             *exported_count = None;
         }
         if let Some(count) = *exported_count {
@@ -1524,17 +1537,51 @@ fn show_lists_and_tables(
         ui.add_space(10.0);
         ui.horizontal(|ui| {
             ui.label("Rows per page:");
-            ui.add(
+            let rows_response = ui.add(
                 Dropdown::new(rows_per_page, ["5", "10", "25"])
                     .width(82.0)
                     .size(Size::Small),
             );
-            ui.add(Badge::new(format!("Showing {visible_count}")).intent(Intent::Neutral));
+            if rows_response.changed() {
+                *page = 0;
+            }
+            let visible_start = if visible_count == 0 {
+                0
+            } else {
+                row_offset + 1
+            };
+            let visible_end = row_offset + visible_count;
+            ui.add(
+                Badge::new(format!("Showing {visible_start}-{visible_end}"))
+                    .intent(Intent::Neutral),
+            );
             ui.add(Badge::new(format!("of {filtered_count}")).intent(Intent::Neutral));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add(Badge::new(
-                    "Page controls omitted until pagination state exists.",
-                ));
+                if ui
+                    .add(
+                        Button::new("Next")
+                            .size(Size::Small)
+                            .variant(Variant::Outline)
+                            .enabled(*page + 1 < page_count && visible_count > 0),
+                    )
+                    .clicked()
+                {
+                    *page += 1;
+                    *table_selection = 0;
+                }
+                ui.add(Badge::new(format!("Page {} of {page_count}", *page + 1)));
+                if ui
+                    .add(
+                        Button::new("Previous")
+                            .size(Size::Small)
+                            .variant(Variant::Outline)
+                            .enabled(*page > 0 && visible_count > 0),
+                    )
+                    .clicked()
+                {
+                    *page -= 1;
+                    *table_selection = 0;
+                }
             });
         });
         ui.add_space(12.0);

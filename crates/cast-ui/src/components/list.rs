@@ -4,7 +4,7 @@ use egui::{
 };
 
 use crate::{
-    color::with_alpha,
+    color::{mix_with_transparent, with_alpha},
     foundation::Size,
     style::IntentColors,
     theme::{CastTheme, theme_for_ui},
@@ -335,7 +335,7 @@ fn paint_table_header(
 
         let galley = ui.painter().layout_job(row_layout_job(
             column.clone(),
-            theme.typography.caption.clone(),
+            theme.typography.small.clone(),
             theme.typography.letter_spacing,
         ));
         ui.painter().galley(
@@ -344,7 +344,7 @@ fn paint_table_header(
                 header_rect.center().y - galley.size().y / 2.0,
             ),
             galley,
-            theme.colors.text_muted,
+            with_alpha(theme.colors.text, 190),
         );
 
         x += column_width;
@@ -445,9 +445,11 @@ fn selectable_row_colors(
     if selected {
         IntentColors {
             fill: if pressed {
-                theme.colors.surface_raised
+                mix_with_transparent(theme.colors.primary_family.base, 0.08)
+            } else if hovered {
+                mix_with_transparent(theme.colors.primary_family.base, 0.07)
             } else {
-                theme.colors.surface_muted
+                mix_with_transparent(theme.colors.primary_family.base, 0.05)
             },
             fg: theme.colors.text,
             border: Color32::TRANSPARENT,
@@ -577,7 +579,10 @@ mod tests {
         let theme = CastTheme::light();
         let colors = selectable_row_colors(&theme, true, false, false);
 
-        assert_eq!(colors.fill, theme.colors.surface_muted);
+        assert_eq!(
+            colors.fill,
+            mix_with_transparent(theme.colors.primary_family.base, 0.05)
+        );
         assert_eq!(colors.fg, theme.colors.text);
         assert_eq!(colors.border, Color32::TRANSPARENT);
     }
