@@ -3,6 +3,7 @@ members = [
     "crates/cast-ui",
     "crates/cast-gallery",
     "crates/cast-font-tool",
+    "crates/eframe-baseline",
 ]
 resolver = "3"
 

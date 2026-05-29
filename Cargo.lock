@@ -873,6 +873,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "eframe-baseline"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+]
+
+[[package]]
 name = "egui"
 version = "0.34.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

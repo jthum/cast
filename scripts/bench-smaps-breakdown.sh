@@ -67,6 +67,8 @@ cp "/proc/$pid/smaps" "$smaps"
 cp "/proc/$pid/smaps_rollup" "$run_dir/smaps_rollup.txt"
 cp "/proc/$pid/status" "$run_dir/status.txt"
 
+binary_path="$(readlink -f "$binary")"
+
 awk '
   function classify(path) {
     if (path == "" || path == "[anonymous]") return "anonymous"
@@ -75,7 +77,7 @@ awk '
     if (path ~ /^\[/) return "kernel-special"
     if (path ~ /^\/dev\/dri/ || path ~ /^\/dev\/shm/ || path ~ /memfd/ || path ~ /anon_inode/) return "gpu-or-shared-memory"
     if (path ~ /libLLVM/ || path ~ /libgallium/ || path ~ /libvulkan/ || path ~ /libVkLayer/ || path ~ /libdrm/ || path ~ /libGL/ || path ~ /libEGL/ || path ~ /mesa/ || path ~ /vulkan/) return "renderer-driver"
-    if (path ~ /\/target\/release\/cast-gallery$/) return "app-binary"
+    if (path == binary) return "app-binary"
     if (path ~ /\.ttf$/ || path ~ /\.otf$/ || path ~ /fonts/) return "font-files"
     if (path ~ /\.so/ || path ~ /\/lib/ || path ~ /\/usr\/lib/) return "shared-libraries"
     return "files"
@@ -146,7 +148,7 @@ awk '
         shared_by_path[path] >> paths
     }
   }
-' categories="$categories_csv" paths="$paths_csv" "$smaps"
+' categories="$categories_csv" paths="$paths_csv" binary="$binary_path" "$smaps"
 
 {
   head -n 1 "$paths_csv"
