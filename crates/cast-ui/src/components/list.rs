@@ -1,5 +1,5 @@
 use egui::{
-    Color32, Response, Sense, StrokeKind, Ui, Widget,
+    Color32, Response, Sense, StrokeKind, Ui, UiBuilder, Widget,
     text::{LayoutJob, TextFormat},
 };
 
@@ -110,6 +110,7 @@ pub struct DataTable<'a> {
     column_weights: Option<Vec<f32>>,
     right_aligned_columns: Vec<usize>,
     size: Size,
+    sticky_body_height: Option<f32>,
 }
 
 impl<'a> DataTable<'a> {
@@ -132,6 +133,7 @@ impl<'a> DataTable<'a> {
             column_weights: None,
             right_aligned_columns: Vec::new(),
             size: Size::Medium,
+            sticky_body_height: None,
         }
     }
 
@@ -158,6 +160,12 @@ impl<'a> DataTable<'a> {
         self.size = size;
         self
     }
+
+    #[must_use]
+    pub fn sticky_header(mut self, body_height: f32) -> Self {
+        self.sticky_body_height = Some(body_height.max(0.0));
+        self
+    }
 }
 
 impl Widget for DataTable<'_> {
@@ -168,7 +176,9 @@ impl Widget for DataTable<'_> {
         let column_widths = table_column_widths(width, columns, self.column_weights.as_deref());
         let header_height = table_header_height(self.size);
         let row_height = table_row_height(self.size);
-        let table_height = header_height + row_height * self.rows.len() as f32;
+        let rows_height = row_height * self.rows.len() as f32;
+        let body_height = table_body_height(rows_height, self.sticky_body_height);
+        let table_height = header_height + body_height;
         let (rect, table_response) =
             ui.allocate_exact_size(egui::vec2(width, table_height), Sense::hover());
         let mut combined = table_response;
@@ -185,45 +195,128 @@ impl Widget for DataTable<'_> {
             );
         }
 
-        for (index, row) in self.rows.iter().enumerate() {
-            let row_rect = egui::Rect::from_min_size(
-                egui::pos2(
-                    rect.min.x,
-                    rect.min.y + header_height + row_height * index as f32,
-                ),
-                egui::vec2(width, row_height),
-            );
-            let selected = *self.selected == index;
-            let mut response = ui.interact(
-                row_rect,
-                ui.make_persistent_id(("cast_data_table_row", index)),
-                Sense::click(),
-            );
+        let table_id = ui.next_auto_id();
+        let body_rect =
+            egui::Rect::from_min_max(egui::pos2(rect.min.x, rect.min.y + header_height), rect.max);
+        let mut body_ui = ui.new_child(
+            UiBuilder::new()
+                .max_rect(body_rect)
+                .layout(*ui.layout())
+                .id_salt(table_id.with("body")),
+        );
 
-            if ui.is_rect_visible(row_rect) {
-                paint_table_row(
-                    ui,
-                    &theme,
-                    row_rect,
-                    &column_widths,
-                    row,
-                    selected,
-                    self.size,
-                    &self.right_aligned_columns,
-                    response.hovered(),
-                    response.is_pointer_button_down_on(),
-                );
-            }
+        if self.sticky_body_height.is_some() && rows_height > body_height {
+            let scroll_response = egui::ScrollArea::vertical()
+                .id_salt(table_id.with("scroll"))
+                .max_height(body_height)
+                .auto_shrink([false, false])
+                .show_viewport(&mut body_ui, |ui, viewport| {
+                    paint_table_rows_viewport(
+                        ui,
+                        &theme,
+                        width,
+                        rows_height,
+                        row_height,
+                        viewport,
+                        self.selected,
+                        &column_widths,
+                        &self.rows,
+                        self.size,
+                        &self.right_aligned_columns,
+                    )
+                });
+            combined = combined.union(scroll_response.inner);
+        } else {
+            combined = combined.union(paint_table_rows_viewport(
+                &mut body_ui,
+                &theme,
+                width,
+                rows_height,
+                row_height,
+                egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(width, rows_height)),
+                self.selected,
+                &column_widths,
+                &self.rows,
+                self.size,
+                &self.right_aligned_columns,
+            ));
+        }
 
-            if response.clicked() && *self.selected != index {
-                *self.selected = index;
-                response.mark_changed();
-            }
-            combined = combined.union(response);
+        if ui.is_rect_visible(rect) {
+            paint_table_outline(ui, &theme, rect);
         }
 
         combined
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn paint_table_rows_viewport(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    width: f32,
+    rows_height: f32,
+    row_height: f32,
+    viewport: egui::Rect,
+    selected_index: &mut usize,
+    column_widths: &[f32],
+    rows: &[Vec<String>],
+    size: Size,
+    right_aligned_columns: &[usize],
+) -> Response {
+    let (_, content_rect) = ui.allocate_space(egui::vec2(width, rows_height));
+    let content_response = ui.interact(
+        content_rect,
+        ui.make_persistent_id("cast_data_table_rows"),
+        Sense::hover(),
+    );
+    let mut combined = content_response;
+    let visible_start = (viewport.min.y / row_height).floor().max(0.0) as usize;
+    let visible_end = ((viewport.max.y / row_height).ceil() as usize + 1).min(rows.len());
+
+    for (index, row) in rows
+        .iter()
+        .enumerate()
+        .take(visible_end)
+        .skip(visible_start)
+    {
+        let row_rect = egui::Rect::from_min_size(
+            egui::pos2(
+                content_rect.min.x,
+                content_rect.min.y + row_height * index as f32,
+            ),
+            egui::vec2(width, row_height),
+        );
+        let selected = *selected_index == index;
+        let mut response = ui.interact(
+            row_rect,
+            ui.make_persistent_id(("cast_data_table_row", index)),
+            Sense::click(),
+        );
+
+        if ui.is_rect_visible(row_rect) {
+            paint_table_row(
+                ui,
+                theme,
+                row_rect,
+                column_widths,
+                row,
+                selected,
+                size,
+                right_aligned_columns,
+                response.hovered(),
+                response.is_pointer_button_down_on(),
+            );
+        }
+
+        if response.clicked() && *selected_index != index {
+            *selected_index = index;
+            response.mark_changed();
+        }
+        combined = combined.union(response);
+    }
+
+    combined
 }
 
 fn paint_list_row_content(ui: &Ui, theme: &CastTheme, rect: egui::Rect, row: ListRow, fg: Color32) {
@@ -299,7 +392,7 @@ fn paint_table_frame(ui: &Ui, theme: &CastTheme, rect: egui::Rect, header_height
         rect,
         egui::CornerRadius::same(theme.radius.lg.round() as u8),
         theme.colors.surface,
-        egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+        egui::Stroke::NONE,
         StrokeKind::Outside,
     );
 
@@ -330,7 +423,7 @@ fn paint_table_header(
     for (index, column) in columns.iter().enumerate() {
         let column_width = column_widths.get(index).copied().unwrap_or(0.0);
         if index > 0 {
-            paint_table_vertical_rule(ui, theme, x, rect);
+            paint_table_vertical_rule(ui, theme, x, header_rect);
         }
 
         let galley = ui.painter().layout_job(row_layout_job(
@@ -356,6 +449,15 @@ fn paint_table_header(
             egui::pos2(header_rect.max.x, header_rect.max.y),
         ],
         egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+    );
+}
+
+fn paint_table_outline(ui: &Ui, theme: &CastTheme, rect: egui::Rect) {
+    ui.painter().rect_stroke(
+        rect,
+        egui::CornerRadius::same(theme.radius.lg.round() as u8),
+        egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+        StrokeKind::Outside,
     );
 }
 
@@ -494,6 +596,12 @@ fn table_cell_padding(theme: &CastTheme) -> f32 {
     theme.spacing.sm
 }
 
+fn table_body_height(rows_height: f32, sticky_body_height: Option<f32>) -> f32 {
+    sticky_body_height
+        .map(|height| height.min(rows_height))
+        .unwrap_or(rows_height)
+}
+
 fn table_header_height(size: Size) -> f32 {
     match size {
         Size::Small => 32.0,
@@ -575,6 +683,13 @@ mod tests {
     }
 
     #[test]
+    fn sticky_table_body_height_caps_rows() {
+        assert_eq!(table_body_height(640.0, Some(320.0)), 320.0);
+        assert_eq!(table_body_height(160.0, Some(320.0)), 160.0);
+        assert_eq!(table_body_height(640.0, None), 640.0);
+    }
+
+    #[test]
     fn selected_row_uses_muted_background_without_text_override() {
         let theme = CastTheme::light();
         let colors = selectable_row_colors(&theme, true, false, false);
@@ -606,10 +721,12 @@ mod tests {
         let table = DataTable::new(&mut selected, ["Name", "Value"], [["Cast", "42"]])
             .column_weights([2.0, 1.0])
             .right_aligned_columns([1])
-            .size(Size::Small);
+            .size(Size::Small)
+            .sticky_header(320.0);
 
         assert_eq!(table.column_weights, Some(vec![2.0, 1.0]));
         assert_eq!(table.right_aligned_columns, vec![1]);
         assert_eq!(table.size, Size::Small);
+        assert_eq!(table.sticky_body_height, Some(320.0));
     }
 }
