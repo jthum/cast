@@ -558,14 +558,12 @@ fn paint_table_row(
         x += column_width;
     }
 
+    if hovered || pressed || selected {
+        paint_table_horizontal_rule(ui, theme, rect.min.y, rect);
+    }
+
     if !last_row {
-        ui.painter().line_segment(
-            [
-                egui::pos2(rect.min.x, rect.max.y),
-                egui::pos2(rect.max.x, rect.max.y),
-            ],
-            egui::Stroke::new(theme.stroke.sm, table_rule_color(theme)),
-        );
+        paint_table_horizontal_rule(ui, theme, rect.max.y, rect);
     }
 }
 
@@ -606,6 +604,13 @@ fn paint_table_row_background(
 
 fn paint_table_vertical_rule(ui: &Ui, theme: &CastTheme, x: f32, rect: egui::Rect) {
     paint_table_rule(ui, x, rect, table_rule_color(theme));
+}
+
+fn paint_table_horizontal_rule(ui: &Ui, theme: &CastTheme, y: f32, rect: egui::Rect) {
+    ui.painter().line_segment(
+        [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
+        egui::Stroke::new(theme.stroke.sm, table_rule_color(theme)),
+    );
 }
 
 fn paint_table_rule(ui: &Ui, x: f32, rect: egui::Rect, color: Color32) {
