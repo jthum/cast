@@ -3,13 +3,15 @@ use std::sync::Arc;
 use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dropdown, Intent, Label,
     Link, ListRow, MenuItem, Notice, Panel as CastPanel, Radio, SearchInput, SegmentedControl,
-    SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput, TextTable, ThemeMode,
+    SemanticColorTokens, Separator, Size, Slider, Switch, Table, Tabs, TextInput, ThemeMode,
     ThemeSeed, TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
     },
 };
+
+const LEAD_COUNT: usize = 24;
 
 fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions::default();
@@ -41,7 +43,7 @@ struct CastGallery {
     form_density: usize,
     menu_choice: usize,
     list_selection: usize,
-    table_selection: usize,
+    lead_selected: [bool; LEAD_COUNT],
     lead_date_filter: usize,
     lead_user_filter: usize,
     lead_status_filter: usize,
@@ -75,7 +77,7 @@ impl CastGallery {
             form_density: 1,
             menu_choice: 0,
             list_selection: 0,
-            table_selection: TextTable::NO_SELECTION,
+            lead_selected: [false; LEAD_COUNT],
             lead_date_filter: 1,
             lead_user_filter: 0,
             lead_status_filter: 0,
@@ -170,7 +172,7 @@ impl eframe::App for CastGallery {
                                     &mut self.menu_choice,
                                     &mut self.lead_search,
                                     &mut self.list_selection,
-                                    &mut self.table_selection,
+                                    &mut self.lead_selected,
                                     &mut self.lead_date_filter,
                                     &mut self.lead_user_filter,
                                     &mut self.lead_status_filter,
@@ -415,7 +417,7 @@ fn show_workspace_view(
     menu_choice: &mut usize,
     lead_search: &mut String,
     list_selection: &mut usize,
-    table_selection: &mut usize,
+    lead_selected: &mut [bool; LEAD_COUNT],
     lead_date_filter: &mut usize,
     lead_user_filter: &mut usize,
     lead_status_filter: &mut usize,
@@ -485,7 +487,7 @@ fn show_workspace_view(
                 ui,
                 lead_search,
                 list_selection,
-                table_selection,
+                lead_selected,
                 lead_date_filter,
                 lead_user_filter,
                 lead_status_filter,
@@ -1602,7 +1604,7 @@ fn show_lists_and_tables(
     ui: &mut egui::Ui,
     _lead_search: &mut String,
     list_selection: &mut usize,
-    table_selection: &mut usize,
+    lead_selected: &mut [bool; LEAD_COUNT],
     _date_filter: &mut usize,
     _user_filter: &mut usize,
     _status_filter: &mut usize,
@@ -1611,7 +1613,7 @@ fn show_lists_and_tables(
     page: &mut usize,
     exported_count: &mut Option<usize>,
 ) {
-    let filtered_leads = LEADS.iter().collect::<Vec<_>>();
+    let filtered_leads = LEADS.iter().enumerate().collect::<Vec<_>>();
     let filtered_count = filtered_leads.len();
     let row_limit = rows_per_page_limit(*rows_per_page);
     let page_count = filtered_count.div_ceil(row_limit).max(1);
@@ -1621,11 +1623,18 @@ fn show_lists_and_tables(
     let row_offset = *page * row_limit;
     let visible_rows = filtered_leads
         .iter()
+        .copied()
         .skip(row_offset)
         .take(row_limit)
-        .map(|lead| lead_table_row(lead))
         .collect::<Vec<_>>();
     let visible_count = visible_rows.len();
+    let selected_rows = visible_rows
+        .iter()
+        .enumerate()
+        .filter_map(|(visible_index, (lead_index, _))| {
+            lead_selected[*lead_index].then_some(visible_index)
+        })
+        .collect::<Vec<_>>();
 
     Card::new().show(ui, |ui| {
         ui.horizontal(|ui| {
@@ -1662,25 +1671,46 @@ fn show_lists_and_tables(
                     .body("Change the search query or filters to widen the result set."),
             );
         } else {
-            ui.add(
-                TextTable::new(
-                    table_selection,
-                    [
-                        "Lead name",
-                        "Status",
-                        "Interest",
-                        "Source",
-                        "Deal value",
-                        "Assigned to",
-                        "Interacted",
-                    ],
-                    visible_rows,
-                )
-                .size(Size::Small)
-                .column_weights([1.35, 1.25, 1.15, 1.30, 1.10, 1.10, 1.0])
-                .right_aligned_columns([4])
-                .sticky_header(320.0),
-            );
+            Table::new([
+                "",
+                "Lead name",
+                "Status",
+                "Interest",
+                "Source",
+                "Deal value",
+                "Assigned to",
+                "Interacted",
+            ])
+            .size(Size::Small)
+            .column_weights([0.30, 1.35, 1.20, 1.10, 1.30, 1.10, 1.10, 1.0])
+            .right_aligned_columns([5])
+            .selected_rows(selected_rows)
+            .sticky_header(320.0)
+            .show(ui, visible_count, |row, row_index| {
+                let (lead_index, lead) = visible_rows[row_index];
+                row.cell(|ui| {
+                    ui.add(Checkbox::new(&mut lead_selected[lead_index], "").size(Size::Small));
+                });
+                row.text(lead.name);
+                row.cell(|ui| {
+                    ui.add(
+                        Badge::new(lead.status)
+                            .intent(lead_status_intent(lead.status))
+                            .size(Size::Small),
+                    );
+                });
+                row.cell(|ui| {
+                    ui.add(
+                        Badge::new(lead.interest)
+                            .intent(lead_interest_intent(lead.interest))
+                            .size(Size::Small),
+                    );
+                });
+                row.text(lead.source);
+                row.text(lead.deal_value);
+                row.text(lead.assigned_to);
+                row.text(lead.interacted);
+            });
         }
         ui.add_space(10.0);
         ui.horizontal(|ui| {
@@ -1692,7 +1722,6 @@ fn show_lists_and_tables(
             );
             if rows_response.changed() {
                 *page = 0;
-                *table_selection = TextTable::NO_SELECTION;
             }
             let visible_start = if visible_count == 0 {
                 0
@@ -1716,7 +1745,6 @@ fn show_lists_and_tables(
                     .clicked()
                 {
                     *page += 1;
-                    *table_selection = TextTable::NO_SELECTION;
                 }
                 ui.add(Badge::new(format!("Page {} of {page_count}", *page + 1)));
                 if ui
@@ -1729,7 +1757,6 @@ fn show_lists_and_tables(
                     .clicked()
                 {
                     *page -= 1;
-                    *table_selection = TextTable::NO_SELECTION;
                 }
             });
         });
@@ -2063,6 +2090,8 @@ const LEADS: [LeadRecord; 24] = [
     },
 ];
 
+const _: [(); LEAD_COUNT] = [(); LEADS.len()];
+
 #[cfg(test)]
 fn filtered_leads(
     query: &str,
@@ -2117,16 +2146,22 @@ fn rows_per_page_limit(index: usize) -> usize {
     }
 }
 
-fn lead_table_row(lead: &LeadRecord) -> [String; 7] {
-    [
-        lead.name.to_owned(),
-        lead.status.to_owned(),
-        lead.interest.to_owned(),
-        lead.source.to_owned(),
-        lead.deal_value.to_owned(),
-        lead.assigned_to.to_owned(),
-        lead.interacted.to_owned(),
-    ]
+fn lead_status_intent(status: &str) -> Intent {
+    match status {
+        "Won" | "Qualified" => Intent::Success,
+        "Call booked" => Intent::Info,
+        "Lost" | "Unqualified" | "No show" => Intent::Danger,
+        _ => Intent::Neutral,
+    }
+}
+
+fn lead_interest_intent(interest: &str) -> Intent {
+    match interest {
+        "Interested" => Intent::Primary,
+        "Achiever" => Intent::Success,
+        "Broke" => Intent::Warning,
+        _ => Intent::Neutral,
+    }
 }
 
 fn show_text_and_feedback(ui: &mut egui::Ui) {

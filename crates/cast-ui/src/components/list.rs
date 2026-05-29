@@ -1,5 +1,5 @@
 use egui::{
-    Color32, Response, Sense, StrokeKind, Ui, UiBuilder, Widget,
+    Color32, Response, RichText, Sense, StrokeKind, Ui, UiBuilder, Widget,
     text::{LayoutJob, TextFormat},
 };
 
@@ -99,6 +99,195 @@ impl Widget for ListRow {
         }
 
         response
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Table {
+    columns: Vec<String>,
+    column_weights: Option<Vec<f32>>,
+    right_aligned_columns: Vec<usize>,
+    selected_rows: Vec<usize>,
+    size: Size,
+    sticky_body_height: Option<f32>,
+    min_column_width: f32,
+}
+
+impl Table {
+    #[must_use]
+    pub fn new<IC, C>(columns: IC) -> Self
+    where
+        IC: IntoIterator<Item = C>,
+        C: Into<String>,
+    {
+        Self {
+            columns: columns.into_iter().map(Into::into).collect(),
+            column_weights: None,
+            right_aligned_columns: Vec::new(),
+            selected_rows: Vec::new(),
+            size: Size::Medium,
+            sticky_body_height: None,
+            min_column_width: 96.0,
+        }
+    }
+
+    #[must_use]
+    pub fn column_weights<I>(mut self, weights: I) -> Self
+    where
+        I: IntoIterator<Item = f32>,
+    {
+        self.column_weights = Some(weights.into_iter().collect());
+        self
+    }
+
+    #[must_use]
+    pub fn right_aligned_columns<I>(mut self, columns: I) -> Self
+    where
+        I: IntoIterator<Item = usize>,
+    {
+        self.right_aligned_columns = columns.into_iter().collect();
+        self
+    }
+
+    #[must_use]
+    pub fn selected_rows<I>(mut self, rows: I) -> Self
+    where
+        I: IntoIterator<Item = usize>,
+    {
+        self.selected_rows = rows.into_iter().collect();
+        self
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = size;
+        self
+    }
+
+    #[must_use]
+    pub fn sticky_header(mut self, body_height: f32) -> Self {
+        self.sticky_body_height = Some(body_height.max(0.0));
+        self
+    }
+
+    #[must_use]
+    pub fn min_column_width(mut self, width: f32) -> Self {
+        self.min_column_width = width.max(24.0);
+        self
+    }
+
+    pub fn show<F>(self, ui: &mut Ui, row_count: usize, mut add_row: F) -> Response
+    where
+        F: for<'row> FnMut(&mut TableRow<'row>, usize),
+    {
+        let theme = theme_for_ui(ui);
+        let viewport_width = ui.available_width().max(240.0);
+        let columns = self.columns.len().max(1);
+        let table_width = table_content_width(viewport_width, columns, self.min_column_width);
+        let column_widths =
+            table_column_widths(table_width, columns, self.column_weights.as_deref());
+        let header_height = table_header_height(self.size);
+        let row_height = table_row_height(self.size);
+        let rows_height = row_height * row_count as f32;
+        let body_height = table_body_height(rows_height, self.sticky_body_height);
+        let table_height = header_height + body_height;
+        let table_id = ui.next_auto_id();
+
+        let output = egui::ScrollArea::horizontal()
+            .id_salt(table_id.with("horizontal"))
+            .max_width(viewport_width)
+            .auto_shrink([false, false])
+            .show_viewport(ui, |ui, _viewport| {
+                paint_widget_table_surface(
+                    ui,
+                    &theme,
+                    table_id,
+                    table_width,
+                    table_height,
+                    header_height,
+                    body_height,
+                    rows_height,
+                    row_height,
+                    self.sticky_body_height,
+                    &column_widths,
+                    &self.columns,
+                    row_count,
+                    self.size,
+                    &self.right_aligned_columns,
+                    &self.selected_rows,
+                    &mut add_row,
+                )
+            });
+
+        output.inner
+    }
+}
+
+pub struct TableRow<'a> {
+    ui: &'a mut Ui,
+    theme: &'a CastTheme,
+    rect: egui::Rect,
+    column_widths: &'a [f32],
+    right_aligned_columns: &'a [usize],
+    size: Size,
+    row_index: usize,
+    column_index: usize,
+}
+
+impl TableRow<'_> {
+    pub fn cell(&mut self, add_contents: impl FnOnce(&mut Ui)) {
+        let Some(cell_rect) = self.next_cell_rect() else {
+            return;
+        };
+        let column_index = self.column_index - 1;
+        let content_rect = cell_rect.shrink2(egui::vec2(table_cell_padding(self.theme), 0.0));
+        let layout = if self.right_aligned_columns.contains(&column_index) {
+            egui::Layout::right_to_left(egui::Align::Center)
+        } else {
+            egui::Layout::left_to_right(egui::Align::Center)
+        };
+        let mut cell_ui = self.ui.new_child(
+            UiBuilder::new()
+                .max_rect(content_rect)
+                .layout(layout)
+                .id_salt(("cast_table_cell", self.row_index, column_index)),
+        );
+        cell_ui.shrink_clip_rect(content_rect);
+        cell_ui.spacing_mut().item_spacing =
+            egui::vec2(self.theme.spacing.xs, self.theme.spacing.xs);
+        add_contents(&mut cell_ui);
+    }
+
+    pub fn text(&mut self, text: impl Into<String>) {
+        let theme = self.theme;
+        let font = table_cell_font(theme, self.size);
+        self.cell(|ui| {
+            ui.label(
+                RichText::new(text.into())
+                    .family(font.family.clone())
+                    .size(font.size)
+                    .color(with_alpha(theme.colors.text, 230))
+                    .extra_letter_spacing(theme.typography.letter_spacing),
+            );
+        });
+    }
+
+    fn next_cell_rect(&mut self) -> Option<egui::Rect> {
+        let column_index = self.column_index;
+        let column_width = self.column_widths.get(column_index).copied()?;
+        let x = self.rect.min.x
+            + self
+                .column_widths
+                .iter()
+                .take(column_index)
+                .copied()
+                .sum::<f32>();
+        self.column_index += 1;
+
+        Some(egui::Rect::from_min_size(
+            egui::pos2(x, self.rect.min.y),
+            egui::vec2(column_width, self.rect.height()),
+        ))
     }
 }
 
@@ -305,6 +494,94 @@ fn paint_text_table_surface(
 }
 
 #[allow(clippy::too_many_arguments)]
+fn paint_widget_table_surface<F>(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    table_id: egui::Id,
+    table_width: f32,
+    table_height: f32,
+    header_height: f32,
+    body_height: f32,
+    rows_height: f32,
+    row_height: f32,
+    sticky_body_height: Option<f32>,
+    column_widths: &[f32],
+    columns: &[String],
+    row_count: usize,
+    size: Size,
+    right_aligned_columns: &[usize],
+    selected_rows: &[usize],
+    add_row: &mut F,
+) -> Response
+where
+    F: for<'row> FnMut(&mut TableRow<'row>, usize),
+{
+    let (rect, table_response) =
+        ui.allocate_exact_size(egui::vec2(table_width, table_height), Sense::hover());
+    let mut combined = table_response;
+
+    if ui.is_rect_visible(rect) {
+        paint_table_frame(ui, theme, rect, header_height);
+        paint_table_header(ui, theme, rect, header_height, column_widths, columns);
+    }
+
+    let body_rect =
+        egui::Rect::from_min_max(egui::pos2(rect.min.x, rect.min.y + header_height), rect.max);
+    let mut body_ui = ui.new_child(
+        UiBuilder::new()
+            .max_rect(body_rect)
+            .layout(*ui.layout())
+            .id_salt(table_id.with("body")),
+    );
+    body_ui.shrink_clip_rect(body_rect);
+
+    if sticky_body_height.is_some() && rows_height > body_height {
+        let scroll_response = egui::ScrollArea::vertical()
+            .id_salt(table_id.with("scroll"))
+            .max_height(body_height)
+            .auto_shrink([false, false])
+            .show_viewport(&mut body_ui, |ui, viewport| {
+                paint_widget_table_rows_viewport(
+                    ui,
+                    theme,
+                    table_width,
+                    rows_height,
+                    row_height,
+                    viewport,
+                    column_widths,
+                    row_count,
+                    size,
+                    right_aligned_columns,
+                    selected_rows,
+                    add_row,
+                )
+            });
+        combined = combined.union(scroll_response.inner);
+    } else {
+        combined = combined.union(paint_widget_table_rows_viewport(
+            &mut body_ui,
+            theme,
+            table_width,
+            rows_height,
+            row_height,
+            egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(table_width, rows_height)),
+            column_widths,
+            row_count,
+            size,
+            right_aligned_columns,
+            selected_rows,
+            add_row,
+        ));
+    }
+
+    if ui.is_rect_visible(rect) {
+        paint_table_outline(ui, theme, rect);
+    }
+
+    combined
+}
+
+#[allow(clippy::too_many_arguments)]
 fn paint_table_rows_viewport(
     ui: &mut Ui,
     theme: &CastTheme,
@@ -363,6 +640,79 @@ fn paint_table_rows_viewport(
                 response.hovered(),
                 response.is_pointer_button_down_on(),
             );
+        }
+
+        combined = combined.union(response);
+    }
+
+    combined
+}
+
+#[allow(clippy::too_many_arguments)]
+fn paint_widget_table_rows_viewport<F>(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    width: f32,
+    rows_height: f32,
+    row_height: f32,
+    viewport: egui::Rect,
+    column_widths: &[f32],
+    row_count: usize,
+    size: Size,
+    right_aligned_columns: &[usize],
+    selected_rows: &[usize],
+    add_row: &mut F,
+) -> Response
+where
+    F: for<'row> FnMut(&mut TableRow<'row>, usize),
+{
+    let (_, content_rect) = ui.allocate_space(egui::vec2(width, rows_height));
+    let content_response = ui.interact(
+        content_rect,
+        ui.make_persistent_id("cast_table_rows"),
+        Sense::hover(),
+    );
+    let mut combined = content_response;
+    let visible_start = (viewport.min.y / row_height).floor().max(0.0) as usize;
+    let visible_end = ((viewport.max.y / row_height).ceil() as usize + 1).min(row_count);
+
+    for index in visible_start..visible_end {
+        let row_rect = egui::Rect::from_min_size(
+            egui::pos2(
+                content_rect.min.x,
+                content_rect.min.y + row_height * index as f32,
+            ),
+            egui::vec2(width, row_height),
+        );
+        let selected = selected_rows.contains(&index);
+        let last_row = index + 1 == row_count;
+        let response = ui.interact(
+            row_rect,
+            ui.make_persistent_id(("cast_table_row", index)),
+            Sense::hover(),
+        );
+
+        if ui.is_rect_visible(row_rect) {
+            let colors = table_row_colors(
+                theme,
+                selected,
+                !selected && response.hovered(),
+                response.is_pointer_button_down_on(),
+            );
+            paint_table_row_background(ui, theme, row_rect, colors, last_row);
+            paint_table_row_rules(ui, theme, row_rect, column_widths, last_row);
+
+            let mut row = TableRow {
+                ui,
+                theme,
+                rect: row_rect,
+                column_widths,
+                right_aligned_columns,
+                size,
+                row_index: index,
+                column_index: 0,
+            };
+            add_row(&mut row, index);
         }
 
         combined = combined.union(response);
@@ -553,6 +903,26 @@ fn paint_table_row(
             galley,
             with_alpha(theme.colors.text, 230),
         );
+        x += column_width;
+    }
+
+    if !last_row {
+        paint_table_horizontal_rule(ui, theme, rect.max.y, rect);
+    }
+}
+
+fn paint_table_row_rules(
+    ui: &Ui,
+    theme: &CastTheme,
+    rect: egui::Rect,
+    column_widths: &[f32],
+    last_row: bool,
+) {
+    let mut x = rect.min.x;
+    for (index, column_width) in column_widths.iter().copied().enumerate() {
+        if index > 0 {
+            paint_table_vertical_rule(ui, theme, x, rect);
+        }
         x += column_width;
     }
 
@@ -948,5 +1318,24 @@ mod tests {
         let table = TextTable::new(&mut selected, ["Name"], [["Cast"]]);
 
         assert_eq!(*table.selected, TextTable::NO_SELECTION);
+    }
+
+    #[test]
+    fn table_collects_columns_and_layout_options() {
+        let table = Table::new(["Name", "Status", "Value"])
+            .column_weights([2.0, 1.0, 1.0])
+            .right_aligned_columns([2])
+            .selected_rows([1, 3])
+            .size(Size::Small)
+            .sticky_header(280.0)
+            .min_column_width(120.0);
+
+        assert_eq!(table.columns, ["Name", "Status", "Value"]);
+        assert_eq!(table.column_weights, Some(vec![2.0, 1.0, 1.0]));
+        assert_eq!(table.right_aligned_columns, vec![2]);
+        assert_eq!(table.selected_rows, vec![1, 3]);
+        assert_eq!(table.size, Size::Small);
+        assert_eq!(table.sticky_body_height, Some(280.0));
+        assert_eq!(table.min_column_width, 120.0);
     }
 }

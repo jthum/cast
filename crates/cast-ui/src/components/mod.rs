@@ -23,7 +23,7 @@ pub use checkbox::{Checkbox, Radio};
 pub use filter_bar::FilterBar;
 pub use label::Label;
 pub use link::Link;
-pub use list::{ListRow, TextTable};
+pub use list::{ListRow, Table, TableRow, TextTable};
 pub use menu::{Dropdown, MenuItem};
 pub use navigation::{NavList, SegmentedControl, Tabs};
 pub use panel::Panel;
