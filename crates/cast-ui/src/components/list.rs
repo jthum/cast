@@ -4,10 +4,10 @@ use egui::{
 };
 
 use crate::{
-    color::{mix_with_transparent, with_alpha},
+    color::{mix_oklch, mix_with_transparent, with_alpha},
     foundation::Size,
     style::IntentColors,
-    theme::{CastTheme, theme_for_ui},
+    theme::{CastTheme, ThemeMode, theme_for_ui},
 };
 
 #[derive(Clone, Debug)]
@@ -460,7 +460,7 @@ fn paint_table_frame(ui: &Ui, theme: &CastTheme, rect: egui::Rect, header_height
             sw: 0,
             se: 0,
         },
-        theme.colors.primary_family.base,
+        table_header_fill(theme),
     );
 }
 
@@ -478,12 +478,7 @@ fn paint_table_header(
     for (index, column) in columns.iter().enumerate() {
         let column_width = column_widths.get(index).copied().unwrap_or(0.0);
         if index > 0 {
-            paint_table_rule(
-                ui,
-                x,
-                header_rect,
-                with_alpha(theme.colors.primary_family.fg, 55),
-            );
+            paint_table_rule(ui, x, header_rect, table_rule_color(theme));
         }
 
         let galley = ui.painter().layout_job(row_layout_job(
@@ -497,7 +492,7 @@ fn paint_table_header(
                 header_rect.center().y - galley.size().y / 2.0,
             ),
             galley,
-            theme.colors.primary_family.fg,
+            table_header_text_color(theme),
         );
 
         x += column_width;
@@ -508,10 +503,7 @@ fn paint_table_header(
             egui::pos2(header_rect.min.x, header_rect.max.y),
             egui::pos2(header_rect.max.x, header_rect.max.y),
         ],
-        egui::Stroke::new(
-            theme.stroke.sm,
-            with_alpha(theme.colors.primary_family.fg, 75),
-        ),
+        egui::Stroke::new(theme.stroke.sm, table_rule_color(theme)),
     );
 }
 
@@ -519,7 +511,7 @@ fn paint_table_outline(ui: &Ui, theme: &CastTheme, rect: egui::Rect) {
     ui.painter().rect_stroke(
         rect,
         egui::CornerRadius::same(theme.radius.lg.round() as u8),
-        egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+        egui::Stroke::new(theme.stroke.sm, table_rule_color(theme)),
         StrokeKind::Outside,
     );
 }
@@ -572,7 +564,7 @@ fn paint_table_row(
                 egui::pos2(rect.min.x, rect.max.y),
                 egui::pos2(rect.max.x, rect.max.y),
             ],
-            egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+            egui::Stroke::new(theme.stroke.sm, table_rule_color(theme)),
         );
     }
 }
@@ -613,7 +605,7 @@ fn paint_table_row_background(
 }
 
 fn paint_table_vertical_rule(ui: &Ui, theme: &CastTheme, x: f32, rect: egui::Rect) {
-    paint_table_rule(ui, x, rect, theme.colors.border);
+    paint_table_rule(ui, x, rect, table_rule_color(theme));
 }
 
 fn paint_table_rule(ui: &Ui, x: f32, rect: egui::Rect, color: Color32) {
@@ -621,6 +613,27 @@ fn paint_table_rule(ui: &Ui, x: f32, rect: egui::Rect, color: Color32) {
         [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
         egui::Stroke::new(1.0, color),
     );
+}
+
+fn table_header_fill(theme: &CastTheme) -> Color32 {
+    match theme.mode {
+        ThemeMode::Light => mix_oklch(theme.colors.surface_raised, theme.colors.surface, 0.35),
+        ThemeMode::Dark => theme.colors.surface_raised,
+    }
+}
+
+fn table_header_text_color(theme: &CastTheme) -> Color32 {
+    match theme.mode {
+        ThemeMode::Light => theme.colors.text,
+        ThemeMode::Dark => mix_oklch(theme.colors.text, theme.colors.surface, 0.10),
+    }
+}
+
+fn table_rule_color(theme: &CastTheme) -> Color32 {
+    match theme.mode {
+        ThemeMode::Light => mix_oklch(theme.colors.border, theme.colors.surface, 0.42),
+        ThemeMode::Dark => mix_oklch(theme.colors.border, theme.colors.surface, 0.18),
+    }
 }
 
 fn selectable_row_colors(
@@ -775,6 +788,22 @@ mod tests {
     fn table_content_width_expands_for_many_columns() {
         assert_eq!(table_content_width(600.0, 3, 96.0), 600.0);
         assert_eq!(table_content_width(600.0, 8, 96.0), 768.0);
+    }
+
+    #[test]
+    fn table_chrome_uses_local_soft_grey_treatment() {
+        let theme = CastTheme::light();
+
+        assert_eq!(
+            table_header_fill(&theme),
+            mix_oklch(theme.colors.surface_raised, theme.colors.surface, 0.35)
+        );
+        assert_eq!(table_header_text_color(&theme), theme.colors.text);
+        assert_eq!(
+            table_rule_color(&theme),
+            mix_oklch(theme.colors.border, theme.colors.surface, 0.42)
+        );
+        assert_ne!(table_rule_color(&theme), theme.colors.border);
     }
 
     #[test]
