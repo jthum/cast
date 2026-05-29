@@ -111,6 +111,7 @@ pub struct DataTable<'a> {
     right_aligned_columns: Vec<usize>,
     size: Size,
     sticky_body_height: Option<f32>,
+    min_column_width: f32,
 }
 
 impl<'a> DataTable<'a> {
@@ -134,6 +135,7 @@ impl<'a> DataTable<'a> {
             right_aligned_columns: Vec::new(),
             size: Size::Medium,
             sticky_body_height: None,
+            min_column_width: 96.0,
         }
     }
 
@@ -166,88 +168,137 @@ impl<'a> DataTable<'a> {
         self.sticky_body_height = Some(body_height.max(0.0));
         self
     }
+
+    #[must_use]
+    pub fn min_column_width(mut self, width: f32) -> Self {
+        self.min_column_width = width.max(24.0);
+        self
+    }
 }
 
 impl Widget for DataTable<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
-        let width = ui.available_width().max(240.0);
+        let viewport_width = ui.available_width().max(240.0);
         let columns = self.columns.len().max(1);
-        let column_widths = table_column_widths(width, columns, self.column_weights.as_deref());
+        let table_width = table_content_width(viewport_width, columns, self.min_column_width);
+        let column_widths =
+            table_column_widths(table_width, columns, self.column_weights.as_deref());
         let header_height = table_header_height(self.size);
         let row_height = table_row_height(self.size);
         let rows_height = row_height * self.rows.len() as f32;
         let body_height = table_body_height(rows_height, self.sticky_body_height);
         let table_height = header_height + body_height;
-        let (rect, table_response) =
-            ui.allocate_exact_size(egui::vec2(width, table_height), Sense::hover());
-        let mut combined = table_response;
-
-        if ui.is_rect_visible(rect) {
-            paint_table_frame(ui, &theme, rect, header_height);
-            paint_table_header(
-                ui,
-                &theme,
-                rect,
-                header_height,
-                &column_widths,
-                &self.columns,
-            );
-        }
-
         let table_id = ui.next_auto_id();
-        let body_rect =
-            egui::Rect::from_min_max(egui::pos2(rect.min.x, rect.min.y + header_height), rect.max);
-        let mut body_ui = ui.new_child(
-            UiBuilder::new()
-                .max_rect(body_rect)
-                .layout(*ui.layout())
-                .id_salt(table_id.with("body")),
-        );
 
-        if self.sticky_body_height.is_some() && rows_height > body_height {
-            let scroll_response = egui::ScrollArea::vertical()
-                .id_salt(table_id.with("scroll"))
-                .max_height(body_height)
-                .auto_shrink([false, false])
-                .show_viewport(&mut body_ui, |ui, viewport| {
-                    paint_table_rows_viewport(
-                        ui,
-                        &theme,
-                        width,
-                        rows_height,
-                        row_height,
-                        viewport,
-                        self.selected,
-                        &column_widths,
-                        &self.rows,
-                        self.size,
-                        &self.right_aligned_columns,
-                    )
-                });
-            combined = combined.union(scroll_response.inner);
-        } else {
-            combined = combined.union(paint_table_rows_viewport(
-                &mut body_ui,
-                &theme,
-                width,
-                rows_height,
-                row_height,
-                egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(width, rows_height)),
-                self.selected,
-                &column_widths,
-                &self.rows,
-                self.size,
-                &self.right_aligned_columns,
-            ));
-        }
+        let output = egui::ScrollArea::horizontal()
+            .id_salt(table_id.with("horizontal"))
+            .max_width(viewport_width)
+            .auto_shrink([false, false])
+            .show_viewport(ui, |ui, _viewport| {
+                paint_data_table_surface(
+                    ui,
+                    &theme,
+                    table_id,
+                    table_width,
+                    table_height,
+                    header_height,
+                    body_height,
+                    rows_height,
+                    row_height,
+                    self.sticky_body_height,
+                    self.selected,
+                    &column_widths,
+                    &self.columns,
+                    &self.rows,
+                    self.size,
+                    &self.right_aligned_columns,
+                )
+            });
 
-        if ui.is_rect_visible(rect) {
-            paint_table_outline(ui, &theme, rect);
-        }
-
-        combined
+        output.inner
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn paint_data_table_surface(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    table_id: egui::Id,
+    table_width: f32,
+    table_height: f32,
+    header_height: f32,
+    body_height: f32,
+    rows_height: f32,
+    row_height: f32,
+    sticky_body_height: Option<f32>,
+    selected: &mut usize,
+    column_widths: &[f32],
+    columns: &[String],
+    rows: &[Vec<String>],
+    size: Size,
+    right_aligned_columns: &[usize],
+) -> Response {
+    let (rect, table_response) =
+        ui.allocate_exact_size(egui::vec2(table_width, table_height), Sense::hover());
+    let mut combined = table_response;
+
+    if ui.is_rect_visible(rect) {
+        paint_table_frame(ui, theme, rect, header_height);
+        paint_table_header(ui, theme, rect, header_height, column_widths, columns);
+    }
+
+    let body_rect =
+        egui::Rect::from_min_max(egui::pos2(rect.min.x, rect.min.y + header_height), rect.max);
+    let mut body_ui = ui.new_child(
+        UiBuilder::new()
+            .max_rect(body_rect)
+            .layout(*ui.layout())
+            .id_salt(table_id.with("body")),
+    );
+
+    if sticky_body_height.is_some() && rows_height > body_height {
+        let scroll_response = egui::ScrollArea::vertical()
+            .id_salt(table_id.with("scroll"))
+            .max_height(body_height)
+            .auto_shrink([false, false])
+            .show_viewport(&mut body_ui, |ui, viewport| {
+                paint_table_rows_viewport(
+                    ui,
+                    theme,
+                    table_width,
+                    rows_height,
+                    row_height,
+                    viewport,
+                    selected,
+                    column_widths,
+                    rows,
+                    size,
+                    right_aligned_columns,
+                )
+            });
+        combined = combined.union(scroll_response.inner);
+    } else {
+        combined = combined.union(paint_table_rows_viewport(
+            &mut body_ui,
+            theme,
+            table_width,
+            rows_height,
+            row_height,
+            egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(table_width, rows_height)),
+            selected,
+            column_widths,
+            rows,
+            size,
+            right_aligned_columns,
+        ));
+    }
+
+    if ui.is_rect_visible(rect) {
+        paint_table_outline(ui, theme, rect);
+    }
+
+    combined
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -405,7 +456,7 @@ fn paint_table_frame(ui: &Ui, theme: &CastTheme, rect: egui::Rect, header_height
             sw: 0,
             se: 0,
         },
-        theme.colors.surface_muted,
+        theme.colors.primary_family.base,
     );
 }
 
@@ -423,7 +474,12 @@ fn paint_table_header(
     for (index, column) in columns.iter().enumerate() {
         let column_width = column_widths.get(index).copied().unwrap_or(0.0);
         if index > 0 {
-            paint_table_vertical_rule(ui, theme, x, header_rect);
+            paint_table_rule(
+                ui,
+                x,
+                header_rect,
+                with_alpha(theme.colors.primary_family.fg, 55),
+            );
         }
 
         let galley = ui.painter().layout_job(row_layout_job(
@@ -437,7 +493,7 @@ fn paint_table_header(
                 header_rect.center().y - galley.size().y / 2.0,
             ),
             galley,
-            with_alpha(theme.colors.text, 190),
+            theme.colors.primary_family.fg,
         );
 
         x += column_width;
@@ -448,7 +504,10 @@ fn paint_table_header(
             egui::pos2(header_rect.min.x, header_rect.max.y),
             egui::pos2(header_rect.max.x, header_rect.max.y),
         ],
-        egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+        egui::Stroke::new(
+            theme.stroke.sm,
+            with_alpha(theme.colors.primary_family.fg, 75),
+        ),
     );
 }
 
@@ -532,9 +591,13 @@ fn paint_table_row_background(ui: &Ui, rect: egui::Rect, colors: IntentColors) {
 }
 
 fn paint_table_vertical_rule(ui: &Ui, theme: &CastTheme, x: f32, rect: egui::Rect) {
+    paint_table_rule(ui, x, rect, theme.colors.border);
+}
+
+fn paint_table_rule(ui: &Ui, x: f32, rect: egui::Rect, color: Color32) {
     ui.painter().line_segment(
         [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
-        egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+        egui::Stroke::new(1.0, color),
     );
 }
 
@@ -558,13 +621,13 @@ fn selectable_row_colors(
         }
     } else if pressed {
         IntentColors {
-            fill: theme.colors.surface_raised,
+            fill: mix_with_transparent(theme.colors.primary_family.base, 0.05),
             fg: theme.colors.text,
             border: Color32::TRANSPARENT,
         }
     } else if hovered {
         IntentColors {
-            fill: theme.colors.surface_muted,
+            fill: mix_with_transparent(theme.colors.primary_family.base, 0.025),
             fg: theme.colors.text,
             border: Color32::TRANSPARENT,
         }
@@ -575,6 +638,10 @@ fn selectable_row_colors(
             border: Color32::TRANSPARENT,
         }
     }
+}
+
+fn table_content_width(viewport_width: f32, columns: usize, min_column_width: f32) -> f32 {
+    viewport_width.max(columns as f32 * min_column_width)
 }
 
 fn table_column_widths(width: f32, columns: usize, weights: Option<&[f32]>) -> Vec<f32> {
@@ -683,6 +750,12 @@ mod tests {
     }
 
     #[test]
+    fn table_content_width_expands_for_many_columns() {
+        assert_eq!(table_content_width(600.0, 3, 96.0), 600.0);
+        assert_eq!(table_content_width(600.0, 8, 96.0), 768.0);
+    }
+
+    #[test]
     fn sticky_table_body_height_caps_rows() {
         assert_eq!(table_body_height(640.0, Some(320.0)), 320.0);
         assert_eq!(table_body_height(160.0, Some(320.0)), 160.0);
@@ -700,6 +773,18 @@ mod tests {
         );
         assert_eq!(colors.fg, theme.colors.text);
         assert_eq!(colors.border, Color32::TRANSPARENT);
+    }
+
+    #[test]
+    fn hovered_rows_use_light_primary_tint() {
+        let theme = CastTheme::light();
+        let colors = selectable_row_colors(&theme, false, true, false);
+
+        assert_eq!(
+            colors.fill,
+            mix_with_transparent(theme.colors.primary_family.base, 0.025)
+        );
+        assert_eq!(colors.fg, theme.colors.text);
     }
 
     #[test]
@@ -722,11 +807,13 @@ mod tests {
             .column_weights([2.0, 1.0])
             .right_aligned_columns([1])
             .size(Size::Small)
-            .sticky_header(320.0);
+            .sticky_header(320.0)
+            .min_column_width(128.0);
 
         assert_eq!(table.column_weights, Some(vec![2.0, 1.0]));
         assert_eq!(table.right_aligned_columns, vec![1]);
         assert_eq!(table.size, Size::Small);
         assert_eq!(table.sticky_body_height, Some(320.0));
+        assert_eq!(table.min_column_width, 128.0);
     }
 }
