@@ -1369,8 +1369,8 @@ impl ComponentTokens {
                 radius: radius.md * 2.0,
                 border_width: stroke.sm,
                 padding_x: spacing.sm,
-                padding_y: spacing.xs,
-                min_height: controls.min_height - 6.0,
+                padding_y: spacing.xs * 0.5,
+                min_height: controls.min_height - 10.0,
             },
             card: SurfaceTokens {
                 fill: colors.surface,

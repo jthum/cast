@@ -167,7 +167,8 @@ fn choice_row(
     let theme = theme_for_ui(ui);
     let metrics = resolve_control_metrics(&theme, size);
     let mark_size = choice_mark_size(size);
-    let gap = theme.spacing.sm;
+    let has_label = !label.is_empty();
+    let gap = choice_label_gap(&theme, label);
     let mut font_id = theme.typography.body.clone();
     font_id.size = metrics.text_size;
     let galley = ui.painter().layout_job(choice_layout_job(
@@ -193,19 +194,21 @@ fn choice_row(
         );
         paint_choice_mark(ui, &theme, mark_rect, &response, enabled, selected, kind);
 
-        let label_color = if enabled {
-            theme.colors.text
-        } else {
-            theme.colors.text_subtle
-        };
-        ui.painter().galley(
-            egui::pos2(
-                mark_rect.max.x + gap,
-                rect.center().y - galley.size().y / 2.0,
-            ),
-            galley,
-            label_color,
-        );
+        if has_label {
+            let label_color = if enabled {
+                theme.colors.text
+            } else {
+                theme.colors.text_subtle
+            };
+            ui.painter().galley(
+                egui::pos2(
+                    mark_rect.max.x + gap,
+                    rect.center().y - galley.size().y / 2.0,
+                ),
+                galley,
+                label_color,
+            );
+        }
     }
 
     response
@@ -374,6 +377,14 @@ fn choice_mark_size(size: Size) -> f32 {
     }
 }
 
+fn choice_label_gap(theme: &CastTheme, label: &str) -> f32 {
+    if label.is_empty() {
+        0.0
+    } else {
+        theme.spacing.sm
+    }
+}
+
 fn choice_layout_job(text: String, font_id: egui::FontId, letter_spacing: f32) -> LayoutJob {
     LayoutJob::single_section(
         text,
@@ -394,6 +405,14 @@ mod tests {
     fn choice_mark_sizes_scale() {
         assert!(choice_mark_size(Size::Small) < choice_mark_size(Size::Medium));
         assert!(choice_mark_size(Size::Medium) < choice_mark_size(Size::Large));
+    }
+
+    #[test]
+    fn empty_choice_labels_do_not_reserve_label_gap() {
+        let theme = CastTheme::light();
+
+        assert_eq!(choice_label_gap(&theme, ""), 0.0);
+        assert_eq!(choice_label_gap(&theme, "Enabled"), theme.spacing.sm);
     }
 
     #[test]

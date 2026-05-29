@@ -332,6 +332,8 @@ mod tests {
         assert_eq!(metrics.min_height, theme.components.badge.min_height);
         assert_eq!(metrics.padding.x, theme.components.badge.padding_x);
         assert_eq!(metrics.padding.y, theme.components.badge.padding_y);
+        assert!(metrics.padding.y < theme.spacing.xs);
+        assert!(metrics.min_height < theme.components.button.min_height - 6.0);
     }
 
     #[test]

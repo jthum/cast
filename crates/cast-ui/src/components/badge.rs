@@ -1,4 +1,7 @@
-use egui::{Response, RichText, Ui, Widget};
+use egui::{
+    Color32, Response, Sense, StrokeKind, Ui, Widget,
+    text::{LayoutJob, TextFormat},
+};
 
 use crate::{
     color::{contrast_ratio, mix_oklch, mix_with_transparent},
@@ -13,6 +16,7 @@ pub struct Badge {
     intent: Intent,
     variant: Option<Variant>,
     size: Size,
+    status_dot: bool,
 }
 
 impl Badge {
@@ -23,6 +27,7 @@ impl Badge {
             intent: Intent::Neutral,
             variant: None,
             size: Size::Small,
+            status_dot: false,
         }
     }
 
@@ -43,36 +48,118 @@ impl Badge {
         self.size = size;
         self
     }
+
+    #[must_use]
+    pub fn status_dot(mut self) -> Self {
+        self.status_dot = true;
+        self.variant = Some(Variant::Outline);
+        self
+    }
 }
 
 impl Widget for Badge {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
-        let colors = resolve_badge_colors(&theme, self.intent, self.variant);
+        let colors = if self.status_dot {
+            resolve_status_dot_badge_colors(&theme)
+        } else {
+            resolve_badge_colors(&theme, self.intent, self.variant)
+        };
         let metrics = resolve_badge_metrics(&theme, self.size);
+        let dot_size = if self.status_dot {
+            badge_dot_size(self.size)
+        } else {
+            0.0
+        };
+        let dot_gap = if self.status_dot {
+            theme.spacing.xs + 1.0
+        } else {
+            0.0
+        };
+        let text = ui.painter().layout_job(badge_layout_job(
+            self.label,
+            egui::FontId::new(metrics.text_size, theme.typography.button.family.clone()),
+            theme.typography.letter_spacing,
+        ));
+        let desired_size = egui::vec2(
+            metrics.padding.x * 2.0 + dot_size + dot_gap + text.size().x,
+            metrics
+                .min_height
+                .max(metrics.padding.y * 2.0 + text.size().y),
+        );
+        let (rect, response) = ui.allocate_exact_size(desired_size, Sense::hover());
 
-        ui.add(
-            egui::Button::new(
-                RichText::new(self.label)
-                    .color(colors.fg)
-                    .family(theme.typography.button.family.clone())
-                    .size(metrics.text_size)
-                    .extra_letter_spacing(theme.typography.letter_spacing),
-            )
-            .fill(colors.fill)
-            .stroke(egui::Stroke::new(
-                theme.components.badge.border_width,
-                colors.border,
-            ))
-            .corner_radius(egui::CornerRadius::same(
-                theme.components.badge.radius as u8,
-            ))
-            .min_size(egui::vec2(
-                metrics.padding.x * 2.0,
-                metrics.min_height.max(metrics.padding.y * 2.0),
-            ))
-            .small(),
-        )
+        if ui.is_rect_visible(rect) {
+            ui.painter().rect(
+                rect,
+                egui::CornerRadius::same(theme.components.badge.radius as u8),
+                colors.fill,
+                egui::Stroke::new(theme.components.badge.border_width, colors.border),
+                StrokeKind::Outside,
+            );
+
+            let mut x = rect.min.x + metrics.padding.x;
+            if self.status_dot {
+                let dot_radius = dot_size / 2.0;
+                ui.painter().circle_filled(
+                    egui::pos2(x + dot_radius, rect.center().y),
+                    dot_radius,
+                    badge_dot_color(&theme, self.intent),
+                );
+                x += dot_size + dot_gap;
+            }
+
+            ui.painter().galley(
+                egui::pos2(x, rect.center().y - text.size().y / 2.0),
+                text,
+                colors.fg,
+            );
+        }
+
+        response
+    }
+}
+
+fn resolve_status_dot_badge_colors(theme: &CastTheme) -> IntentColors {
+    IntentColors {
+        fill: egui::Color32::TRANSPARENT,
+        fg: theme.colors.text,
+        border: match theme.mode {
+            ThemeMode::Light => theme.colors.border,
+            ThemeMode::Dark => mix_with_transparent(theme.colors.text_muted, 0.28),
+        },
+    }
+}
+
+fn badge_layout_job(text: String, font_id: egui::FontId, letter_spacing: f32) -> LayoutJob {
+    LayoutJob::single_section(
+        text,
+        TextFormat {
+            font_id,
+            extra_letter_spacing: letter_spacing,
+            color: Color32::PLACEHOLDER,
+            ..Default::default()
+        },
+    )
+}
+
+fn badge_dot_size(size: Size) -> f32 {
+    match size {
+        Size::Small => 7.0,
+        Size::Medium => 8.0,
+        Size::Large => 9.0,
+    }
+}
+
+fn badge_dot_color(theme: &CastTheme, intent: Intent) -> egui::Color32 {
+    match intent {
+        Intent::Neutral => theme.colors.text_muted,
+        Intent::Primary => theme.colors.primary_family.base,
+        Intent::Secondary => theme.colors.secondary_family.base,
+        Intent::Success => theme.colors.success_family.base,
+        Intent::Warning => theme.colors.warning_family.base,
+        Intent::Danger => theme.colors.danger_family.base,
+        Intent::Info => theme.colors.info_family.base,
     }
 }
 
@@ -198,5 +285,20 @@ mod tests {
 
         assert_eq!(colors.fill, egui::Color32::TRANSPARENT);
         assert_eq!(border_alpha, 77);
+    }
+
+    #[test]
+    fn status_dot_badge_uses_neutral_outline_with_semantic_dot() {
+        let theme = CastTheme::light();
+        let colors = resolve_status_dot_badge_colors(&theme);
+
+        assert_eq!(colors.fill, egui::Color32::TRANSPARENT);
+        assert_eq!(colors.fg, theme.colors.text);
+        assert_eq!(colors.border, theme.colors.border);
+        assert_eq!(
+            badge_dot_color(&theme, Intent::Success),
+            theme.colors.success_family.base
+        );
+        assert_eq!(badge_dot_size(Size::Small), 7.0);
     }
 }

@@ -236,23 +236,42 @@ pub struct TableRow<'a> {
 
 impl TableRow<'_> {
     pub fn cell(&mut self, add_contents: impl FnOnce(&mut Ui)) {
+        self.cell_with_layout(None, add_contents);
+    }
+
+    pub fn centered_cell(&mut self, add_contents: impl FnOnce(&mut Ui)) {
+        self.cell_with_layout(
+            Some(egui::Layout::centered_and_justified(
+                egui::Direction::LeftToRight,
+            )),
+            add_contents,
+        );
+    }
+
+    fn cell_with_layout(
+        &mut self,
+        explicit_layout: Option<egui::Layout>,
+        add_contents: impl FnOnce(&mut Ui),
+    ) {
         let Some(cell_rect) = self.next_cell_rect() else {
             return;
         };
         let column_index = self.column_index - 1;
-        let content_rect = cell_rect.shrink2(egui::vec2(table_cell_padding(self.theme), 0.0));
-        let layout = if self.right_aligned_columns.contains(&column_index) {
-            egui::Layout::right_to_left(egui::Align::Center)
-        } else {
-            egui::Layout::left_to_right(egui::Align::Center)
-        };
+        let content_rect = table_cell_content_rect(self.theme, cell_rect);
+        let layout = explicit_layout.unwrap_or_else(|| {
+            if self.right_aligned_columns.contains(&column_index) {
+                egui::Layout::right_to_left(egui::Align::Center)
+            } else {
+                egui::Layout::left_to_right(egui::Align::Center)
+            }
+        });
         let mut cell_ui = self.ui.new_child(
             UiBuilder::new()
                 .max_rect(content_rect)
                 .layout(layout)
                 .id_salt(("cast_table_cell", self.row_index, column_index)),
         );
-        cell_ui.shrink_clip_rect(content_rect);
+        cell_ui.set_clip_rect(cell_rect.intersect(self.ui.clip_rect()));
         cell_ui.spacing_mut().item_spacing =
             egui::vec2(self.theme.spacing.xs, self.theme.spacing.xs);
         add_contents(&mut cell_ui);
@@ -1104,6 +1123,12 @@ fn table_cell_padding(theme: &CastTheme) -> f32 {
     theme.spacing.sm
 }
 
+fn table_cell_content_rect(theme: &CastTheme, cell_rect: egui::Rect) -> egui::Rect {
+    let horizontal_padding =
+        table_cell_padding(theme).min(((cell_rect.width() - 24.0) / 2.0).max(theme.spacing.xs));
+    cell_rect.shrink2(egui::vec2(horizontal_padding, 0.0))
+}
+
 fn table_body_height(rows_height: f32, sticky_body_height: Option<f32>) -> f32 {
     sticky_body_height
         .map(|height| height.min(rows_height))
@@ -1337,5 +1362,21 @@ mod tests {
         assert_eq!(table.size, Size::Small);
         assert_eq!(table.sticky_body_height, Some(280.0));
         assert_eq!(table.min_column_width, 120.0);
+    }
+
+    #[test]
+    fn table_cell_padding_adapts_for_narrow_widget_columns() {
+        let theme = CastTheme::light();
+        let narrow = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(32.0, 32.0));
+        let wide = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(120.0, 32.0));
+
+        assert_eq!(
+            table_cell_content_rect(&theme, narrow).min.x,
+            theme.spacing.xs
+        );
+        assert_eq!(
+            table_cell_content_rect(&theme, wide).min.x,
+            table_cell_padding(&theme)
+        );
     }
 }

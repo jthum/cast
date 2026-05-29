@@ -1682,13 +1682,13 @@ fn show_lists_and_tables(
                 "Interacted",
             ])
             .size(Size::Small)
-            .column_weights([0.30, 1.35, 1.20, 1.10, 1.30, 1.10, 1.10, 1.0])
+            .column_weights([0.24, 1.35, 1.20, 1.10, 1.30, 1.10, 1.10, 1.0])
             .right_aligned_columns([5])
             .selected_rows(selected_rows)
             .sticky_header(320.0)
             .show(ui, visible_count, |row, row_index| {
                 let (lead_index, lead) = visible_rows[row_index];
-                row.cell(|ui| {
+                row.centered_cell(|ui| {
                     ui.add(Checkbox::new(&mut lead_selected[lead_index], "").size(Size::Small));
                 });
                 row.text(lead.name);
@@ -1696,6 +1696,7 @@ fn show_lists_and_tables(
                     ui.add(
                         Badge::new(lead.status)
                             .intent(lead_status_intent(lead.status))
+                            .status_dot()
                             .size(Size::Small),
                     );
                 });
@@ -1703,6 +1704,7 @@ fn show_lists_and_tables(
                     ui.add(
                         Badge::new(lead.interest)
                             .intent(lead_interest_intent(lead.interest))
+                            .status_dot()
                             .size(Size::Small),
                     );
                 });
