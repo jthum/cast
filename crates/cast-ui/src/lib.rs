@@ -8,9 +8,9 @@ pub mod theme;
 
 pub use color::{contrast_ratio, mix_with_transparent};
 pub use components::{
-    Alert, Badge, Button, Card, Checkbox, DataTable, Dropdown, Label, Link, ListRow, MenuItem,
-    NavList, Notice, Panel, Radio, SearchInput, SegmentedControl, Separator, Slider, Switch, Tabs,
-    TextInput,
+    Alert, Badge, Button, Card, Checkbox, DataTable, Dropdown, FilterBar, Label, Link, ListRow,
+    MenuItem, NavList, Notice, Panel, Radio, SearchInput, SegmentedControl, Separator, Slider,
+    Switch, Tabs, TextInput,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};

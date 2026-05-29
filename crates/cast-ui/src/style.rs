@@ -1,4 +1,4 @@
-use egui::{Color32, Margin, Stroke, Vec2};
+use egui::{Color32, Margin, Stroke, Ui, Vec2};
 
 use crate::{
     color::{mix_with_transparent, with_alpha},
@@ -82,6 +82,30 @@ fn semantic_intent_colors(family: SemanticColorTokens, variant: Variant) -> Inte
 
 pub(crate) fn resolve_control_metrics(theme: &CastTheme, size: Size) -> ControlMetrics {
     button_metrics(theme.components.button, theme, size)
+}
+
+pub(crate) fn contextual_control_size(ui: &Ui) -> Option<Size> {
+    ui.data(|data| data.get_temp(contextual_control_size_id()))
+}
+
+pub(crate) fn push_contextual_control_size(ui: &mut Ui, size: Size) -> Option<Size> {
+    let previous = contextual_control_size(ui);
+    ui.data_mut(|data| data.insert_temp(contextual_control_size_id(), size));
+    previous
+}
+
+pub(crate) fn pop_contextual_control_size(ui: &mut Ui, previous: Option<Size>) {
+    ui.data_mut(|data| {
+        if let Some(previous) = previous {
+            data.insert_temp(contextual_control_size_id(), previous);
+        } else {
+            data.remove_temp::<Size>(contextual_control_size_id());
+        }
+    });
+}
+
+fn contextual_control_size_id() -> egui::Id {
+    egui::Id::new("cast_contextual_control_size")
 }
 
 pub(crate) fn resolve_badge_metrics(theme: &CastTheme, size: Size) -> ControlMetrics {

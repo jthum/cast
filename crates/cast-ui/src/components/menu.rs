@@ -16,7 +16,7 @@ pub struct Dropdown<'a> {
     labels: Vec<String>,
     placeholder: String,
     width: Option<f32>,
-    size: Size,
+    size: Option<Size>,
     enabled: bool,
 }
 
@@ -32,7 +32,7 @@ impl<'a> Dropdown<'a> {
             labels: labels.into_iter().map(Into::into).collect(),
             placeholder: "Select".to_owned(),
             width: None,
-            size: Size::Medium,
+            size: None,
             enabled: true,
         }
     }
@@ -51,7 +51,7 @@ impl<'a> Dropdown<'a> {
 
     #[must_use]
     pub fn size(mut self, size: Size) -> Self {
-        self.size = size;
+        self.size = Some(size);
         self
     }
 
@@ -77,7 +77,11 @@ impl Widget for Dropdown<'_> {
             .map(String::as_str)
             .unwrap_or(&self.placeholder);
         let width = self.width.unwrap_or(180.0);
-        let mut response = dropdown_trigger(ui, label, width, self.size, self.enabled);
+        let size = self
+            .size
+            .or_else(|| crate::style::contextual_control_size(ui))
+            .unwrap_or(Size::Medium);
+        let mut response = dropdown_trigger(ui, label, width, size, self.enabled);
         let mut changed = false;
 
         if self.enabled {
@@ -292,18 +296,6 @@ impl Widget for MenuItem {
                 StrokeKind::Outside,
             );
 
-            if self.selected {
-                let accent = egui::Rect::from_min_max(
-                    egui::pos2(rect.min.x, rect.min.y + theme.spacing.xs),
-                    egui::pos2(rect.min.x + 2.0, rect.max.y - theme.spacing.xs),
-                );
-                ui.painter().rect_filled(
-                    accent,
-                    egui::CornerRadius::same(1),
-                    theme.colors.primary_family.base,
-                );
-            }
-
             let fg = if self.enabled {
                 colors.fg
             } else {
@@ -404,6 +396,7 @@ mod tests {
 
         assert_eq!(dropdown.labels, ["One", "Two"]);
         assert_eq!(dropdown.placeholder, "Select");
+        assert_eq!(dropdown.size, None);
     }
 
     #[test]

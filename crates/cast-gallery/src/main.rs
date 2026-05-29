@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use cast::{
-    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, DataTable, Dropdown, Intent,
-    Label, Link, ListRow, MenuItem, NavList, Notice, Panel as CastPanel, Radio, SearchInput,
-    SegmentedControl, SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput,
-    ThemeMode, ThemeSeed, TypographyTokens, Variant,
+    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, DataTable, Dropdown,
+    FilterBar, Intent, Label, Link, ListRow, MenuItem, NavList, Notice, Panel as CastPanel, Radio,
+    SearchInput, SegmentedControl, SemanticColorTokens, Separator, Size, Slider, Switch, Tabs,
+    TextInput, ThemeMode, ThemeSeed, TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -1458,34 +1458,21 @@ fn show_lists_and_tables(
             });
         });
         ui.add_space(10.0);
-        ui.horizontal_wrapped(|ui| {
+        FilterBar::new().show(ui, |ui| {
             filters_changed |= ui
                 .add(
                     Dropdown::new(date_filter, ["All time", "Last 7 days", "Last 24 hours"])
-                        .width(150.0)
-                        .size(Size::Small),
+                        .width(150.0),
                 )
                 .changed();
             filters_changed |= ui
-                .add(
-                    Dropdown::new(user_filter, LEAD_USER_FILTERS)
-                        .width(150.0)
-                        .size(Size::Small),
-                )
+                .add(Dropdown::new(user_filter, LEAD_USER_FILTERS).width(150.0))
                 .changed();
             filters_changed |= ui
-                .add(
-                    Dropdown::new(status_filter, LEAD_STATUS_FILTERS)
-                        .width(158.0)
-                        .size(Size::Small),
-                )
+                .add(Dropdown::new(status_filter, LEAD_STATUS_FILTERS).width(158.0))
                 .changed();
             filters_changed |= ui
-                .add(
-                    Dropdown::new(payment_filter, LEAD_PAYMENT_FILTERS)
-                        .width(150.0)
-                        .size(Size::Small),
-                )
+                .add(Dropdown::new(payment_filter, LEAD_PAYMENT_FILTERS).width(150.0))
                 .changed();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 filters_changed |= ui

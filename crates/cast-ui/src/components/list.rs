@@ -4,7 +4,7 @@ use egui::{
 };
 
 use crate::{
-    color::{mix_with_transparent, with_alpha},
+    color::with_alpha,
     foundation::Size,
     style::IntentColors,
     theme::{CastTheme, theme_for_ui},
@@ -94,7 +94,7 @@ impl Widget for ListRow {
             let hovered = self.enabled && response.hovered();
             let pressed = self.enabled && response.is_pointer_button_down_on();
             let colors = selectable_row_colors(&theme, self.selected, hovered, pressed);
-            paint_selectable_row_background(ui, &theme, rect, colors, self.selected);
+            paint_selectable_row_background(ui, &theme, rect, colors);
             paint_list_row_content(ui, &theme, rect, self, colors.fg);
         }
 
@@ -374,7 +374,7 @@ fn paint_table_row(
 ) {
     let colors = selectable_row_colors(theme, selected, hovered, pressed);
 
-    paint_table_row_background(ui, theme, rect, colors, selected);
+    paint_table_row_background(ui, rect, colors);
     let mut x = rect.min.x;
     for (index, cell) in cells.iter().enumerate() {
         let column_width = column_widths.get(index).copied().unwrap_or(0.0);
@@ -395,11 +395,7 @@ fn paint_table_row(
         ui.painter().galley(
             egui::pos2(text_x, rect.center().y - galley.size().y / 2.0),
             galley,
-            if selected {
-                colors.fg
-            } else {
-                with_alpha(theme.colors.text, 230)
-            },
+            with_alpha(theme.colors.text, 230),
         );
         x += column_width;
     }
@@ -418,7 +414,6 @@ fn paint_selectable_row_background(
     theme: &CastTheme,
     rect: egui::Rect,
     colors: IntentColors,
-    selected: bool,
 ) {
     ui.painter().rect(
         rect,
@@ -427,41 +422,11 @@ fn paint_selectable_row_background(
         egui::Stroke::new(theme.stroke.sm, colors.border),
         StrokeKind::Outside,
     );
-
-    if selected {
-        let accent = egui::Rect::from_min_max(
-            egui::pos2(rect.min.x, rect.min.y + theme.spacing.xs),
-            egui::pos2(rect.min.x + 2.0, rect.max.y - theme.spacing.xs),
-        );
-        ui.painter().rect_filled(
-            accent,
-            egui::CornerRadius::same(1),
-            theme.colors.primary_family.base,
-        );
-    }
 }
 
-fn paint_table_row_background(
-    ui: &Ui,
-    theme: &CastTheme,
-    rect: egui::Rect,
-    colors: IntentColors,
-    selected: bool,
-) {
+fn paint_table_row_background(ui: &Ui, rect: egui::Rect, colors: IntentColors) {
     ui.painter()
         .rect_filled(rect, egui::CornerRadius::ZERO, colors.fill);
-
-    if selected {
-        let accent = egui::Rect::from_min_max(
-            egui::pos2(rect.min.x, rect.min.y + theme.spacing.xs),
-            egui::pos2(rect.min.x + 2.0, rect.max.y - theme.spacing.xs),
-        );
-        ui.painter().rect_filled(
-            accent,
-            egui::CornerRadius::same(1),
-            theme.colors.primary_family.base,
-        );
-    }
 }
 
 fn paint_table_vertical_rule(ui: &Ui, theme: &CastTheme, x: f32, rect: egui::Rect) {
@@ -478,17 +443,14 @@ fn selectable_row_colors(
     pressed: bool,
 ) -> IntentColors {
     if selected {
-        let alpha = if pressed {
-            0.12
-        } else if hovered {
-            0.09
-        } else {
-            0.05
-        };
         IntentColors {
-            fill: mix_with_transparent(theme.colors.primary_family.base, alpha),
-            fg: theme.colors.primary_family.base,
-            border: mix_with_transparent(theme.colors.primary_family.base, 0.30),
+            fill: if pressed {
+                theme.colors.surface_raised
+            } else {
+                theme.colors.surface_muted
+            },
+            fg: theme.colors.text,
+            border: Color32::TRANSPARENT,
         }
     } else if pressed {
         IntentColors {
@@ -611,15 +573,13 @@ mod tests {
     }
 
     #[test]
-    fn selected_row_uses_transparent_primary_tints() {
+    fn selected_row_uses_muted_background_without_text_override() {
         let theme = CastTheme::light();
         let colors = selectable_row_colors(&theme, true, false, false);
-        let [_, _, _, fill_alpha] = colors.fill.to_srgba_unmultiplied();
-        let [_, _, _, border_alpha] = colors.border.to_srgba_unmultiplied();
 
-        assert_eq!(colors.fg, theme.colors.primary_family.base);
-        assert_eq!(fill_alpha, 13);
-        assert_eq!(border_alpha, 77);
+        assert_eq!(colors.fill, theme.colors.surface_muted);
+        assert_eq!(colors.fg, theme.colors.text);
+        assert_eq!(colors.border, Color32::TRANSPARENT);
     }
 
     #[test]

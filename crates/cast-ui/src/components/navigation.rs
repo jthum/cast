@@ -279,18 +279,6 @@ fn nav_list_item(ui: &mut Ui, label: &str, size: Size, selected: bool) -> Respon
             StrokeKind::Outside,
         );
 
-        if selected {
-            let accent = egui::Rect::from_min_max(
-                egui::pos2(rect.min.x, rect.min.y + theme.spacing.xs),
-                egui::pos2(rect.min.x + 2.0, rect.max.y - theme.spacing.xs),
-            );
-            ui.painter().rect_filled(
-                accent,
-                egui::CornerRadius::same(1),
-                theme.colors.primary_family.base,
-            );
-        }
-
         let text_pos = egui::pos2(
             rect.min.x + metrics.padding.x,
             rect.center().y - galley.size().y / 2.0,

@@ -16,7 +16,7 @@ pub struct TextInput<'a> {
     status_text: Option<String>,
     status_intent: Option<Intent>,
     width: Option<f32>,
-    size: Size,
+    size: Option<Size>,
     variant: Variant,
     enabled: bool,
 }
@@ -32,7 +32,7 @@ impl<'a> TextInput<'a> {
             status_text: None,
             status_intent: None,
             width: None,
-            size: Size::Medium,
+            size: None,
             variant: Variant::Solid,
             enabled: true,
         }
@@ -86,7 +86,7 @@ impl<'a> TextInput<'a> {
 
     #[must_use]
     pub fn size(mut self, size: Size) -> Self {
-        self.size = size;
+        self.size = Some(size);
         self
     }
 
@@ -112,7 +112,11 @@ impl<'a> TextInput<'a> {
 impl Widget for TextInput<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
-        let metrics = resolve_control_metrics(&theme, self.size);
+        let size = self
+            .size
+            .or_else(|| crate::style::contextual_control_size(ui))
+            .unwrap_or(Size::Medium);
+        let metrics = resolve_control_metrics(&theme, size);
         let mut font = theme.typography.body.clone();
         font.size = metrics.text_size;
         let label = self.label;
@@ -377,6 +381,14 @@ mod tests {
             search.inner.help_text.as_deref(),
             Some("Filters the current view")
         );
+    }
+
+    #[test]
+    fn text_input_size_is_optional_for_contextual_sizing() {
+        let mut value = String::new();
+        let input = TextInput::new(&mut value);
+
+        assert_eq!(input.size, None);
     }
 
     #[test]
