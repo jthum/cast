@@ -256,6 +256,7 @@ fn paint_data_table_surface(
             .layout(*ui.layout())
             .id_salt(table_id.with("body")),
     );
+    body_ui.shrink_clip_rect(body_rect);
 
     if sticky_body_height.is_some() && rows_height > body_height {
         let scroll_response = egui::ScrollArea::vertical()
@@ -339,6 +340,7 @@ fn paint_table_rows_viewport(
             egui::vec2(width, row_height),
         );
         let selected = *selected_index == index;
+        let last_row = index + 1 == rows.len();
         let mut response = ui.interact(
             row_rect,
             ui.make_persistent_id(("cast_data_table_row", index)),
@@ -353,6 +355,7 @@ fn paint_table_rows_viewport(
                 column_widths,
                 row,
                 selected,
+                last_row,
                 size,
                 right_aligned_columns,
                 response.hovered(),
@@ -448,8 +451,9 @@ fn paint_table_frame(ui: &Ui, theme: &CastTheme, rect: egui::Rect, header_height
     );
 
     let header_rect = egui::Rect::from_min_size(rect.min, egui::vec2(rect.width(), header_height));
+    let header_fill_rect = header_rect.expand2(egui::vec2(0.5, 0.0));
     ui.painter().rect_filled(
-        header_rect,
+        header_fill_rect,
         egui::CornerRadius {
             nw: theme.radius.lg.round() as u8,
             ne: theme.radius.lg.round() as u8,
@@ -528,6 +532,7 @@ fn paint_table_row(
     column_widths: &[f32],
     cells: &[String],
     selected: bool,
+    last_row: bool,
     size: Size,
     right_aligned_columns: &[usize],
     hovered: bool,
@@ -535,7 +540,7 @@ fn paint_table_row(
 ) {
     let colors = selectable_row_colors(theme, selected, hovered, pressed);
 
-    paint_table_row_background(ui, rect, colors);
+    paint_table_row_background(ui, theme, rect, colors, last_row);
     let mut x = rect.min.x;
     for (index, cell) in cells.iter().enumerate() {
         let column_width = column_widths.get(index).copied().unwrap_or(0.0);
@@ -561,13 +566,15 @@ fn paint_table_row(
         x += column_width;
     }
 
-    ui.painter().line_segment(
-        [
-            egui::pos2(rect.min.x, rect.max.y),
-            egui::pos2(rect.max.x, rect.max.y),
-        ],
-        egui::Stroke::new(theme.stroke.sm, theme.colors.border),
-    );
+    if !last_row {
+        ui.painter().line_segment(
+            [
+                egui::pos2(rect.min.x, rect.max.y),
+                egui::pos2(rect.max.x, rect.max.y),
+            ],
+            egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+        );
+    }
 }
 
 fn paint_selectable_row_background(
@@ -585,9 +592,24 @@ fn paint_selectable_row_background(
     );
 }
 
-fn paint_table_row_background(ui: &Ui, rect: egui::Rect, colors: IntentColors) {
-    ui.painter()
-        .rect_filled(rect, egui::CornerRadius::ZERO, colors.fill);
+fn paint_table_row_background(
+    ui: &Ui,
+    theme: &CastTheme,
+    rect: egui::Rect,
+    colors: IntentColors,
+    last_row: bool,
+) {
+    let radius = if last_row {
+        egui::CornerRadius {
+            nw: 0,
+            ne: 0,
+            sw: theme.radius.lg.round() as u8,
+            se: theme.radius.lg.round() as u8,
+        }
+    } else {
+        egui::CornerRadius::ZERO
+    };
+    ui.painter().rect_filled(rect, radius, colors.fill);
 }
 
 fn paint_table_vertical_rule(ui: &Ui, theme: &CastTheme, x: f32, rect: egui::Rect) {
