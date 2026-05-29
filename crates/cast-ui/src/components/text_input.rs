@@ -128,10 +128,7 @@ impl Widget for TextInput<'_> {
         let mut edit = TextEdit::singleline(self.text)
             .frame(input_frame(&theme, self.variant))
             .font(font.clone())
-            .min_size(egui::vec2(
-                0.0,
-                metrics.min_height.max(theme.components.input.min_height),
-            ))
+            .min_size(egui::vec2(0.0, input_min_height(&theme, size, metrics)))
             .text_color(if enabled {
                 theme.components.input.fg
             } else {
@@ -220,14 +217,14 @@ fn input_interaction_halo(
     focused: bool,
     hovered: bool,
 ) -> Option<egui::Stroke> {
-    let color = status.map_or(theme.colors.border_strong, |status| {
+    let color = status.map_or(theme.colors.primary_family.base, |status| {
         status_color(theme, status)
     });
 
     if focused {
-        Some(egui::Stroke::new(3.0, mix_with_transparent(color, 0.50)))
+        Some(egui::Stroke::new(3.0, mix_with_transparent(color, 0.14)))
     } else if hovered || status.is_some() {
-        Some(egui::Stroke::new(2.0, mix_with_transparent(color, 0.30)))
+        Some(egui::Stroke::new(2.0, mix_with_transparent(color, 0.09)))
     } else {
         None
     }
@@ -250,6 +247,14 @@ fn input_interaction_border(
 
 fn input_border_width(theme: &CastTheme) -> f32 {
     theme.components.input.border_width.max(1.0)
+}
+
+fn input_min_height(theme: &CastTheme, size: Size, metrics: crate::style::ControlMetrics) -> f32 {
+    if size == Size::Small {
+        (metrics.min_height - theme.components.input.padding_y * 2.0).max(metrics.text_size)
+    } else {
+        metrics.min_height.max(theme.components.input.min_height)
+    }
 }
 
 fn status_color(theme: &CastTheme, intent: Intent) -> Color32 {
@@ -392,6 +397,17 @@ mod tests {
     }
 
     #[test]
+    fn small_text_inputs_match_small_control_height() {
+        let theme = CastTheme::light();
+        let metrics = resolve_control_metrics(&theme, Size::Small);
+
+        assert_eq!(
+            input_min_height(&theme, Size::Small, metrics),
+            (metrics.min_height - theme.components.input.padding_y * 2.0).max(metrics.text_size)
+        );
+    }
+
+    #[test]
     fn input_hover_and_focus_use_muted_chrome() {
         let theme = CastTheme::light();
         let hover = input_interaction_border(&theme, false, true).unwrap();
@@ -404,15 +420,23 @@ mod tests {
     }
 
     #[test]
-    fn input_halo_uses_subtle_muted_tints() {
+    fn input_halo_uses_subtle_primary_tints() {
         let theme = CastTheme::light();
         let hover = input_interaction_halo(&theme, None, false, true).unwrap();
         let focus = input_interaction_halo(&theme, None, true, false).unwrap();
         let [_, _, _, hover_alpha] = hover.color.to_srgba_unmultiplied();
         let [_, _, _, focus_alpha] = focus.color.to_srgba_unmultiplied();
 
-        assert_eq!(hover_alpha, 77);
-        assert_eq!(focus_alpha, 128);
+        assert_eq!(
+            hover.color,
+            mix_with_transparent(theme.colors.primary_family.base, 0.09)
+        );
+        assert_eq!(
+            focus.color,
+            mix_with_transparent(theme.colors.primary_family.base, 0.14)
+        );
+        assert_eq!(hover_alpha, 23);
+        assert_eq!(focus_alpha, 36);
     }
 
     #[test]
@@ -426,7 +450,7 @@ mod tests {
         let [halo_r, _, _, halo_alpha] = halo.color.to_srgba_unmultiplied();
 
         assert!((i16::from(halo_r) - i16::from(theme.colors.danger_family.base.r())).abs() <= 3);
-        assert_eq!(halo_alpha, 77);
+        assert_eq!(halo_alpha, 23);
         assert_eq!(border.width, input_border_width(&theme));
     }
 }

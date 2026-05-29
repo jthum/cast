@@ -103,7 +103,7 @@ impl Widget for ListRow {
 }
 
 #[derive(Debug)]
-pub struct DataTable<'a> {
+pub struct TextTable<'a> {
     selected: &'a mut usize,
     columns: Vec<String>,
     rows: Vec<Vec<String>>,
@@ -114,7 +114,9 @@ pub struct DataTable<'a> {
     min_column_width: f32,
 }
 
-impl<'a> DataTable<'a> {
+impl<'a> TextTable<'a> {
+    pub const NO_SELECTION: usize = usize::MAX;
+
     #[must_use]
     pub fn new<IC, C, IR, R, Cell>(selected: &'a mut usize, columns: IC, rows: IR) -> Self
     where
@@ -176,7 +178,7 @@ impl<'a> DataTable<'a> {
     }
 }
 
-impl Widget for DataTable<'_> {
+impl Widget for TextTable<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
         let viewport_width = ui.available_width().max(240.0);
@@ -196,7 +198,7 @@ impl Widget for DataTable<'_> {
             .max_width(viewport_width)
             .auto_shrink([false, false])
             .show_viewport(ui, |ui, _viewport| {
-                paint_data_table_surface(
+                paint_text_table_surface(
                     ui,
                     &theme,
                     table_id,
@@ -221,7 +223,7 @@ impl Widget for DataTable<'_> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn paint_data_table_surface(
+fn paint_text_table_surface(
     ui: &mut Ui,
     theme: &CastTheme,
     table_id: egui::Id,
@@ -319,7 +321,7 @@ fn paint_table_rows_viewport(
     let (_, content_rect) = ui.allocate_space(egui::vec2(width, rows_height));
     let content_response = ui.interact(
         content_rect,
-        ui.make_persistent_id("cast_data_table_rows"),
+        ui.make_persistent_id("cast_text_table_rows"),
         Sense::hover(),
     );
     let mut combined = content_response;
@@ -341,10 +343,10 @@ fn paint_table_rows_viewport(
         );
         let selected = *selected_index == index;
         let last_row = index + 1 == rows.len();
-        let mut response = ui.interact(
+        let response = ui.interact(
             row_rect,
-            ui.make_persistent_id(("cast_data_table_row", index)),
-            Sense::click(),
+            ui.make_persistent_id(("cast_text_table_row", index)),
+            Sense::hover(),
         );
 
         if ui.is_rect_visible(row_rect) {
@@ -363,10 +365,6 @@ fn paint_table_rows_viewport(
             );
         }
 
-        if response.clicked() && *selected_index != index {
-            *selected_index = index;
-            response.mark_changed();
-        }
         combined = combined.union(response);
     }
 
@@ -483,7 +481,7 @@ fn paint_table_header(
 
         let galley = ui.painter().layout_job(row_layout_job(
             column.clone(),
-            theme.typography.small.clone(),
+            table_header_font(theme),
             theme.typography.letter_spacing,
         ));
         ui.painter().galley(
@@ -511,7 +509,7 @@ fn paint_table_outline(ui: &Ui, theme: &CastTheme, rect: egui::Rect) {
     ui.painter().rect_stroke(
         rect,
         egui::CornerRadius::same(theme.radius.lg.round() as u8),
-        egui::Stroke::new(theme.stroke.sm, table_rule_color(theme)),
+        egui::Stroke::new(theme.stroke.md, table_rule_color(theme)),
         StrokeKind::Outside,
     );
 }
@@ -556,10 +554,6 @@ fn paint_table_row(
             with_alpha(theme.colors.text, 230),
         );
         x += column_width;
-    }
-
-    if hovered || pressed || selected {
-        paint_table_horizontal_rule(ui, theme, rect.min.y, rect);
     }
 
     if !last_row {
@@ -631,8 +625,17 @@ fn table_header_text_color(theme: &CastTheme) -> Color32 {
     }
 }
 
+fn table_header_font(theme: &CastTheme) -> egui::FontId {
+    let mut font = theme.typography.strong.clone();
+    font.size = theme.typography.small.size;
+    font
+}
+
 fn table_rule_color(theme: &CastTheme) -> Color32 {
-    mix_with_transparent(theme.colors.primary_family.base, 0.14)
+    match theme.mode {
+        ThemeMode::Light => mix_with_transparent(theme.colors.primary_family.base, 0.14),
+        ThemeMode::Dark => mix_with_transparent(theme.colors.text_muted, 0.30),
+    }
 }
 
 fn table_hover_fill(theme: &CastTheme, pressed: bool) -> Color32 {
@@ -650,7 +653,7 @@ fn table_row_colors(
 ) -> IntentColors {
     if selected {
         IntentColors {
-            fill: mix_with_transparent(theme.colors.primary_family.base, 0.05),
+            fill: table_hover_fill(theme, false),
             fg: theme.colors.text,
             border: Color32::TRANSPARENT,
         }
@@ -836,7 +839,22 @@ mod tests {
             table_rule_color(&theme),
             mix_with_transparent(theme.colors.primary_family.base, 0.14)
         );
+        assert_eq!(
+            table_header_font(&theme).family,
+            theme.typography.strong.family
+        );
+        assert_eq!(table_header_font(&theme).size, theme.typography.small.size);
         assert_ne!(table_rule_color(&theme), theme.colors.border);
+    }
+
+    #[test]
+    fn dark_table_rules_are_more_visible() {
+        let theme = CastTheme::dark();
+
+        assert_eq!(
+            table_rule_color(&theme),
+            mix_with_transparent(theme.colors.text_muted, 0.30)
+        );
     }
 
     #[test]
@@ -858,14 +876,7 @@ mod tests {
         let theme = CastTheme::light();
         let colors = table_row_colors(&theme, true, true, false);
 
-        assert_eq!(
-            colors.fill,
-            mix_with_transparent(theme.colors.primary_family.base, 0.05)
-        );
-        assert_ne!(
-            colors.fill,
-            mix_with_transparent(theme.colors.primary_family.base, 0.025)
-        );
+        assert_eq!(colors.fill, table_hover_fill(&theme, false));
         assert_eq!(colors.fg, theme.colors.text);
     }
 
@@ -902,9 +913,9 @@ mod tests {
     }
 
     #[test]
-    fn data_table_collects_columns_and_rows() {
+    fn text_table_collects_columns_and_rows() {
         let mut selected = 0;
-        let table = DataTable::new(
+        let table = TextTable::new(
             &mut selected,
             ["Name", "State"],
             [["Build", "Done"], ["Review", "Pending"]],
@@ -915,9 +926,9 @@ mod tests {
     }
 
     #[test]
-    fn data_table_stores_layout_options() {
+    fn text_table_stores_layout_options() {
         let mut selected = 0;
-        let table = DataTable::new(&mut selected, ["Name", "Value"], [["Cast", "42"]])
+        let table = TextTable::new(&mut selected, ["Name", "Value"], [["Cast", "42"]])
             .column_weights([2.0, 1.0])
             .right_aligned_columns([1])
             .size(Size::Small)
@@ -929,5 +940,13 @@ mod tests {
         assert_eq!(table.size, Size::Small);
         assert_eq!(table.sticky_body_height, Some(320.0));
         assert_eq!(table.min_column_width, 128.0);
+    }
+
+    #[test]
+    fn text_table_can_represent_no_external_selection() {
+        let mut selected = TextTable::NO_SELECTION;
+        let table = TextTable::new(&mut selected, ["Name"], [["Cast"]]);
+
+        assert_eq!(*table.selected, TextTable::NO_SELECTION);
     }
 }

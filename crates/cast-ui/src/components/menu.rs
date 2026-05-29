@@ -140,6 +140,7 @@ fn dropdown_trigger(ui: &mut Ui, label: &str, width: f32, size: Size, enabled: b
     if ui.is_rect_visible(rect) {
         let hovered = enabled && response.hovered();
         let pressed = enabled && response.is_pointer_button_down_on();
+        let active = enabled && (pressed || response.has_focus());
         let fill = if pressed {
             theme.colors.surface_raised
         } else if hovered {
@@ -152,12 +153,19 @@ fn dropdown_trigger(ui: &mut Ui, label: &str, width: f32, size: Size, enabled: b
         } else {
             theme.colors.text_subtle
         };
-        let border = if enabled {
-            mix_with_transparent(theme.colors.text, 0.30)
-        } else {
-            theme.colors.border
-        };
+        let border = dropdown_border_color(&theme, enabled);
         let radius = egui::CornerRadius::same(theme.components.button.radius.round() as u8);
+
+        if active {
+            ui.painter().rect_filled(
+                rect.expand(if pressed { 5.0 } else { 4.0 }),
+                radius,
+                mix_with_transparent(
+                    theme.colors.primary_family.base,
+                    if pressed { 0.14 } else { 0.09 },
+                ),
+            );
+        }
 
         ui.painter().rect(
             rect,
@@ -178,6 +186,14 @@ fn dropdown_trigger(ui: &mut Ui, label: &str, width: f32, size: Size, enabled: b
     }
 
     response
+}
+
+fn dropdown_border_color(theme: &CastTheme, enabled: bool) -> Color32 {
+    if enabled {
+        theme.colors.border
+    } else {
+        mix_with_transparent(theme.colors.text_subtle, 0.18)
+    }
 }
 
 fn paint_dropdown_chevron(ui: &Ui, theme: &CastTheme, rect: egui::Rect, color: Color32) {
@@ -438,5 +454,12 @@ mod tests {
             dropdown_icon_space(&theme),
             theme.spacing.lg + theme.spacing.sm
         );
+    }
+
+    #[test]
+    fn dropdown_border_uses_muted_theme_border() {
+        let theme = CastTheme::light();
+
+        assert_eq!(dropdown_border_color(&theme, true), theme.colors.border);
     }
 }

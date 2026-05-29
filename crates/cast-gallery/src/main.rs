@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use cast::{
-    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, DataTable, Dropdown,
-    FilterBar, Intent, Label, Link, ListRow, MenuItem, Notice, Panel as CastPanel, Radio,
-    SearchInput, SegmentedControl, SemanticColorTokens, Separator, Size, Slider, Switch, Tabs,
-    TextInput, ThemeMode, ThemeSeed, TypographyTokens, Variant,
+    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dropdown, Intent, Label,
+    Link, ListRow, MenuItem, Notice, Panel as CastPanel, Radio, SearchInput, SegmentedControl,
+    SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput, TextTable, ThemeMode,
+    ThemeSeed, TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -75,7 +75,7 @@ impl CastGallery {
             form_density: 1,
             menu_choice: 0,
             list_selection: 0,
-            table_selection: 0,
+            table_selection: TextTable::NO_SELECTION,
             lead_date_filter: 1,
             lead_user_filter: 0,
             lead_status_filter: 0,
@@ -128,6 +128,7 @@ impl eframe::App for CastGallery {
                     .fill(self.theme.colors.surface)
                     .inner_margin(egui::Margin::symmetric(28, 18))
                     .show(ui, |ui| {
+                        ui.set_min_width(ui.available_width());
                         theme_changed |= show_shell_top_bar(
                             ui,
                             &ctx,
@@ -194,45 +195,38 @@ impl eframe::App for CastGallery {
 fn show_shell_top_bar(
     ui: &mut egui::Ui,
     ctx: &egui::Context,
-    theme: &CastTheme,
+    _theme: &CastTheme,
     seed: &mut ThemeSeed,
     zoom: &mut f32,
 ) -> bool {
     let mut changed = false;
-    ui.horizontal(|ui| {
-        ui.add(
-            Button::new("All teams")
-                .variant(Variant::Subtle)
-                .size(Size::Small),
-        );
-        ui.label(RichText::new(">").color(theme.colors.text_subtle));
+    ui.horizontal_wrapped(|ui| {
         ui.label("Cast Gallery");
+        ui.separator();
 
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add(Badge::new("Gallery").intent(Intent::Info));
-            let mut mode_index = match seed.mode {
-                ThemeMode::Light => 0,
-                ThemeMode::Dark => 1,
+        let mut mode_index = match seed.mode {
+            ThemeMode::Light => 0,
+            ThemeMode::Dark => 1,
+        };
+        let previous_mode_index = mode_index;
+        ui.add(SegmentedControl::new(&mut mode_index, ["Light", "Dark"]).size(Size::Small));
+        if mode_index != previous_mode_index {
+            seed.mode = if mode_index == 0 {
+                ThemeMode::Light
+            } else {
+                ThemeMode::Dark
             };
-            let previous_mode_index = mode_index;
-            ui.add(SegmentedControl::new(&mut mode_index, ["Light", "Dark"]).size(Size::Small));
-            if mode_index != previous_mode_index {
-                seed.mode = if mode_index == 0 {
-                    ThemeMode::Light
-                } else {
-                    ThemeMode::Dark
-                };
-                changed = true;
-            }
-            ui.add_space(10.0);
-            ui.label("Zoom");
-            if ui
-                .add(Slider::new(zoom, 0.9..=1.35).show_value(false).width(118.0))
-                .changed()
-            {
-                ctx.set_zoom_factor(*zoom);
-            }
-        });
+            changed = true;
+        }
+
+        ui.separator();
+        ui.label("Zoom");
+        if ui
+            .add(Slider::new(zoom, 0.9..=1.35).show_value(false).width(118.0))
+            .changed()
+        {
+            ctx.set_zoom_factor(*zoom);
+        }
     });
     changed
 }
@@ -1606,24 +1600,18 @@ fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize) {
 #[allow(clippy::too_many_arguments)]
 fn show_lists_and_tables(
     ui: &mut egui::Ui,
-    lead_search: &mut String,
+    _lead_search: &mut String,
     list_selection: &mut usize,
     table_selection: &mut usize,
-    date_filter: &mut usize,
-    user_filter: &mut usize,
-    status_filter: &mut usize,
-    payment_filter: &mut usize,
+    _date_filter: &mut usize,
+    _user_filter: &mut usize,
+    _status_filter: &mut usize,
+    _payment_filter: &mut usize,
     rows_per_page: &mut usize,
     page: &mut usize,
     exported_count: &mut Option<usize>,
 ) {
-    let filtered_leads = filtered_leads(
-        lead_search,
-        *date_filter,
-        *user_filter,
-        *status_filter,
-        *payment_filter,
-    );
+    let filtered_leads = LEADS.iter().collect::<Vec<_>>();
     let filtered_count = filtered_leads.len();
     let row_limit = rows_per_page_limit(*rows_per_page);
     let page_count = filtered_count.div_ceil(row_limit).max(1);
@@ -1639,18 +1627,11 @@ fn show_lists_and_tables(
         .collect::<Vec<_>>();
     let visible_count = visible_rows.len();
 
-    if *table_selection >= visible_count && visible_count > 0 {
-        *table_selection = 0;
-    }
-    let mut filters_changed = false;
-
     Card::new().show(ui, |ui| {
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.heading(format!("Leads [{filtered_count}]"));
-                ui.label(
-                    "Filtered lead records with working search, filters, and export feedback.",
-                );
+                ui.label("Lead records rendered directly by the Cast table component.");
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                 if ui
@@ -1666,42 +1647,11 @@ fn show_lists_and_tables(
                 }
             });
         });
-        ui.add_space(10.0);
-        FilterBar::new().show(ui, |ui| {
-            filters_changed |= ui
-                .add(
-                    Dropdown::new(date_filter, ["All time", "Last 7 days", "Last 24 hours"])
-                        .width(150.0),
-                )
-                .changed();
-            filters_changed |= ui
-                .add(Dropdown::new(user_filter, LEAD_USER_FILTERS).width(150.0))
-                .changed();
-            filters_changed |= ui
-                .add(Dropdown::new(status_filter, LEAD_STATUS_FILTERS).width(158.0))
-                .changed();
-            filters_changed |= ui
-                .add(Dropdown::new(payment_filter, LEAD_PAYMENT_FILTERS).width(150.0))
-                .changed();
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                filters_changed |= ui
-                    .add(
-                        SearchInput::new(lead_search)
-                            .hint_text("Search leads by name, email...")
-                            .width(260.0),
-                    )
-                    .changed();
-            });
-        });
-        if filters_changed {
-            *page = 0;
-            *exported_count = None;
-        }
         if let Some(count) = *exported_count {
             ui.add_space(8.0);
             ui.add(
                 Notice::new(format!("{count} leads exported"))
-                    .body("Export feedback is wired to the currently filtered table rows.")
+                    .body("Export feedback is wired to the current table rows.")
                     .intent(Intent::Success),
             );
         }
@@ -1713,7 +1663,7 @@ fn show_lists_and_tables(
             );
         } else {
             ui.add(
-                DataTable::new(
+                TextTable::new(
                     table_selection,
                     [
                         "Lead name",
@@ -1742,6 +1692,7 @@ fn show_lists_and_tables(
             );
             if rows_response.changed() {
                 *page = 0;
+                *table_selection = TextTable::NO_SELECTION;
             }
             let visible_start = if visible_count == 0 {
                 0
@@ -1765,7 +1716,7 @@ fn show_lists_and_tables(
                     .clicked()
                 {
                     *page += 1;
-                    *table_selection = 0;
+                    *table_selection = TextTable::NO_SELECTION;
                 }
                 ui.add(Badge::new(format!("Page {} of {page_count}", *page + 1)));
                 if ui
@@ -1778,7 +1729,7 @@ fn show_lists_and_tables(
                     .clicked()
                 {
                     *page -= 1;
-                    *table_selection = 0;
+                    *table_selection = TextTable::NO_SELECTION;
                 }
             });
         });
@@ -1809,6 +1760,7 @@ fn show_lists_and_tables(
     });
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 struct LeadRecord {
     name: &'static str,
@@ -1822,6 +1774,7 @@ struct LeadRecord {
     days_ago: u8,
 }
 
+#[cfg(test)]
 const LEAD_USER_FILTERS: [&str; 6] = [
     "All users",
     "Sarah P.",
@@ -1830,6 +1783,7 @@ const LEAD_USER_FILTERS: [&str; 6] = [
     "John S.",
     "Ali M.",
 ];
+#[cfg(test)]
 const LEAD_STATUS_FILTERS: [&str; 7] = [
     "Any status",
     "Won",
@@ -1839,6 +1793,7 @@ const LEAD_STATUS_FILTERS: [&str; 7] = [
     "Lost",
     "No show",
 ];
+#[cfg(test)]
 const LEAD_PAYMENT_FILTERS: [&str; 4] = ["All payments", "Paid", "Pending", "No value"];
 
 const LEADS: [LeadRecord; 24] = [
@@ -2108,6 +2063,7 @@ const LEADS: [LeadRecord; 24] = [
     },
 ];
 
+#[cfg(test)]
 fn filtered_leads(
     query: &str,
     date_filter: usize,
@@ -2139,6 +2095,7 @@ fn filtered_leads(
         .collect()
 }
 
+#[cfg(test)]
 fn lead_matches_date_filter(lead: &LeadRecord, filter: usize) -> bool {
     match filter {
         1 => lead.days_ago <= 7,
@@ -2147,6 +2104,7 @@ fn lead_matches_date_filter(lead: &LeadRecord, filter: usize) -> bool {
     }
 }
 
+#[cfg(test)]
 fn lead_matches_choice<const N: usize>(value: &str, labels: [&str; N], index: usize) -> bool {
     index == 0 || labels.get(index).is_some_and(|label| *label == value)
 }
