@@ -1,8 +1,8 @@
-use egui::{Align, InnerResponse, Layout, RichText, Ui};
+use egui::{Align, InnerResponse, Layout, Response, RichText, Ui, Widget};
 
 use crate::{
     foundation::Intent,
-    style::alert_intent_colors,
+    style::{alert_frame, alert_intent_colors},
     theme::{CastTheme, theme_for_ui},
 };
 
@@ -127,6 +127,121 @@ impl FormActions {
 impl Default for FormActions {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValidationIssue {
+    field: Option<String>,
+    message: String,
+}
+
+impl ValidationIssue {
+    #[must_use]
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            field: None,
+            message: message.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn field(mut self, field: impl Into<String>) -> Self {
+        self.field = Some(field.into());
+        self
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidationSummary {
+    title: String,
+    issues: Vec<ValidationIssue>,
+    intent: Intent,
+    width: Option<f32>,
+}
+
+impl ValidationSummary {
+    #[must_use]
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            issues: Vec::new(),
+            intent: Intent::Danger,
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn issue(mut self, issue: ValidationIssue) -> Self {
+        self.issues.push(issue);
+        self
+    }
+
+    #[must_use]
+    pub fn issues(mut self, issues: impl IntoIterator<Item = ValidationIssue>) -> Self {
+        self.issues.extend(issues);
+        self
+    }
+
+    #[must_use]
+    pub fn intent(mut self, intent: Intent) -> Self {
+        self.intent = intent;
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width.max(180.0));
+        self
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+impl Widget for ValidationSummary {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let colors = alert_intent_colors(&theme, self.intent);
+
+        alert_frame(&theme, colors.border)
+            .fill(colors.fill)
+            .show(ui, |ui| {
+                if let Some(width) = self.width {
+                    ui.set_min_width(width);
+                    ui.set_max_width(width);
+                }
+
+                ui.spacing_mut().item_spacing.y = theme.spacing.xs;
+                ui.label(
+                    RichText::new(self.title)
+                        .font(theme.typography.strong.clone())
+                        .color(colors.fg)
+                        .extra_letter_spacing(theme.typography.letter_spacing),
+                );
+
+                for issue in self.issues {
+                    ui.horizontal_top(|ui| {
+                        ui.spacing_mut().item_spacing.x = theme.spacing.sm;
+                        ui.label(
+                            RichText::new("•")
+                                .font(theme.typography.small.clone())
+                                .color(colors.fg)
+                                .extra_letter_spacing(theme.typography.letter_spacing),
+                        );
+                        let text = validation_issue_text(&issue);
+                        ui.label(
+                            RichText::new(text)
+                                .font(theme.typography.small.clone())
+                                .color(theme.colors.text_muted)
+                                .extra_letter_spacing(theme.typography.letter_spacing),
+                        );
+                    });
+                }
+            })
+            .response
     }
 }
 
@@ -255,6 +370,13 @@ fn form_message_color(theme: &CastTheme, intent: Intent) -> egui::Color32 {
     }
 }
 
+fn validation_issue_text(issue: &ValidationIssue) -> String {
+    issue.field.as_ref().map_or_else(
+        || issue.message.clone(),
+        |field| format!("{field}: {}", issue.message),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,6 +413,31 @@ mod tests {
 
         assert!(actions.separator);
         assert!(actions.align_end);
+    }
+
+    #[test]
+    fn validation_summary_collects_issues() {
+        let summary = ValidationSummary::new("Review fields")
+            .issue(ValidationIssue::new("Required").field("Handle"))
+            .issues([ValidationIssue::new("Choose a preset")])
+            .intent(Intent::Warning)
+            .width(80.0);
+
+        assert_eq!(summary.issues.len(), 2);
+        assert_eq!(summary.intent, Intent::Warning);
+        assert_eq!(summary.width, Some(180.0));
+        assert!(!summary.is_empty());
+    }
+
+    #[test]
+    fn validation_issue_text_includes_field_when_present() {
+        let issue = ValidationIssue::new("Required").field("Handle");
+
+        assert_eq!(validation_issue_text(&issue), "Handle: Required");
+        assert_eq!(
+            validation_issue_text(&ValidationIssue::new("Choose a preset")),
+            "Choose a preset"
+        );
     }
 
     #[test]

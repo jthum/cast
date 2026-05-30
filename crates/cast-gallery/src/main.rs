@@ -17,7 +17,8 @@ use cast::{
     FormSection, Intent, Label, Link, Loader, LoaderStyle, MenuItem, Notice, Panel as CastPanel,
     Popover, ProgressBar, RadioGroup, SearchInput, SegmentedControl, Select, SemanticColorTokens,
     Separator, Sheet, Size, Skeleton, Slider, Switch, Tabs, TextArea, TextInput, ThemeMode,
-    ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip, TypographyTokens, Variant,
+    ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip, TypographyTokens, ValidationIssue,
+    ValidationSummary, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -2230,6 +2231,14 @@ fn show_forms(
         FormSection::new("Project details")
             .description("A grouped form area with related controls and field-level messages.")
             .show(ui, |ui| {
+                ui.add(
+                    ValidationSummary::new("Review before publishing")
+                        .issue(ValidationIssue::new("Required before publishing.").field("Handle"))
+                        .issue(ValidationIssue::new("Pick a preset for repeatable previews."))
+                        .intent(Intent::Warning)
+                        .width(520.0),
+                );
+                ui.add_space(8.0);
                 ui.horizontal_wrapped(|ui| {
                     FormField::new("Project name")
                         .description("Shown in window titles and saved presets.")
