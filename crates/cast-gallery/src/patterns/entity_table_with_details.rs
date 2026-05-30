@@ -118,7 +118,7 @@ pub fn show_entity_table_with_details(
         .right_aligned_columns([5])
         .selected_rows(selected_rows)
         .expanded_rows(expanded_rows)
-        .expanded_row_height(66.0)
+        .expanded_row_height(88.0)
         .sticky_header(320.0)
         .show_with_details(
             ui,
@@ -135,6 +135,7 @@ pub fn show_entity_table_with_details(
                     if ui
                         .add(
                             Button::new(if expanded { "-" } else { "+" })
+                                .intent(Intent::Neutral)
                                 .variant(Variant::Ghost)
                                 .size(Size::Small),
                         )
@@ -144,7 +145,12 @@ pub fn show_entity_table_with_details(
                             *expanded = !*expanded;
                         }
                     }
-                    ui.label(record.name);
+                    let name = if expanded {
+                        RichText::new(record.name).strong()
+                    } else {
+                        RichText::new(record.name)
+                    };
+                    ui.label(name);
                 });
                 row.cell(|ui| {
                     ui.add(
@@ -236,28 +242,50 @@ pub fn rows_per_page_limit(index: usize) -> usize {
 }
 
 fn entity_detail_content(ui: &mut egui::Ui, record: &EntityRecord) {
-    ui.horizontal_wrapped(|ui| {
+    let theme = cast::theme_for_ui(ui);
+    ui.vertical(|ui| {
         ui.label(
             RichText::new("Related information")
                 .strong()
-                .color(cast::theme_for_ui(ui).colors.text),
+                .color(theme.colors.text),
         );
+        ui.add_space(theme.spacing.xs);
+        ui.columns(3, |columns| {
+            detail_field(
+                &mut columns[0],
+                "Owner",
+                record.assigned_to,
+                Intent::Neutral,
+            );
+            detail_field(&mut columns[1], "Source", record.source, Intent::Info);
+            detail_field(
+                &mut columns[2],
+                "Payment",
+                record.payment,
+                payment_intent(record.payment),
+            );
+        });
+        ui.add_space(theme.spacing.xs);
+        ui.label(
+            RichText::new(format!(
+                "{} last interacted; current interest is {}.",
+                record.interacted, record.interest
+            ))
+            .color(theme.colors.text_muted),
+        );
+    });
+}
+
+fn detail_field(ui: &mut egui::Ui, label: &str, value: &str, intent: Intent) {
+    let theme = cast::theme_for_ui(ui);
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(label).small().color(theme.colors.text_muted));
         ui.add(
-            Badge::new(format!("Owner {}", record.assigned_to))
-                .intent(Intent::Neutral)
+            Badge::new(value)
+                .intent(intent)
                 .status_dot()
                 .size(Size::Small),
         );
-        ui.add(
-            Badge::new(record.source)
-                .intent(Intent::Info)
-                .status_dot()
-                .size(Size::Small),
-        );
-        ui.label(format!(
-            "{} last interacted; current interest is {}.",
-            record.interacted, record.interest
-        ));
     });
 }
 
@@ -279,6 +307,15 @@ fn entity_interest_intent(interest: &str) -> Intent {
     }
 }
 
+fn payment_intent(payment: &str) -> Intent {
+    match payment {
+        "Paid" => Intent::Success,
+        "Pending" => Intent::Warning,
+        "No value" => Intent::Neutral,
+        _ => Intent::Neutral,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,5 +325,14 @@ mod tests {
         assert_eq!(rows_per_page_limit(0), 5);
         assert_eq!(rows_per_page_limit(1), 10);
         assert_eq!(rows_per_page_limit(2), 25);
+    }
+
+    #[test]
+    fn entity_badge_intents_follow_record_semantics() {
+        assert_eq!(entity_status_intent("Won"), Intent::Success);
+        assert_eq!(entity_status_intent("No show"), Intent::Danger);
+        assert_eq!(entity_interest_intent("Broke"), Intent::Warning);
+        assert_eq!(payment_intent("Paid"), Intent::Success);
+        assert_eq!(payment_intent("Pending"), Intent::Warning);
     }
 }
