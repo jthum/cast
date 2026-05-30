@@ -73,19 +73,19 @@ impl Widget for ProgressBar {
 }
 
 #[derive(Clone, Debug)]
-pub struct Spinner {
+pub struct Loader {
     intent: Intent,
     size: Size,
-    style: SpinnerStyle,
+    style: LoaderStyle,
 }
 
-impl Spinner {
+impl Loader {
     #[must_use]
     pub fn new() -> Self {
         Self {
             intent: Intent::Primary,
             size: Size::Medium,
-            style: SpinnerStyle::Ticks,
+            style: LoaderStyle::Ticks,
         }
     }
 
@@ -102,43 +102,44 @@ impl Spinner {
     }
 
     #[must_use]
-    pub fn style(mut self, style: SpinnerStyle) -> Self {
+    pub fn style(mut self, style: LoaderStyle) -> Self {
         self.style = style;
         self
     }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum SpinnerStyle {
+pub enum LoaderStyle {
     #[default]
     Ticks,
     Signal,
-    PixelSnake,
     PixelEqualizer,
+    PulseGrid,
 }
 
-impl Default for Spinner {
+pub type Spinner = Loader;
+pub type SpinnerStyle = LoaderStyle;
+
+impl Default for Loader {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Widget for Spinner {
+impl Widget for Loader {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
-        let side = spinner_side(self.size);
+        let side = loader_side(self.size);
         let (rect, response) = ui.allocate_exact_size(Vec2::splat(side), Sense::hover());
 
         if ui.is_rect_visible(rect) {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(16));
             match self.style {
-                SpinnerStyle::Ticks => paint_tick_spinner(ui, &theme, rect, self.intent),
-                SpinnerStyle::Signal => paint_signal_spinner(ui, &theme, rect, self.intent),
-                SpinnerStyle::PixelSnake => paint_pixel_snake_spinner(ui, rect, self.intent),
-                SpinnerStyle::PixelEqualizer => {
-                    paint_pixel_equalizer_spinner(ui, rect, self.intent)
-                }
+                LoaderStyle::Ticks => paint_tick_loader(ui, &theme, rect, self.intent),
+                LoaderStyle::Signal => paint_signal_loader(ui, &theme, rect, self.intent),
+                LoaderStyle::PixelEqualizer => paint_pixel_equalizer_loader(ui, rect, self.intent),
+                LoaderStyle::PulseGrid => paint_pulse_grid_loader(ui, rect, self.intent),
             }
         }
 
@@ -146,7 +147,7 @@ impl Widget for Spinner {
     }
 }
 
-fn paint_tick_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
+fn paint_tick_loader(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
     let center = rect.center();
     let radius = rect.width().min(rect.height()) * 0.38;
     let accent = progress_accent(theme, intent);
@@ -169,7 +170,7 @@ fn paint_tick_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Inte
     }
 }
 
-fn paint_signal_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
+fn paint_signal_loader(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
     let center = rect.center();
     let side = rect.width().min(rect.height());
     let accent = progress_accent(theme, intent);
@@ -202,26 +203,7 @@ fn paint_signal_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: In
     }
 }
 
-fn paint_pixel_snake_spinner(ui: &Ui, rect: egui::Rect, intent: Intent) {
-    let theme = theme_for_ui(ui);
-    let accent = progress_accent(&theme, intent);
-    let time = ui.input(|input| input.time) as f32;
-    let cells = pixel_snake_cells(rect, 4);
-    let step = (time * 12.0).floor() as usize;
-    let tail_len = 5;
-
-    for tail_index in 0..tail_len {
-        let index = (step + cells.len() - tail_index) % cells.len();
-        let fade = 1.0 - tail_index as f32 / tail_len as f32;
-        ui.painter().rect_filled(
-            cells[index],
-            egui::CornerRadius::ZERO,
-            color_with_scaled_alpha(accent, 0.18 + fade * 0.76),
-        );
-    }
-}
-
-fn paint_pixel_equalizer_spinner(ui: &Ui, rect: egui::Rect, intent: Intent) {
+fn paint_pixel_equalizer_loader(ui: &Ui, rect: egui::Rect, intent: Intent) {
     let theme = theme_for_ui(ui);
     let accent = progress_accent(&theme, intent);
     let time = ui.input(|input| input.time) as f32;
@@ -256,31 +238,33 @@ fn paint_pixel_equalizer_spinner(ui: &Ui, rect: egui::Rect, intent: Intent) {
     }
 }
 
-fn pixel_snake_cells(rect: egui::Rect, grid: usize) -> Vec<egui::Rect> {
-    let grid = grid.max(3);
-    let outer_side = rect.width().min(rect.height()) * 0.64;
-    let pitch = outer_side / grid as f32;
-    let cell = pitch * 0.74;
+fn paint_pulse_grid_loader(ui: &Ui, rect: egui::Rect, intent: Intent) {
+    let theme = theme_for_ui(ui);
+    let accent = progress_accent(&theme, intent);
+    let time = ui.input(|input| input.time) as f32;
+    let grid = 3;
+    let side = rect.width().min(rect.height()) * 0.74;
+    let pitch = side / grid as f32;
+    let cell = pitch * 0.68;
     let origin = egui::pos2(
-        rect.center().x - outer_side / 2.0 + (pitch - cell) / 2.0,
-        rect.center().y - outer_side / 2.0 + (pitch - cell) / 2.0,
+        rect.center().x - side / 2.0 + (pitch - cell) / 2.0,
+        rect.center().y - side / 2.0 + (pitch - cell) / 2.0,
     );
-    let mut cells = Vec::with_capacity((grid - 1) * 4);
 
-    for column in 0..grid {
-        cells.push(pixel_cell(origin, pitch, cell, column, 0));
+    for row in 0..grid {
+        for column in 0..grid {
+            let diagonal = row + column;
+            let phase = time * 5.0 - diagonal as f32 * 0.52;
+            let wave = (phase.sin() + 1.0) * 0.5;
+            let center_bias = if row == 1 && column == 1 { 0.16 } else { 0.0 };
+            let alpha = 0.16 + center_bias + wave * 0.68;
+            ui.painter().rect_filled(
+                pixel_cell(origin, pitch, cell, column, row),
+                egui::CornerRadius::ZERO,
+                color_with_scaled_alpha(accent, alpha),
+            );
+        }
     }
-    for row in 1..grid {
-        cells.push(pixel_cell(origin, pitch, cell, grid - 1, row));
-    }
-    for column in (0..grid - 1).rev() {
-        cells.push(pixel_cell(origin, pitch, cell, column, grid - 1));
-    }
-    for row in (1..grid - 1).rev() {
-        cells.push(pixel_cell(origin, pitch, cell, 0, row));
-    }
-
-    cells
 }
 
 fn pixel_cell(origin: egui::Pos2, pitch: f32, size: f32, column: usize, row: usize) -> egui::Rect {
@@ -301,7 +285,7 @@ fn progress_height(size: Size) -> f32 {
     }
 }
 
-fn spinner_side(size: Size) -> f32 {
+fn loader_side(size: Size) -> f32 {
     match size {
         Size::Small => 16.0,
         Size::Medium => 20.0,
@@ -341,9 +325,9 @@ mod tests {
     }
 
     #[test]
-    fn spinner_sizes_scale() {
-        assert!(spinner_side(Size::Small) < spinner_side(Size::Medium));
-        assert!(spinner_side(Size::Medium) < spinner_side(Size::Large));
+    fn loader_sizes_scale() {
+        assert!(loader_side(Size::Small) < loader_side(Size::Medium));
+        assert!(loader_side(Size::Medium) < loader_side(Size::Large));
     }
 
     #[test]
@@ -362,28 +346,23 @@ mod tests {
     }
 
     #[test]
-    fn spinner_defaults_to_tick_style() {
-        assert_eq!(Spinner::new().style, SpinnerStyle::Ticks);
+    fn loader_defaults_to_tick_style() {
+        assert_eq!(Loader::new().style, LoaderStyle::Ticks);
     }
 
     #[test]
-    fn spinner_style_can_be_changed() {
+    fn loader_style_can_be_changed() {
         assert_eq!(
-            Spinner::new().style(SpinnerStyle::PixelEqualizer).style,
-            SpinnerStyle::PixelEqualizer
+            Loader::new().style(LoaderStyle::PulseGrid).style,
+            LoaderStyle::PulseGrid
         );
     }
 
     #[test]
-    fn pixel_snake_cells_trace_square_perimeter() {
-        let rect = egui::Rect::from_min_max(egui::pos2(2.0, 4.0), egui::pos2(12.0, 14.0));
-        let cells = pixel_snake_cells(rect, 3);
-
-        assert_eq!(cells.len(), 8);
-        assert_eq!(cells[2].min.x, cells[3].min.x);
-        assert_eq!(cells[4].min.y, cells[5].min.y);
-        assert!(cells[1].min.x > cells[0].max.x);
-        assert!(cells[3].min.y > cells[2].max.y);
-        assert!(cells[0].width() < rect.width() / 3.0);
+    fn spinner_aliases_remain_available() {
+        assert_eq!(
+            Spinner::new().style(SpinnerStyle::PixelEqualizer).style,
+            LoaderStyle::PixelEqualizer
+        );
     }
 }

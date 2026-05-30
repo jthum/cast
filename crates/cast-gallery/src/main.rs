@@ -13,9 +13,9 @@ use patterns::shell::{
 
 use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dialog, Dropdown,
-    EmptyState, Intent, Label, Link, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar,
-    Radio, SearchInput, SegmentedControl, SemanticColorTokens, Separator, Size, Skeleton, Slider,
-    Spinner, SpinnerStyle, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, Tooltip,
+    EmptyState, Intent, Label, Link, Loader, LoaderStyle, MenuItem, Notice, Panel as CastPanel,
+    Popover, ProgressBar, Radio, SearchInput, SegmentedControl, SemanticColorTokens, Separator,
+    Size, Skeleton, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, Tooltip,
     TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
@@ -1964,43 +1964,43 @@ fn show_text_and_feedback(ui: &mut egui::Ui) {
         ui.add(Separator::new().spacing(10.0));
         ui.heading("Loading");
         ui.horizontal_wrapped(|ui| {
-            ui.add(Spinner::new().size(Size::Small));
-            ui.add(Spinner::new().intent(Intent::Info));
-            ui.add(Spinner::new().intent(Intent::Success).size(Size::Large));
+            ui.add(Loader::new().size(Size::Small));
+            ui.add(Loader::new().intent(Intent::Info));
+            ui.add(Loader::new().intent(Intent::Success).size(Size::Large));
             ui.add(
-                Spinner::new()
+                Loader::new()
                     .intent(Intent::Primary)
-                    .style(SpinnerStyle::Signal)
+                    .style(LoaderStyle::Signal)
                     .size(Size::Large),
             );
             ui.add(
-                Spinner::new()
+                Loader::new()
                     .intent(Intent::Info)
-                    .style(SpinnerStyle::Signal),
+                    .style(LoaderStyle::Signal),
             );
             ui.add(
-                Spinner::new()
+                Loader::new()
                     .intent(Intent::Primary)
-                    .style(SpinnerStyle::PixelSnake)
+                    .style(LoaderStyle::PixelEqualizer)
                     .size(Size::Large),
             );
             ui.add(
-                Spinner::new()
+                Loader::new()
+                    .intent(Intent::Info)
+                    .style(LoaderStyle::PixelEqualizer),
+            );
+            ui.add(
+                Loader::new()
                     .intent(Intent::Success)
-                    .style(SpinnerStyle::PixelSnake),
-            );
-            ui.add(
-                Spinner::new()
-                    .intent(Intent::Primary)
-                    .style(SpinnerStyle::PixelEqualizer)
+                    .style(LoaderStyle::PulseGrid)
                     .size(Size::Large),
             );
             ui.add(
-                Spinner::new()
-                    .intent(Intent::Info)
-                    .style(SpinnerStyle::PixelEqualizer),
+                Loader::new()
+                    .intent(Intent::Primary)
+                    .style(LoaderStyle::PulseGrid),
             );
-            ui.label("Async work can use spinner and progress primitives together.");
+            ui.label("Async work can use loader and progress primitives together.");
         });
         ui.add_space(8.0);
         ui.add(ProgressBar::new(0.64).intent(Intent::Primary));
