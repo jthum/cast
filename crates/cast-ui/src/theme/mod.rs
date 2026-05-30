@@ -249,6 +249,7 @@ impl CastTheme {
 
         style.spacing.item_spacing = Vec2::splat(self.spacing.sm);
         style.spacing.button_padding = Vec2::new(self.controls.padding_x, self.controls.padding_y);
+        style.spacing.scroll.fade.strength = 0.0;
         style.animation_time = self.animation.normal_seconds();
         style.scroll_animation = if self.animation.should_animate() && self.scroll.animated {
             egui::style::ScrollAnimation::new(
@@ -1809,6 +1810,7 @@ mod tests {
 
         assert_eq!(style.spacing.item_spacing, Vec2::splat(theme.spacing.sm));
         assert_eq!(style.spacing.button_padding.x, theme.controls.padding_x);
+        assert_eq!(style.spacing.scroll.fade.strength, 0.0);
         assert_eq!(
             style.scroll_animation.points_per_second,
             theme.scroll.points_per_second
