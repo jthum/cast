@@ -13,10 +13,10 @@ use patterns::shell::{
 
 use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dialog, Dropdown,
-    EmptyState, Intent, Label, Link, Loader, LoaderStyle, MenuItem, Notice, Panel as CastPanel,
-    Popover, ProgressBar, Radio, SearchInput, SegmentedControl, SemanticColorTokens, Separator,
-    Size, Skeleton, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement,
-    ToastStack, Tooltip, TypographyTokens, Variant,
+    EmptyState, FormField, Intent, Label, Link, Loader, LoaderStyle, MenuItem, Notice,
+    Panel as CastPanel, Popover, ProgressBar, Radio, SearchInput, SegmentedControl,
+    SemanticColorTokens, Separator, Size, Skeleton, Slider, Switch, Tabs, TextInput, ThemeMode,
+    ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip, TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -2125,54 +2125,67 @@ fn show_forms(
     Card::new().show(ui, |ui| {
         ui.heading("Forms");
         ui.horizontal_wrapped(|ui| {
-            ui.add(
-                TextInput::new(name)
-                    .label("Project name")
-                    .hint_text("Project name")
-                    .help_text("Shown in window titles and saved presets.")
-                    .width(240.0),
-            );
-            ui.add(
-                SearchInput::new(search)
-                    .label("Search")
-                    .help_text("Filters the current gallery view.")
-                    .width(240.0),
-            );
+            FormField::new("Project name")
+                .description("Shown in window titles and saved presets.")
+                .required(true)
+                .width(240.0)
+                .show(ui, |ui| {
+                    ui.add(TextInput::new(name).hint_text("Project name").width(240.0));
+                });
+            FormField::new("Search")
+                .description("Filters the current gallery view.")
+                .width(240.0)
+                .show(ui, |ui| {
+                    ui.add(SearchInput::new(search).width(240.0));
+                });
         });
         ui.add_space(8.0);
         ui.horizontal_wrapped(|ui| {
-            ui.add(
-                TextInput::new(handle)
-                    .label("Handle")
-                    .hint_text("theme-handle")
-                    .variant(Variant::Subtle)
-                    .error_text("Required before publishing.")
-                    .width(220.0),
-            );
-            ui.add(
-                TextInput::new(name)
-                    .label("Outline")
-                    .hint_text("Outline input")
-                    .variant(Variant::Outline)
-                    .success_text("Looks ready.")
-                    .width(220.0),
-            );
-            ui.add(
-                TextInput::new(search)
-                    .label("Ghost")
-                    .hint_text("Ghost input")
-                    .variant(Variant::Ghost)
-                    .warning_text("Use sparingly in dense forms.")
-                    .width(220.0),
-            );
-            ui.add(
-                TextInput::new(name)
-                    .label("Disabled")
-                    .hint_text("Disabled input")
-                    .disabled()
-                    .help_text("Disabled state remains legible.")
-                    .width(220.0),
-            );
+            FormField::new("Handle")
+                .required(true)
+                .error("Required before publishing.")
+                .width(220.0)
+                .show(ui, |ui| {
+                    ui.add(
+                        TextInput::new(handle)
+                            .hint_text("theme-handle")
+                            .variant(Variant::Subtle)
+                            .width(220.0),
+                    );
+                });
+            FormField::new("Outline")
+                .success("Looks ready.")
+                .width(220.0)
+                .show(ui, |ui| {
+                    ui.add(
+                        TextInput::new(name)
+                            .hint_text("Outline input")
+                            .variant(Variant::Outline)
+                            .width(220.0),
+                    );
+                });
+            FormField::new("Ghost")
+                .warning("Use sparingly in dense forms.")
+                .width(220.0)
+                .show(ui, |ui| {
+                    ui.add(
+                        TextInput::new(search)
+                            .hint_text("Ghost input")
+                            .variant(Variant::Ghost)
+                            .width(220.0),
+                    );
+                });
+            FormField::new("Disabled")
+                .description("Disabled state remains legible.")
+                .width(220.0)
+                .show(ui, |ui| {
+                    ui.add(
+                        TextInput::new(name)
+                            .hint_text("Disabled input")
+                            .disabled()
+                            .width(220.0),
+                    );
+                });
         });
         ui.add(Separator::new().spacing(10.0));
         ui.horizontal_wrapped(|ui| {
