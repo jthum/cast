@@ -199,9 +199,10 @@ impl<'a> ToastStack<'a> {
         }
 
         let hover_id = self.id.with("hovered");
+        let animation_id = self.id.with("expanded_animation");
         let was_hovered = ctx.data(|data| data.get_temp::<bool>(hover_id).unwrap_or(false));
-        let collapsed =
-            self.mode == ToastStackMode::Compact && !was_hovered && self.toasts.len() > 1;
+        let target_expanded =
+            self.mode == ToastStackMode::Expanded || was_hovered || self.toasts.len() <= 1;
 
         Some(
             egui::Area::new(self.id)
@@ -213,22 +214,37 @@ impl<'a> ToastStack<'a> {
                 .show(ctx, |ui| {
                     let theme = theme_for_ui(ui);
                     let width = self.width.unwrap_or(320.0);
+                    let expansion = if theme.animation.should_animate() {
+                        ui.ctx().animate_bool_with_time(
+                            animation_id,
+                            target_expanded,
+                            theme.animation.normal_seconds(),
+                        )
+                    } else if target_expanded {
+                        1.0
+                    } else {
+                        0.0
+                    };
+                    let collapsed = expansion <= 0.02 && self.toasts.len() > 1;
                     ui.set_width(width);
-                    ui.spacing_mut().item_spacing.y = theme.spacing.sm;
+                    ui.spacing_mut().item_spacing.y =
+                        toast_stack_spacing(theme.spacing.sm, expansion);
                     let mut stack_response = ToastStackResponse {
                         dismissed_indices: Vec::new(),
                         expanded: !collapsed,
                     };
 
                     if collapsed {
-                        paint_collapsed_stack_backing(ui, &theme, width, self.toasts.len());
+                        paint_stack_backing(ui, &theme, width, self.toasts.len(), expansion);
                         let response = self.toasts[0].clone().width(width).show(ui);
                         if response.dismissed {
                             stack_response.dismissed_indices.push(0);
                         }
                     } else {
+                        paint_stack_backing(ui, &theme, width, self.toasts.len(), expansion);
                         for (index, toast) in self.toasts.iter().cloned().enumerate() {
-                            let response = toast.width(width).show(ui);
+                            let inset = toast_stack_inset(index, expansion);
+                            let response = show_stack_toast(ui, toast, width, inset);
                             if response.dismissed {
                                 stack_response.dismissed_indices.push(index);
                             }
@@ -239,7 +255,10 @@ impl<'a> ToastStack<'a> {
                 }),
         )
         .inspect(|inner| {
-            ctx.data_mut(|data| data.insert_temp(hover_id, inner.response.hovered()));
+            let pointer_in_stack = ctx.pointer_hover_pos().is_some_and(|position| {
+                toast_stack_hover_rect(inner.response.rect).contains(position)
+            });
+            ctx.data_mut(|data| data.insert_temp(hover_id, pointer_in_stack));
         })
     }
 }
@@ -301,28 +320,70 @@ fn toast_close_button(ui: &mut Ui, theme: &CastTheme) -> Response {
     response
 }
 
-fn paint_collapsed_stack_backing(ui: &mut Ui, theme: &CastTheme, width: f32, count: usize) {
+fn show_stack_toast(ui: &mut Ui, toast: Toast, width: f32, inset: f32) -> ToastResponse {
+    if inset <= 0.5 {
+        return toast.width(width).show(ui);
+    }
+
+    let mut response = None;
+    ui.horizontal(|ui| {
+        ui.add_space(inset);
+        response = Some(toast.width((width - inset * 2.0).max(240.0)).show(ui));
+    });
+
+    response.expect("toast stack row must render a toast")
+}
+
+fn paint_stack_backing(ui: &mut Ui, theme: &CastTheme, width: f32, count: usize, expansion: f32) {
     let visible_backing = count.saturating_sub(1).min(2);
-    if visible_backing == 0 {
+    let alpha = (1.0 - expansion).clamp(0.0, 1.0);
+    if visible_backing == 0 || alpha <= 0.02 {
         return;
     }
 
     let top_left = ui.cursor().min;
     for depth in (1..=visible_backing).rev() {
-        let inset = depth as f32 * 8.0;
-        let y_offset = depth as f32 * 7.0;
+        let layer = depth as f32;
+        let inset = layer * 10.0 * alpha;
+        let y_offset = layer * 9.0 * alpha;
         let rect = egui::Rect::from_min_size(
             egui::pos2(top_left.x + inset, top_left.y + y_offset),
-            egui::vec2((width - inset * 2.0).max(180.0), 52.0),
+            egui::vec2((width - inset * 2.0).max(180.0), 76.0),
         );
         ui.painter().rect(
             rect,
             egui::CornerRadius::same(theme.radius.lg as u8),
-            theme.colors.surface_overlay,
-            Stroke::new(theme.stroke.sm, theme.colors.border),
+            color_with_alpha_fraction(theme.colors.surface_overlay, 0.80 * alpha),
+            Stroke::new(
+                theme.stroke.sm,
+                color_with_alpha_fraction(theme.colors.border, 0.80 * alpha),
+            ),
             StrokeKind::Outside,
         );
     }
+}
+
+fn toast_stack_spacing(expanded_spacing: f32, expansion: f32) -> f32 {
+    let compact_overlap = -44.0;
+    compact_overlap + (expanded_spacing - compact_overlap) * expansion.clamp(0.0, 1.0)
+}
+
+fn toast_stack_inset(index: usize, expansion: f32) -> f32 {
+    let depth = index.min(2) as f32;
+    depth * 10.0 * (1.0 - expansion.clamp(0.0, 1.0))
+}
+
+fn toast_stack_hover_rect(rect: egui::Rect) -> egui::Rect {
+    rect.expand2(egui::vec2(14.0, 18.0))
+}
+
+fn color_with_alpha_fraction(color: Color32, alpha: f32) -> Color32 {
+    Color32::from_rgba_unmultiplied(
+        color.r(),
+        color.g(),
+        color.b(),
+        (f32::from(color.a()) * alpha.clamp(0.0, 1.0)).round() as u8,
+    )
 }
 
 fn toast_anchor(placement: ToastPlacement) -> Align2 {
@@ -386,6 +447,27 @@ mod tests {
         let stack = ToastStack::new("toasts", &toasts).mode(ToastStackMode::Expanded);
 
         assert_eq!(stack.mode, ToastStackMode::Expanded);
+    }
+
+    #[test]
+    fn toast_stack_spacing_animates_from_overlap_to_gap() {
+        assert!(toast_stack_spacing(8.0, 0.0) < 0.0);
+        assert_eq!(toast_stack_spacing(8.0, 1.0), 8.0);
+    }
+
+    #[test]
+    fn toast_stack_inset_animates_to_zero() {
+        assert_eq!(toast_stack_inset(2, 1.0), 0.0);
+        assert!(toast_stack_inset(2, 0.0) > toast_stack_inset(1, 0.0));
+    }
+
+    #[test]
+    fn toast_stack_hover_rect_covers_gaps_around_stack() {
+        let rect = egui::Rect::from_min_size(egui::pos2(10.0, 20.0), egui::vec2(100.0, 80.0));
+        let hover_rect = toast_stack_hover_rect(rect);
+
+        assert!(hover_rect.contains(egui::pos2(10.0, 12.0)));
+        assert!(hover_rect.contains(egui::pos2(110.0, 118.0)));
     }
 
     #[test]
