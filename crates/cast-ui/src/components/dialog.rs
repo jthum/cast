@@ -295,14 +295,28 @@ impl<'a> Sheet<'a> {
         ctx: &egui::Context,
         add_contents: impl FnOnce(&mut Ui, &mut SheetController) -> R,
     ) -> Option<InnerResponse<R>> {
+        let theme = current_theme(ctx).unwrap_or_else(CastTheme::light);
+
         if !*self.open {
+            ctx.animate_bool_with_time_and_easing(
+                self.id.with("slide"),
+                false,
+                theme.animation.normal_seconds(),
+                egui::emath::easing::cubic_out,
+            );
             return None;
         }
 
-        let theme = current_theme(ctx).unwrap_or_else(CastTheme::light);
         let screen_rect = ctx.content_rect();
         let extent = self.extent.unwrap_or(420.0).max(sheet_extent_floor());
         let (pos, size) = sheet_geometry(screen_rect, self.placement, extent);
+        let slide_progress = ctx.animate_bool_with_time_and_easing(
+            self.id.with("slide"),
+            true,
+            theme.animation.normal_seconds(),
+            egui::emath::easing::cubic_out,
+        );
+        let pos = sheet_slide_position(pos, size, self.placement, slide_progress);
         let backdrop_id = self.id.with("backdrop");
         let backdrop_response = egui::Area::new(backdrop_id)
             .order(egui::Order::Middle)
@@ -432,6 +446,17 @@ fn sheet_geometry(screen: Rect, placement: Placement, extent: f32) -> (Pos2, Vec
             egui::vec2(screen.width(), extent.min(screen.height())),
         ),
     }
+}
+
+fn sheet_slide_position(pos: Pos2, size: Vec2, placement: Placement, progress: f32) -> Pos2 {
+    let offset = match placement {
+        Placement::Left => egui::vec2(-size.x, 0.0),
+        Placement::Right => egui::vec2(size.x, 0.0),
+        Placement::Top => egui::vec2(0.0, -size.y),
+        Placement::Bottom => egui::vec2(0.0, size.y),
+    };
+
+    pos + offset * (1.0 - progress.clamp(0.0, 1.0))
 }
 
 fn sheet_content_size(frame_size: Vec2, theme: &CastTheme) -> Vec2 {
@@ -616,6 +641,18 @@ mod tests {
 
         assert_eq!(pos, Pos2::new(680.0, 0.0));
         assert_eq!(size, Vec2::new(320.0, 700.0));
+    }
+
+    #[test]
+    fn sheet_slide_position_offsets_from_attached_edge() {
+        let pos = Pos2::new(680.0, 0.0);
+        let size = Vec2::new(320.0, 700.0);
+
+        assert_eq!(
+            sheet_slide_position(pos, size, Placement::Right, 0.0),
+            Pos2::new(1000.0, 0.0)
+        );
+        assert_eq!(sheet_slide_position(pos, size, Placement::Right, 1.0), pos);
     }
 
     #[test]

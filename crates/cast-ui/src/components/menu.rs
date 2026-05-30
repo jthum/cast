@@ -279,7 +279,10 @@ impl Widget for Combobox<'_> {
                         .font(font)
                         .desired_width(width - theme.spacing.lg)
                         .frame(crate::style::input_frame(&theme, Variant::Solid));
-                    ui.add(edit);
+                    let search_response = ui.add(edit);
+                    if !search_response.has_focus() {
+                        search_response.request_focus();
+                    }
                     ui.add_space(theme.spacing.xs);
 
                     let matches = combobox_matches(&self.labels, self.query);

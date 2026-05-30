@@ -50,6 +50,7 @@ struct CastGallery {
     handle: String,
     preset_query: String,
     preset_choice: usize,
+    form_validation_attention: bool,
     enabled: bool,
     notifications: bool,
     indeterminate: bool,
@@ -95,6 +96,7 @@ impl CastGallery {
             handle: String::new(),
             preset_query: String::new(),
             preset_choice: 0,
+            form_validation_attention: false,
             enabled: true,
             notifications: true,
             indeterminate: false,
@@ -232,6 +234,7 @@ impl eframe::App for CastGallery {
                                     &mut self.handle,
                                     &mut self.preset_query,
                                     &mut self.preset_choice,
+                                    &mut self.form_validation_attention,
                                     &mut self.enabled,
                                     &mut self.notifications,
                                     &mut self.indeterminate,
@@ -304,6 +307,7 @@ fn show_workspace_view(
     handle: &mut String,
     preset_query: &mut String,
     preset_choice: &mut usize,
+    form_validation_attention: &mut bool,
     enabled: &mut bool,
     notifications: &mut bool,
     indeterminate: &mut bool,
@@ -353,6 +357,7 @@ fn show_workspace_view(
                 handle,
                 preset_query,
                 preset_choice,
+                form_validation_attention,
                 enabled,
                 notifications,
                 indeterminate,
@@ -425,6 +430,7 @@ fn show_workspace_view(
                 handle,
                 preset_query,
                 preset_choice,
+                form_validation_attention,
                 enabled,
                 notifications,
                 indeterminate,
@@ -2226,11 +2232,14 @@ fn show_forms(
     handle: &mut String,
     preset_query: &mut String,
     preset_choice: &mut usize,
+    form_validation_attention: &mut bool,
     enabled: &mut bool,
     notifications: &mut bool,
     indeterminate: &mut bool,
     form_density: &mut usize,
 ) {
+    let clear_validation_attention = *form_validation_attention;
+
     Card::new().show(ui, |ui| {
         ui.heading("Forms");
 
@@ -2242,7 +2251,9 @@ fn show_forms(
                         .issue(ValidationIssue::new("Required before publishing.").field("Handle"))
                         .issue(ValidationIssue::new("Pick a preset for repeatable previews."))
                         .intent(Intent::Warning)
-                        .width(520.0),
+                        .width(520.0)
+                        .attention(*form_validation_attention)
+                        .scroll_to(*form_validation_attention),
                 );
                 ui.add_space(8.0);
                 ui.horizontal_wrapped(|ui| {
@@ -2388,10 +2399,12 @@ fn show_forms(
                     ui.add(Switch::new(enabled).size(Size::Medium));
                     ui.add(Switch::new(enabled).size(Size::Large));
                 });
-            });
+        });
 
         FormActions::new().show(ui, |ui| {
-            ui.add(Button::new("Save").size(Size::Small));
+            if ui.add(Button::new("Save").size(Size::Small)).clicked() {
+                *form_validation_attention = true;
+            }
             ui.add(
                 Button::new("Reset")
                     .intent(Intent::Neutral)
@@ -2400,6 +2413,10 @@ fn show_forms(
             );
         });
     });
+
+    if clear_validation_attention {
+        *form_validation_attention = false;
+    }
 }
 
 fn show_raw_egui_controls(ui: &mut egui::Ui, search: &mut String, enabled: &mut bool) {

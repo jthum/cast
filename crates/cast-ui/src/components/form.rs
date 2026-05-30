@@ -1,6 +1,7 @@
-use egui::{Align, InnerResponse, Layout, Response, RichText, Ui, Widget};
+use egui::{Align, InnerResponse, Layout, Response, RichText, StrokeKind, Ui, Widget};
 
 use crate::{
+    color::mix_with_transparent,
     foundation::Intent,
     style::{alert_frame, alert_intent_colors},
     theme::{CastTheme, theme_for_ui},
@@ -158,6 +159,8 @@ pub struct ValidationSummary {
     issues: Vec<ValidationIssue>,
     intent: Intent,
     width: Option<f32>,
+    attention: bool,
+    scroll_to: bool,
 }
 
 impl ValidationSummary {
@@ -168,6 +171,8 @@ impl ValidationSummary {
             issues: Vec::new(),
             intent: Intent::Danger,
             width: None,
+            attention: false,
+            scroll_to: false,
         }
     }
 
@@ -196,6 +201,18 @@ impl ValidationSummary {
     }
 
     #[must_use]
+    pub fn attention(mut self, attention: bool) -> Self {
+        self.attention = attention;
+        self
+    }
+
+    #[must_use]
+    pub fn scroll_to(mut self, scroll_to: bool) -> Self {
+        self.scroll_to = scroll_to;
+        self
+    }
+
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.issues.is_empty()
     }
@@ -205,8 +222,10 @@ impl Widget for ValidationSummary {
     fn ui(self, ui: &mut Ui) -> Response {
         let theme = theme_for_ui(ui);
         let colors = alert_intent_colors(&theme, self.intent);
+        let attention = self.attention;
+        let scroll_to = self.scroll_to;
 
-        alert_frame(&theme, colors.border)
+        let response = alert_frame(&theme, colors.border)
             .fill(colors.fill)
             .show(ui, |ui| {
                 if let Some(width) = self.width {
@@ -241,7 +260,22 @@ impl Widget for ValidationSummary {
                     });
                 }
             })
-            .response
+            .response;
+
+        if attention {
+            ui.painter().rect_stroke(
+                response.rect.expand(3.0),
+                egui::CornerRadius::same(theme.components.alert.radius as u8),
+                egui::Stroke::new(2.0, mix_with_transparent(colors.fg, 0.35)),
+                StrokeKind::Outside,
+            );
+        }
+
+        if scroll_to {
+            response.scroll_to_me(Some(Align::Center));
+        }
+
+        response
     }
 }
 
@@ -421,11 +455,15 @@ mod tests {
             .issue(ValidationIssue::new("Required").field("Handle"))
             .issues([ValidationIssue::new("Choose a preset")])
             .intent(Intent::Warning)
-            .width(80.0);
+            .width(80.0)
+            .attention(true)
+            .scroll_to(true);
 
         assert_eq!(summary.issues.len(), 2);
         assert_eq!(summary.intent, Intent::Warning);
         assert_eq!(summary.width, Some(180.0));
+        assert!(summary.attention);
+        assert!(summary.scroll_to);
         assert!(!summary.is_empty());
     }
 
