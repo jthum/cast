@@ -1,4 +1,4 @@
-use egui::{InnerResponse, RichText, Ui};
+use egui::{Align, InnerResponse, Layout, RichText, Ui};
 
 use crate::{
     foundation::Intent,
@@ -13,6 +13,121 @@ pub struct FormField {
     message: Option<FormFieldMessage>,
     required: bool,
     width: Option<f32>,
+}
+
+#[derive(Clone, Debug)]
+pub struct FormSection {
+    title: String,
+    description: Option<String>,
+    width: Option<f32>,
+}
+
+impl FormSection {
+    #[must_use]
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            description: None,
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width.max(160.0));
+        self
+    }
+
+    pub fn show<R>(self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
+        let theme = theme_for_ui(ui);
+
+        ui.vertical(|ui| {
+            if let Some(width) = self.width {
+                ui.set_min_width(width);
+                ui.set_max_width(width);
+            }
+
+            ui.spacing_mut().item_spacing.y = theme.spacing.xs;
+            ui.label(
+                RichText::new(self.title)
+                    .font(theme.typography.heading_sm.clone())
+                    .color(theme.colors.text)
+                    .extra_letter_spacing(theme.typography.letter_spacing),
+            );
+
+            if let Some(description) = self.description {
+                paint_field_support_text(ui, &theme, &description, theme.colors.text_muted);
+            }
+
+            ui.add_space(theme.spacing.sm);
+            add_contents(ui)
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FormActions {
+    separator: bool,
+    align_end: bool,
+}
+
+impl FormActions {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            separator: true,
+            align_end: true,
+        }
+    }
+
+    #[must_use]
+    pub fn separator(mut self, separator: bool) -> Self {
+        self.separator = separator;
+        self
+    }
+
+    #[must_use]
+    pub fn align_end(mut self, align_end: bool) -> Self {
+        self.align_end = align_end;
+        self
+    }
+
+    pub fn show<R>(self, ui: &mut Ui, add_actions: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
+        let theme = theme_for_ui(ui);
+
+        ui.vertical(|ui| {
+            if self.separator {
+                ui.add_space(theme.spacing.sm);
+                let rect = ui
+                    .allocate_exact_size(
+                        egui::vec2(ui.available_width(), theme.stroke.sm.max(1.0)),
+                        egui::Sense::hover(),
+                    )
+                    .0;
+                ui.painter().rect_filled(rect, 0.0, theme.colors.border);
+                ui.add_space(theme.spacing.sm);
+            }
+
+            if self.align_end {
+                ui.with_layout(Layout::right_to_left(Align::Center), add_actions)
+            } else {
+                ui.horizontal(add_actions)
+            }
+        })
+        .inner
+    }
+}
+
+impl Default for FormActions {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FormField {
@@ -152,6 +267,30 @@ mod tests {
         assert!(!field.required);
         assert!(field.description.is_none());
         assert!(field.message.is_none());
+    }
+
+    #[test]
+    fn form_section_defaults_to_plain_group() {
+        let section = FormSection::new("Basics");
+
+        assert_eq!(section.title, "Basics");
+        assert!(section.description.is_none());
+        assert!(section.width.is_none());
+    }
+
+    #[test]
+    fn form_section_width_has_floor() {
+        let section = FormSection::new("Basics").width(80.0);
+
+        assert_eq!(section.width, Some(160.0));
+    }
+
+    #[test]
+    fn form_actions_default_to_separated_end_alignment() {
+        let actions = FormActions::new();
+
+        assert!(actions.separator);
+        assert!(actions.align_end);
     }
 
     #[test]

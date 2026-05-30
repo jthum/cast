@@ -13,11 +13,11 @@ use patterns::shell::{
 
 use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Combobox,
-    ConfirmDialog, ConfirmDialogResponse, Dialog, Dropdown, EmptyState, FormField, Intent, Label,
-    Link, Loader, LoaderStyle, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar,
-    RadioGroup, SearchInput, SegmentedControl, Select, SemanticColorTokens, Separator, Sheet, Size,
-    Skeleton, Slider, Switch, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, Toast,
-    ToastPlacement, ToastStack, Tooltip, TypographyTokens, Variant,
+    ConfirmDialog, ConfirmDialogResponse, Dialog, Dropdown, EmptyState, FormActions, FormField,
+    FormSection, Intent, Label, Link, Loader, LoaderStyle, MenuItem, Notice, Panel as CastPanel,
+    Popover, ProgressBar, RadioGroup, SearchInput, SegmentedControl, Select, SemanticColorTokens,
+    Separator, Sheet, Size, Skeleton, Slider, Switch, Tabs, TextArea, TextInput, ThemeMode,
+    ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip, TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -2226,143 +2226,163 @@ fn show_forms(
 ) {
     Card::new().show(ui, |ui| {
         ui.heading("Forms");
-        ui.horizontal_wrapped(|ui| {
-            FormField::new("Project name")
-                .description("Shown in window titles and saved presets.")
-                .required(true)
-                .width(240.0)
-                .show(ui, |ui| {
-                    ui.add(TextInput::new(name).hint_text("Project name").width(240.0));
-                });
-            FormField::new("Search")
-                .description("Filters the current gallery view.")
-                .width(240.0)
-                .show(ui, |ui| {
-                    ui.add(SearchInput::new(search).width(240.0));
-                });
-        });
-        ui.add_space(8.0);
-        FormField::new("Instructions")
-            .description(
-                "Multiline text areas use the same input frame, halo, and status treatment.",
-            )
-            .width(520.0)
+
+        FormSection::new("Project details")
+            .description("A grouped form area with related controls and field-level messages.")
             .show(ui, |ui| {
-                ui.add(
-                    TextArea::new(notes)
-                        .hint_text("Describe what the agent should do...")
-                        .rows(4)
-                        .width(520.0),
-                );
-            });
-        ui.add_space(8.0);
-        ui.horizontal_wrapped(|ui| {
-            FormField::new("Handle")
-                .required(true)
-                .error("Required before publishing.")
-                .width(220.0)
-                .show(ui, |ui| {
-                    ui.add(
-                        TextInput::new(handle)
-                            .hint_text("theme-handle")
-                            .variant(Variant::Subtle)
-                            .width(220.0),
-                    );
+                ui.horizontal_wrapped(|ui| {
+                    FormField::new("Project name")
+                        .description("Shown in window titles and saved presets.")
+                        .required(true)
+                        .width(240.0)
+                        .show(ui, |ui| {
+                            ui.add(TextInput::new(name).hint_text("Project name").width(240.0));
+                        });
+                    FormField::new("Search")
+                        .description("Filters the current gallery view.")
+                        .width(240.0)
+                        .show(ui, |ui| {
+                            ui.add(SearchInput::new(search).width(240.0));
+                        });
                 });
-            FormField::new("Outline")
-                .success("Looks ready.")
-                .width(220.0)
-                .show(ui, |ui| {
-                    ui.add(
-                        TextInput::new(name)
-                            .hint_text("Outline input")
-                            .variant(Variant::Outline)
-                            .width(220.0),
-                    );
-                });
-            FormField::new("Ghost")
-                .warning("Use sparingly in dense forms.")
-                .width(220.0)
-                .show(ui, |ui| {
-                    ui.add(
-                        TextInput::new(search)
-                            .hint_text("Ghost input")
-                            .variant(Variant::Ghost)
-                            .width(220.0),
-                    );
-                });
-            FormField::new("Disabled")
-                .description("Disabled state remains legible.")
-                .width(220.0)
-                .show(ui, |ui| {
-                    ui.add(
-                        TextInput::new(name)
-                            .hint_text("Disabled input")
-                            .disabled()
-                            .width(220.0),
-                    );
-                });
-        });
-        ui.add(Separator::new().spacing(10.0));
-        ui.horizontal_wrapped(|ui| {
-            ui.add(Checkbox::new(enabled, "Enabled"));
-            ui.add(Checkbox::new(indeterminate, "Mixed").indeterminate(true));
-            ui.add(Checkbox::new(notifications, "Disabled").disabled());
-        });
-        FormField::new("Density")
-            .description("RadioGroup keeps related choices together.")
-            .width(360.0)
-            .show(ui, |ui| {
-                ui.add(
-                    RadioGroup::new(
-                        form_density,
-                        [(0, "Compact"), (1, "Comfortable"), (2, "Spacious")],
+                ui.add_space(8.0);
+                FormField::new("Instructions")
+                    .description(
+                        "Multiline text areas use the same input frame, halo, and status treatment.",
                     )
+                    .width(520.0)
+                    .show(ui, |ui| {
+                        ui.add(
+                            TextArea::new(notes)
+                                .hint_text("Describe what the agent should do...")
+                                .rows(4)
+                                .width(520.0),
+                        );
+                    });
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    FormField::new("Handle")
+                        .required(true)
+                        .error("Required before publishing.")
+                        .width(220.0)
+                        .show(ui, |ui| {
+                            ui.add(
+                                TextInput::new(handle)
+                                    .hint_text("theme-handle")
+                                    .variant(Variant::Subtle)
+                                    .width(220.0),
+                            );
+                        });
+                    FormField::new("Outline")
+                        .success("Looks ready.")
+                        .width(220.0)
+                        .show(ui, |ui| {
+                            ui.add(
+                                TextInput::new(name)
+                                    .hint_text("Outline input")
+                                    .variant(Variant::Outline)
+                                    .width(220.0),
+                            );
+                        });
+                    FormField::new("Ghost")
+                        .warning("Use sparingly in dense forms.")
+                        .width(220.0)
+                        .show(ui, |ui| {
+                            ui.add(
+                                TextInput::new(search)
+                                    .hint_text("Ghost input")
+                                    .variant(Variant::Ghost)
+                                    .width(220.0),
+                            );
+                        });
+                    FormField::new("Disabled")
+                        .description("Disabled state remains legible.")
+                        .width(220.0)
+                        .show(ui, |ui| {
+                            ui.add(
+                                TextInput::new(name)
+                                    .hint_text("Disabled input")
+                                    .disabled()
+                                    .width(220.0),
+                            );
+                        });
+                });
+            });
+
+        ui.add(Separator::new().spacing(12.0));
+        FormSection::new("Preferences")
+            .description("Choice controls can be composed as grouped fields or standalone toggles.")
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.add(Checkbox::new(enabled, "Enabled"));
+                    ui.add(Checkbox::new(indeterminate, "Mixed").indeterminate(true));
+                    ui.add(Checkbox::new(notifications, "Disabled").disabled());
+                });
+                FormField::new("Density")
+                    .description("RadioGroup keeps related choices together.")
+                    .width(360.0)
+                    .show(ui, |ui| {
+                        ui.add(
+                            RadioGroup::new(
+                                form_density,
+                                [(0, "Compact"), (1, "Comfortable"), (2, "Spacious")],
+                            )
+                            .size(Size::Small),
+                        );
+                    });
+                ui.add_space(6.0);
+                FormField::new("Density select")
+                    .description("Select gives dropdown behavior a form-control name.")
+                    .width(220.0)
+                    .show(ui, |ui| {
+                        ui.add(
+                            Select::new(form_density, ["Compact", "Comfortable", "Spacious"])
+                                .placeholder("Density")
+                                .width(220.0),
+                        );
+                    });
+                ui.add_space(6.0);
+                FormField::new("Preset combobox")
+                    .description("Combobox filters larger option sets before choosing.")
+                    .width(260.0)
+                    .show(ui, |ui| {
+                        ui.add(
+                            Combobox::new(
+                                preset_choice,
+                                preset_query,
+                                [
+                                    "Compact",
+                                    "Comfortable",
+                                    "Spacious",
+                                    "Agent workspace",
+                                    "Dense table",
+                                    "Presentation",
+                                ],
+                            )
+                            .placeholder("Preset")
+                            .search_hint("Search presets")
+                            .width(260.0),
+                        );
+                    });
+                ui.horizontal(|ui| {
+                    ui.add(Switch::new(notifications));
+                    ui.label("Notifications");
+                });
+                ui.horizontal_wrapped(|ui| {
+                    ui.add(Switch::new(enabled).size(Size::Small));
+                    ui.add(Switch::new(enabled).size(Size::Medium));
+                    ui.add(Switch::new(enabled).size(Size::Large));
+                });
+            });
+
+        FormActions::new().show(ui, |ui| {
+            ui.add(Button::new("Save").size(Size::Small));
+            ui.add(
+                Button::new("Reset")
+                    .intent(Intent::Neutral)
+                    .variant(Variant::Outline)
                     .size(Size::Small),
-                );
-            });
-        ui.add_space(6.0);
-        FormField::new("Density select")
-            .description("Select gives dropdown behavior a form-control name.")
-            .width(220.0)
-            .show(ui, |ui| {
-                ui.add(
-                    Select::new(form_density, ["Compact", "Comfortable", "Spacious"])
-                        .placeholder("Density")
-                        .width(220.0),
-                );
-            });
-        ui.add_space(6.0);
-        FormField::new("Preset combobox")
-            .description("Combobox filters larger option sets before choosing.")
-            .width(260.0)
-            .show(ui, |ui| {
-                ui.add(
-                    Combobox::new(
-                        preset_choice,
-                        preset_query,
-                        [
-                            "Compact",
-                            "Comfortable",
-                            "Spacious",
-                            "Agent workspace",
-                            "Dense table",
-                            "Presentation",
-                        ],
-                    )
-                    .placeholder("Preset")
-                    .search_hint("Search presets")
-                    .width(260.0),
-                );
-            });
-        ui.horizontal(|ui| {
-            ui.add(Switch::new(notifications));
-            ui.label("Notifications");
-        });
-        ui.horizontal_wrapped(|ui| {
-            ui.add(Switch::new(enabled).size(Size::Small));
-            ui.add(Switch::new(enabled).size(Size::Medium));
-            ui.add(Switch::new(enabled).size(Size::Large));
+            );
         });
     });
 }

@@ -37,7 +37,7 @@ pub use dialog::{
 pub use disclosure::{Accordion, AccordionItem, Disclosure, DisclosureResponse};
 pub use empty_state::EmptyState;
 pub use filter_bar::FilterBar;
-pub use form::FormField;
+pub use form::{FormActions, FormField, FormSection};
 pub use label::Label;
 pub use link::Link;
 pub use list::{ListRow, Table, TableDetailRow, TableRow, TextTable};
