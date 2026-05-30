@@ -133,7 +133,7 @@ impl Widget for Button {
             let radius = egui::CornerRadius::same(theme.components.button.radius as u8);
             let depth = if pressed { 1.0 } else { 0.0 };
             let paint_rect = rect.translate(egui::vec2(0.0, depth));
-            let accent = button_accent(&theme, self.intent).0;
+            let accent = button_accent(&theme, self.intent).base;
             let active_fill =
                 button_fill(colors.fill, accent, &theme, self.variant, hovered, pressed);
             let fill = if enabled {
@@ -167,7 +167,7 @@ impl Widget for Button {
 }
 
 fn button_colors(theme: &crate::CastTheme, intent: Intent, variant: Variant) -> IntentColors {
-    let (accent, solid_fg) = button_accent(theme, intent);
+    let accent = button_accent(theme, intent);
 
     match variant {
         Variant::Solid if intent == Intent::Neutral => IntentColors {
@@ -176,52 +176,56 @@ fn button_colors(theme: &crate::CastTheme, intent: Intent, variant: Variant) -> 
             border: Color32::TRANSPARENT,
         },
         Variant::Solid => IntentColors {
-            fill: accent,
-            fg: solid_fg,
+            fill: accent.base,
+            fg: accent.solid_fg,
             border: Color32::TRANSPARENT,
         },
         Variant::Subtle => IntentColors {
-            fill: mix_with_transparent(accent, 0.05),
-            fg: accent,
-            border: mix_with_transparent(accent, 0.30),
+            fill: mix_with_transparent(accent.base, 0.05),
+            fg: accent.text,
+            border: mix_with_transparent(accent.base, 0.30),
         },
         Variant::Outline => IntentColors {
             fill: Color32::TRANSPARENT,
-            fg: accent,
-            border: mix_with_transparent(accent, 0.30),
+            fg: accent.text,
+            border: mix_with_transparent(accent.base, 0.30),
         },
         Variant::Ghost => IntentColors {
             fill: Color32::TRANSPARENT,
-            fg: accent,
+            fg: accent.text,
             border: Color32::TRANSPARENT,
         },
     }
 }
 
-fn button_accent(theme: &crate::CastTheme, intent: Intent) -> (Color32, Color32) {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ButtonAccent {
+    base: Color32,
+    solid_fg: Color32,
+    text: Color32,
+}
+
+fn button_accent(theme: &crate::CastTheme, intent: Intent) -> ButtonAccent {
     match intent {
-        Intent::Neutral => (theme.colors.text, theme.colors.text),
-        Intent::Primary => (
-            theme.colors.primary_family.base,
-            theme.colors.primary_family.fg,
-        ),
-        Intent::Secondary => (
-            theme.colors.secondary_family.base,
-            theme.colors.secondary_family.fg,
-        ),
-        Intent::Success => (
-            theme.colors.success_family.base,
-            theme.colors.success_family.fg,
-        ),
-        Intent::Warning => (
-            theme.colors.warning_family.base,
-            theme.colors.warning_family.fg,
-        ),
-        Intent::Danger => (
-            theme.colors.danger_family.base,
-            theme.colors.danger_family.fg,
-        ),
-        Intent::Info => (theme.colors.info_family.base, theme.colors.info_family.fg),
+        Intent::Neutral => ButtonAccent {
+            base: theme.colors.text,
+            solid_fg: theme.colors.text,
+            text: theme.colors.text,
+        },
+        Intent::Primary => semantic_button_accent(theme.colors.primary_family),
+        Intent::Secondary => semantic_button_accent(theme.colors.secondary_family),
+        Intent::Success => semantic_button_accent(theme.colors.success_family),
+        Intent::Warning => semantic_button_accent(theme.colors.warning_family),
+        Intent::Danger => semantic_button_accent(theme.colors.danger_family),
+        Intent::Info => semantic_button_accent(theme.colors.info_family),
+    }
+}
+
+fn semantic_button_accent(family: crate::SemanticColorTokens) -> ButtonAccent {
+    ButtonAccent {
+        base: family.base,
+        solid_fg: family.fg,
+        text: family.emphasis,
     }
 }
 
@@ -434,6 +438,6 @@ mod tests {
 
         assert_eq!(fill_alpha, 13);
         assert_eq!(border_alpha, 77);
-        assert_eq!(colors.fg, theme.colors.success_family.base);
+        assert_eq!(colors.fg, theme.colors.success_family.emphasis);
     }
 }

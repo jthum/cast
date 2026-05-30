@@ -49,17 +49,18 @@ impl Popover {
         self
     }
 
-    pub fn show<T, C>(
+    pub fn show<C>(
         self,
         ui: &mut Ui,
-        add_trigger: impl FnOnce(&mut Ui) -> T,
+        add_trigger: impl FnOnce(&mut Ui) -> Response,
         add_contents: impl FnOnce(&mut Ui) -> C,
-    ) -> InnerResponse<T> {
+    ) -> InnerResponse<Response> {
         let trigger = ui.scope(add_trigger);
-        let response = self.show_on(ui, &trigger.response, add_contents);
+        let trigger_response = trigger.inner;
+        let response = self.show_on(ui, &trigger_response, add_contents);
 
         InnerResponse {
-            inner: trigger.inner,
+            inner: trigger_response,
             response,
         }
     }

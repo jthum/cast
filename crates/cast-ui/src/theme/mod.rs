@@ -10,7 +10,7 @@ use egui::{
     TextStyle, Ui, Vec2, Visuals,
 };
 
-use crate::color::{accessible_foreground, mix_oklch, with_alpha};
+use crate::color::{accessible_foreground, mix_oklch, readable_accent_on, with_alpha};
 
 const THEME_ID: &str = "cast_theme";
 const INTER_REGULAR_FONT: &str = "cast_inter_regular";
@@ -1103,7 +1103,7 @@ impl ColorTokens {
             info_fg: info_family.fg,
             selection: with_alpha(primary, selection_alpha),
             focus: primary,
-            link: primary,
+            link: primary_family.emphasis,
         }
     }
 }
@@ -1139,7 +1139,7 @@ impl SemanticColorTokens {
             fg: accessible_foreground(base),
             subtle: mix_oklch(base, surface, subtle_mix),
             muted: mix_oklch(base, surface, muted_mix),
-            emphasis: base,
+            emphasis: readable_accent_on(surface, base),
             border: mix_oklch(base, surface, border_mix),
             hover: mix_oklch(base, hover_anchor, hover_mix),
             active: mix_oklch(base, hover_anchor, active_mix),
@@ -1845,7 +1845,19 @@ mod tests {
 
         assert_eq!(theme.colors.primary, primary);
         assert_eq!(theme.colors.focus, primary);
-        assert_eq!(theme.colors.link, primary);
+        assert_eq!(theme.colors.link, theme.colors.primary_family.emphasis);
+    }
+
+    #[test]
+    fn dark_theme_link_uses_contrast_adjusted_primary() {
+        let primary = Color32::from_rgb(88, 28, 135);
+        let theme =
+            CastTheme::from_palette(ThemeMode::Dark, CastPaletteInput::from_primary(primary));
+
+        assert_eq!(theme.colors.primary, primary);
+        assert_eq!(theme.colors.link, theme.colors.primary_family.emphasis);
+        assert!(contrast_ratio(theme.colors.surface, theme.colors.link) >= 4.5);
+        assert_ne!(theme.colors.link, primary);
     }
 
     #[test]
@@ -1874,6 +1886,7 @@ mod tests {
 
         assert_eq!(family.base, theme.colors.primary);
         assert_eq!(family.fg, theme.colors.primary_fg);
+        assert_eq!(family.emphasis, theme.colors.link);
         assert_ne!(family.subtle, family.base);
         assert_ne!(family.hover, family.active);
     }

@@ -26,6 +26,26 @@ pub(crate) fn accessible_foreground(background: Color32) -> Color32 {
 }
 
 #[must_use]
+pub(crate) fn readable_accent_on(background: Color32, accent: Color32) -> Color32 {
+    const MIN_CONTRAST: f32 = 4.5;
+
+    if contrast_ratio(background, accent) >= MIN_CONTRAST {
+        return accent;
+    }
+
+    let target = accessible_foreground(background);
+    for step in 1..=24 {
+        let amount = step as f32 / 24.0;
+        let candidate = mix_oklch(accent, target, amount);
+        if contrast_ratio(background, candidate) >= MIN_CONTRAST {
+            return candidate;
+        }
+    }
+
+    target
+}
+
+#[must_use]
 pub(crate) fn mix_oklch(a: Color32, b: Color32, t: f32) -> Color32 {
     let a = color32_to_oklch(a);
     let b = color32_to_oklch(b);
@@ -139,5 +159,23 @@ mod tests {
         let warning = Color32::from_rgb(251, 191, 36);
 
         assert!(contrast_ratio(warning, Color32::BLACK) > contrast_ratio(warning, Color32::WHITE));
+    }
+
+    #[test]
+    fn readable_accent_preserves_readable_colors() {
+        let surface = Color32::from_rgb(20, 20, 28);
+        let accent = Color32::from_rgb(192, 132, 252);
+
+        assert_eq!(readable_accent_on(surface, accent), accent);
+    }
+
+    #[test]
+    fn readable_accent_lifts_low_contrast_colors() {
+        let surface = Color32::from_rgb(20, 20, 28);
+        let accent = Color32::from_rgb(88, 28, 135);
+        let readable = readable_accent_on(surface, accent);
+
+        assert!(contrast_ratio(surface, readable) >= 4.5);
+        assert_ne!(readable, accent);
     }
 }

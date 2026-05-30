@@ -64,17 +64,17 @@ fn semantic_intent_colors(family: SemanticColorTokens, variant: Variant) -> Inte
         },
         Variant::Subtle => IntentColors {
             fill: family.subtle,
-            fg: family.base,
+            fg: family.emphasis,
             border: family.border,
         },
         Variant::Outline => IntentColors {
             fill: Color32::TRANSPARENT,
-            fg: family.base,
+            fg: family.emphasis,
             border: family.border,
         },
         Variant::Ghost => IntentColors {
             fill: Color32::TRANSPARENT,
-            fg: family.base,
+            fg: family.emphasis,
             border: Color32::TRANSPARENT,
         },
     }
@@ -268,7 +268,7 @@ pub(crate) fn alert_intent_colors(theme: &CastTheme, intent: Intent) -> IntentCo
     let family = semantic_family(theme, intent);
     IntentColors {
         fill: mix_with_transparent(family.base, 0.05),
-        fg: family.base,
+        fg: family.emphasis,
         border: mix_with_transparent(family.base, 0.30),
     }
 }
@@ -420,6 +420,6 @@ mod tests {
 
         assert_eq!(fill_alpha, 13);
         assert_eq!(border_alpha, 77);
-        assert_eq!(colors.fg, theme.colors.success_family.base);
+        assert_eq!(colors.fg, theme.colors.success_family.emphasis);
     }
 }

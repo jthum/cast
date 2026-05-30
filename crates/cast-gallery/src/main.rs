@@ -1485,7 +1485,7 @@ fn show_menus(
                         Button::new("Open popover")
                             .intent(Intent::Neutral)
                             .variant(Variant::Outline),
-                    );
+                    )
                 },
                 |ui| {
                     ui.horizontal_wrapped(|ui| {
