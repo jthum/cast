@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 mod patterns;
 
+use patterns::command_palette::{CommandPaletteState, show_command_palette};
 use patterns::entity_table_with_details::{
     EntityRecord, EntityTableState, show_entity_table_with_details,
 };
@@ -50,6 +51,7 @@ struct CastGallery {
     form_density: usize,
     menu_choice: usize,
     dialog_open: bool,
+    command_palette: CommandPaletteState,
     related_activity_open: bool,
     related_activity_group: Option<usize>,
     lead_selected: [bool; LEAD_COUNT],
@@ -87,6 +89,7 @@ impl CastGallery {
             form_density: 1,
             menu_choice: 0,
             dialog_open: false,
+            command_palette: CommandPaletteState::default(),
             related_activity_open: false,
             related_activity_group: None,
             lead_selected: [false; LEAD_COUNT],
@@ -108,12 +111,49 @@ impl CastGallery {
         self.theme = self.seed.clone().resolve();
         cast::set_theme(ctx, self.theme.clone());
     }
+
+    fn apply_command_palette_action(&mut self, action: &str) -> bool {
+        match action {
+            "open-workspace" => self.sidebar_section = 0,
+            "show-components" => self.sidebar_section = 2,
+            "theme-lab" => self.sidebar_section = 1,
+            "export-table" => {
+                self.lead_exported_count = Some(
+                    self.lead_selected
+                        .iter()
+                        .filter(|selected| **selected)
+                        .count(),
+                );
+            }
+            "review-diagnostics" => self.sidebar_section = 1,
+            "toggle-mode" => {
+                let next = if self.seed.mode == ThemeMode::Light {
+                    ThemeMode::Dark
+                } else {
+                    ThemeMode::Light
+                };
+                self.seed = self.seed.clone().with_mode(next);
+                return true;
+            }
+            "reset-theme" => {
+                self.seed =
+                    ThemeSeed::for_mode(self.seed.mode).with_typography(TypographyTokens::cast());
+                return true;
+            }
+            _ => {}
+        }
+
+        false
+    }
 }
 
 impl eframe::App for CastGallery {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         ctx.set_zoom_factor(self.zoom);
+        if ctx.input_mut(|input| input.consume_key(egui::Modifiers::COMMAND, egui::Key::K)) {
+            self.command_palette.open = true;
+        }
 
         EguiPanel::left("sidebar")
             .resizable(false)
@@ -184,6 +224,7 @@ impl eframe::App for CastGallery {
                                     &mut self.form_density,
                                     &mut self.menu_choice,
                                     &mut self.dialog_open,
+                                    &mut self.command_palette,
                                     &mut self.lead_search,
                                     &mut self.related_activity_open,
                                     &mut self.related_activity_group,
@@ -202,6 +243,10 @@ impl eframe::App for CastGallery {
                             });
                     });
             });
+
+        if let Some(action) = show_command_palette(&ctx, &mut self.command_palette) {
+            theme_changed |= self.apply_command_palette_action(action);
+        }
 
         if theme_changed {
             self.apply_theme(&ctx);
@@ -436,6 +481,7 @@ fn show_workspace_view(
     form_density: &mut usize,
     menu_choice: &mut usize,
     dialog_open: &mut bool,
+    command_palette: &mut CommandPaletteState,
     lead_search: &mut String,
     related_activity_open: &mut bool,
     related_activity_group: &mut Option<usize>,
@@ -504,7 +550,7 @@ fn show_workspace_view(
             ui.add_space(12.0);
             show_buttons_and_badges(ui);
             ui.add_space(12.0);
-            show_menus(ui, menu_choice, dialog_open);
+            show_menus(ui, menu_choice, dialog_open, command_palette);
             ui.add_space(12.0);
             show_lists_and_tables(
                 ui,
@@ -1603,7 +1649,12 @@ fn show_surfaces(ui: &mut egui::Ui) {
     });
 }
 
-fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize, dialog_open: &mut bool) {
+fn show_menus(
+    ui: &mut egui::Ui,
+    menu_choice: &mut usize,
+    dialog_open: &mut bool,
+    command_palette: &mut CommandPaletteState,
+) {
     Card::new().show(ui, |ui| {
         ui.heading("Menus and dropdowns");
         ui.horizontal_wrapped(|ui| {
@@ -1624,7 +1675,12 @@ fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize, dialog_open: &mut bool
         CastPanel::new().show(ui, |ui| {
             ui.label("Menu items");
             ui.add_space(4.0);
-            ui.add(MenuItem::new("Open command palette").selected(true));
+            if ui
+                .add(MenuItem::new("Open command palette").selected(true))
+                .clicked()
+            {
+                command_palette.open = true;
+            }
             ui.add(MenuItem::new("Duplicate theme"));
             ui.add(MenuItem::new("Archive preset").intent(Intent::Warning));
             ui.add(MenuItem::new("Delete preset").intent(Intent::Danger));
