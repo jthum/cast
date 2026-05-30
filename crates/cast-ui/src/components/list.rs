@@ -970,7 +970,7 @@ fn paint_table_header(
     for (index, column) in columns.iter().enumerate() {
         let column_width = column_widths.get(index).copied().unwrap_or(0.0);
         if index > 0 {
-            paint_table_rule(ui, x, header_rect, table_rule_color(theme));
+            paint_table_rule(ui, x, header_rect, table_internal_rule_color(theme));
         }
 
         let galley = ui.painter().layout_job(row_layout_job(
@@ -995,7 +995,7 @@ fn paint_table_header(
             egui::pos2(header_rect.min.x, header_rect.max.y),
             egui::pos2(header_rect.max.x, header_rect.max.y),
         ],
-        egui::Stroke::new(theme.stroke.sm, table_rule_color(theme)),
+        egui::Stroke::new(theme.stroke.sm, table_internal_rule_color(theme)),
     );
 }
 
@@ -1003,7 +1003,7 @@ fn paint_table_outline(ui: &Ui, theme: &CastTheme, rect: egui::Rect) {
     ui.painter().rect_stroke(
         rect,
         egui::CornerRadius::same(theme.radius.lg.round() as u8),
-        egui::Stroke::new(theme.stroke.md, table_rule_color(theme)),
+        egui::Stroke::new(table_outline_width(theme), table_outline_color(theme)),
         StrokeKind::Outside,
     );
 }
@@ -1133,13 +1133,13 @@ fn paint_table_detail_row(ui: &Ui, theme: &CastTheme, rect: egui::Rect, last_row
 }
 
 fn paint_table_vertical_rule(ui: &Ui, theme: &CastTheme, x: f32, rect: egui::Rect) {
-    paint_table_rule(ui, x, rect, table_rule_color(theme));
+    paint_table_rule(ui, x, rect, table_internal_rule_color(theme));
 }
 
 fn paint_table_horizontal_rule(ui: &Ui, theme: &CastTheme, y: f32, rect: egui::Rect) {
     ui.painter().line_segment(
         [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
-        egui::Stroke::new(theme.stroke.sm, table_rule_color(theme)),
+        egui::Stroke::new(theme.stroke.sm, table_internal_rule_color(theme)),
     );
 }
 
@@ -1167,10 +1167,21 @@ fn table_header_font(theme: &CastTheme) -> egui::FontId {
     font
 }
 
-fn table_rule_color(theme: &CastTheme) -> Color32 {
+fn table_outline_width(theme: &CastTheme) -> f32 {
+    theme.stroke.md.max(theme.stroke.sm)
+}
+
+fn table_outline_color(theme: &CastTheme) -> Color32 {
     match theme.mode {
-        ThemeMode::Light => mix_with_transparent(theme.colors.primary_family.base, 0.14),
-        ThemeMode::Dark => mix_with_transparent(theme.colors.text_muted, 0.30),
+        ThemeMode::Light => mix_with_transparent(theme.colors.primary_family.base, 0.16),
+        ThemeMode::Dark => mix_with_transparent(theme.colors.text_muted, 0.34),
+    }
+}
+
+fn table_internal_rule_color(theme: &CastTheme) -> Color32 {
+    match theme.mode {
+        ThemeMode::Light => mix_with_transparent(theme.colors.primary_family.base, 0.10),
+        ThemeMode::Dark => mix_with_transparent(theme.colors.text_muted, 0.24),
     }
 }
 
@@ -1400,15 +1411,23 @@ mod tests {
         );
         assert_eq!(table_header_text_color(&theme), theme.colors.text);
         assert_eq!(
-            table_rule_color(&theme),
-            mix_with_transparent(theme.colors.primary_family.base, 0.14)
+            table_outline_color(&theme),
+            mix_with_transparent(theme.colors.primary_family.base, 0.16)
+        );
+        assert_eq!(
+            table_internal_rule_color(&theme),
+            mix_with_transparent(theme.colors.primary_family.base, 0.10)
         );
         assert_eq!(
             table_header_font(&theme).family,
             theme.typography.strong.family
         );
         assert_eq!(table_header_font(&theme).size, theme.typography.small.size);
-        assert_ne!(table_rule_color(&theme), theme.colors.border);
+        assert_ne!(table_internal_rule_color(&theme), theme.colors.border);
+        assert_ne!(
+            table_outline_color(&theme),
+            table_internal_rule_color(&theme)
+        );
     }
 
     #[test]
@@ -1416,8 +1435,12 @@ mod tests {
         let theme = CastTheme::dark();
 
         assert_eq!(
-            table_rule_color(&theme),
-            mix_with_transparent(theme.colors.text_muted, 0.30)
+            table_outline_color(&theme),
+            mix_with_transparent(theme.colors.text_muted, 0.34)
+        );
+        assert_eq!(
+            table_internal_rule_color(&theme),
+            mix_with_transparent(theme.colors.text_muted, 0.24)
         );
     }
 
