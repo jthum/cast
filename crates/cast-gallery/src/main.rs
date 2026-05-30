@@ -12,13 +12,13 @@ use patterns::shell::{
 };
 
 use cast::{
-    Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Combobox,
-    ConfirmDialog, ConfirmDialogResponse, Dialog, Dropdown, EmptyState, FormActions, FormField,
-    FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle, MenuItem, Notice,
-    Panel as CastPanel, Popover, ProgressBar, RadioGroup, SearchInput, SegmentedControl, Select,
-    SemanticColorTokens, Separator, Sheet, Size, Skeleton, Slider, Switch, Tabs, TextArea,
-    TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip, TypographyTokens,
-    ValidationIssue, ValidationSummary, Variant,
+    AgentComposer, Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, ChatMessage,
+    Checkbox, Combobox, ConfirmDialog, ConfirmDialogResponse, Dialog, Dropdown, EmptyState,
+    FormActions, FormField, FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle, MenuItem,
+    Notice, Panel as CastPanel, Popover, ProgressBar, RadioGroup, SearchInput, SegmentedControl,
+    Select, SemanticColorTokens, Separator, Sheet, Size, Skeleton, Slider, Switch, Tabs, TextArea,
+    TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallStatus,
+    Tooltip, TypographyTokens, ValidationIssue, ValidationSummary, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -486,29 +486,39 @@ fn show_workbench_preview(
     ui.columns(2, |columns| {
         CastPanel::new().show(&mut columns[0], |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.heading("Run composer");
-                ui.add(Badge::new("Ready").intent(Intent::Success));
+                ui.heading("Agent thread");
+                ui.add(Badge::new("Ready").intent(Intent::Success).status_dot());
             });
             ui.add_space(8.0);
             ui.add(
-                TextInput::new(command)
-                    .label("Instruction")
-                    .hint_text("Ask Cast to refine a surface")
-                    .help_text(
-                        "Previewing field anatomy, status, and actions in one composed pane.",
-                    )
+                ChatMessage::user("Refine the component gallery into an app-like workspace.")
+                    .metadata("Just now")
                     .width(ui.available_width()),
             );
             ui.add_space(8.0);
-            ui.horizontal_wrapped(|ui| {
-                ui.add(Button::new("Run").leading_icon("[>]"));
-                ui.add(
-                    Button::new("Review")
-                        .intent(Intent::Secondary)
-                        .variant(Variant::Outline),
-                );
-                ui.add(Button::new("Save preset").variant(Variant::Ghost));
-            });
+            ui.add(
+                ChatMessage::assistant(
+                    "I will inspect the current surface, update the reusable widgets, and keep the gallery as the visual checkpoint.",
+                )
+                .metadata("Planning")
+                .width(ui.available_width()),
+            );
+            ui.add_space(8.0);
+            ui.add(
+                ToolCall::new("cargo test -p cast-ui")
+                    .status(ToolCallStatus::Succeeded)
+                    .metadata("1.2s")
+                    .body("179 tests passed")
+                    .width(ui.available_width()),
+            );
+            ui.add_space(8.0);
+            AgentComposer::new(command)
+                .placeholder("Ask Cast to adjust this surface...")
+                .send_label("Run")
+                .secondary_label("Attach")
+                .rows(2)
+                .width(ui.available_width())
+                .show(ui);
             ui.add(Separator::new().spacing(12.0));
             activity_row(ui, "01", "Inspect theme tokens", "Done", Intent::Success);
             activity_row(

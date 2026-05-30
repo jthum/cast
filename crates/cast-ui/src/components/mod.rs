@@ -1,3 +1,4 @@
+mod agent;
 mod alert;
 mod avatar;
 mod badge;
@@ -26,6 +27,9 @@ mod text_input;
 mod toast;
 mod tooltip;
 
+pub use agent::{
+    AgentComposer, AgentComposerResponse, ChatMessage, ChatRole, ToolCall, ToolCallStatus,
+};
 pub use alert::{Alert, Notice};
 pub use avatar::Avatar;
 pub use badge::Badge;
