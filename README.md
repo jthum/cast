@@ -29,12 +29,14 @@ The repository is named `cast`. The published crate is intended to be named `cas
 
 ## Current Status
 
-This repository is in early scaffold form. The workspace currently contains:
+This repository is in active component-library prototyping. The workspace currently contains:
 
 - Runtime-changeable theme model with light and dark defaults.
 - Semantic tokens for colors, spacing, radius, typography, controls, and focus.
-- Initial `Button`, `Badge`, and `Card` components.
-- A native gallery app with runtime light/dark switching.
+- Core controls including `Button`, `Badge`, `Checkbox`, `Radio`, `Switch`, `Slider`, `TextInput`, `SearchInput`, `Dropdown`, `Tabs`, and `SegmentedControl`.
+- Surfaces and feedback including `Card`, `Panel`, `Alert`, `Tooltip`, `Popover`, `Dialog`, `Disclosure`, and `Accordion`.
+- Data display primitives including `Table`, `TextTable`, expandable table details, list rows, and separators.
+- A native gallery app with runtime light/dark switching, token editing, component examples, and reusable app patterns.
 
 ## Development
 
@@ -59,3 +61,7 @@ cargo run -p cast-gallery
 ## Direction
 
 The first implementation milestone is the foundation: theme tokens, `egui` style integration, runtime theme switching, and a focused set of core components. Broader controls, overlays, data display, navigation, command surfaces, serialization, and Dashbase/Baseline theme import experiments should build on that foundation rather than define it.
+
+## Patterns
+
+Reusable composed UI blocks live in `crates/cast-gallery/src/patterns` while their API and visual language are still being proven. These are not low-level Cast widgets yet; they are examples of how primitives combine into product surfaces such as command palettes, shell chrome, related activity, and expandable entity tables.
