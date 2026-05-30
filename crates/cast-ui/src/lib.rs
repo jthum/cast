@@ -10,11 +10,11 @@ pub use color::{contrast_ratio, mix_with_transparent};
 pub use components::{
     Accordion, AccordionItem, Alert, Avatar, Badge, Button, Card, Checkbox, Combobox,
     ConfirmDialog, ConfirmDialogResponse, Dialog, DialogController, Disclosure, DisclosureResponse,
-    Dropdown, EmptyState, FilterBar, FormActions, FormField, FormSection, Label, Link, ListRow,
-    Loader, LoaderStyle, MenuItem, NavList, Notice, Panel, Popover, ProgressBar, Radio, RadioGroup,
-    SearchInput, SegmentedControl, Select, Separator, Sheet, SheetController, Skeleton, Slider,
-    Spinner, SpinnerStyle, Switch, Table, TableDetailRow, TableRow, Tabs, TextArea, TextInput,
-    TextTable, Toast, ToastPlacement, ToastResponse, ToastStack, ToastStackMode,
+    Dropdown, EmptyState, FilterBar, FormActions, FormField, FormSection, Kbd, Label, Link,
+    ListRow, Loader, LoaderStyle, MenuItem, NavList, Notice, Panel, Popover, ProgressBar, Radio,
+    RadioGroup, SearchInput, SegmentedControl, Select, Separator, Sheet, SheetController, Skeleton,
+    Slider, Spinner, SpinnerStyle, Switch, Table, TableDetailRow, TableRow, Tabs, TextArea,
+    TextInput, TextTable, Toast, ToastPlacement, ToastResponse, ToastStack, ToastStackMode,
     ToastStackResponse, Tooltip, ValidationIssue, ValidationSummary,
 };
 pub use egui;

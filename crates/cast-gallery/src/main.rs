@@ -14,11 +14,11 @@ use patterns::shell::{
 use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Combobox,
     ConfirmDialog, ConfirmDialogResponse, Dialog, Dropdown, EmptyState, FormActions, FormField,
-    FormSection, Intent, Label, Link, Loader, LoaderStyle, MenuItem, Notice, Panel as CastPanel,
-    Popover, ProgressBar, RadioGroup, SearchInput, SegmentedControl, Select, SemanticColorTokens,
-    Separator, Sheet, Size, Skeleton, Slider, Switch, Tabs, TextArea, TextInput, ThemeMode,
-    ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip, TypographyTokens, ValidationIssue,
-    ValidationSummary, Variant,
+    FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle, MenuItem, Notice,
+    Panel as CastPanel, Popover, ProgressBar, RadioGroup, SearchInput, SegmentedControl, Select,
+    SemanticColorTokens, Separator, Sheet, Size, Skeleton, Slider, Switch, Tabs, TextArea,
+    TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip, TypographyTokens,
+    ValidationIssue, ValidationSummary, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -2088,6 +2088,12 @@ fn show_text_and_feedback(
             ui.add(Label::new("Small label").size(Size::Small));
             ui.add(Link::new("Action link"));
             ui.add(Link::new("egui").to("https://github.com/emilk/egui"));
+        });
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Kbd::new("K").size(Size::Small));
+            ui.add(Kbd::shortcut(["Ctrl", "K"]).size(Size::Small));
+            ui.add(Kbd::shortcut(["Shift", "Enter"]));
         });
         ui.add(Separator::new().spacing(10.0));
         ui.add(

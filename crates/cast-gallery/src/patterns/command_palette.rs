@@ -1,5 +1,5 @@
 use cast::{
-    Badge, Dialog, Intent, SearchInput, Size, Variant,
+    Dialog, Intent, Kbd, SearchInput, Size, Variant,
     egui::{self, Color32, RichText, Sense, StrokeKind, text::LayoutJob},
 };
 
@@ -216,12 +216,7 @@ fn command_row(ui: &mut egui::Ui, command: CommandPaletteItem, selected: bool) -
         ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(theme.spacing.md);
-                ui.add(
-                    Badge::new(command.shortcut)
-                        .intent(command.intent)
-                        .variant(Variant::Outline)
-                        .size(Size::Small),
-                );
+                ui.add(Kbd::new(command.shortcut).size(Size::Small));
             });
         });
     }
