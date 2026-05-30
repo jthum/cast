@@ -112,6 +112,60 @@ impl Widget for Dropdown<'_> {
     }
 }
 
+#[derive(Debug)]
+pub struct Select<'a> {
+    inner: Dropdown<'a>,
+}
+
+impl<'a> Select<'a> {
+    #[must_use]
+    pub fn new<I, L>(selected: &'a mut usize, labels: I) -> Self
+    where
+        I: IntoIterator<Item = L>,
+        L: Into<String>,
+    {
+        Self {
+            inner: Dropdown::new(selected, labels),
+        }
+    }
+
+    #[must_use]
+    pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
+        self.inner = self.inner.placeholder(placeholder);
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.inner = self.inner.width(width);
+        self
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.inner = self.inner.size(size);
+        self
+    }
+
+    #[must_use]
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.inner = self.inner.enabled(enabled);
+        self
+    }
+
+    #[must_use]
+    pub fn disabled(mut self) -> Self {
+        self.inner = self.inner.disabled();
+        self
+    }
+}
+
+impl Widget for Select<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        self.inner.ui(ui)
+    }
+}
+
 fn dropdown_trigger(ui: &mut Ui, label: &str, width: f32, size: Size, enabled: bool) -> Response {
     let theme = theme_for_ui(ui);
     let metrics = resolve_control_metrics(&theme, size);
@@ -413,6 +467,20 @@ mod tests {
         assert_eq!(dropdown.labels, ["One", "Two"]);
         assert_eq!(dropdown.placeholder, "Select");
         assert_eq!(dropdown.size, None);
+    }
+
+    #[test]
+    fn select_wraps_dropdown_semantics() {
+        let mut selected = 1;
+        let select = Select::new(&mut selected, ["Compact", "Comfortable"])
+            .placeholder("Density")
+            .size(Size::Small)
+            .width(144.0);
+
+        assert_eq!(select.inner.labels, ["Compact", "Comfortable"]);
+        assert_eq!(select.inner.placeholder, "Density");
+        assert_eq!(select.inner.size, Some(Size::Small));
+        assert_eq!(select.inner.width, Some(144.0));
     }
 
     #[test]

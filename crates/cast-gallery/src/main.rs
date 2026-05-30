@@ -15,7 +15,7 @@ use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, ConfirmDialog,
     ConfirmDialogResponse, Dialog, Dropdown, EmptyState, FormField, Intent, Label, Link, Loader,
     LoaderStyle, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar, Radio, SearchInput,
-    SegmentedControl, SemanticColorTokens, Separator, Size, Skeleton, Slider, Switch, Tabs,
+    SegmentedControl, Select, SemanticColorTokens, Separator, Size, Skeleton, Slider, Switch, Tabs,
     TextArea, TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip,
     TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
@@ -2267,6 +2267,17 @@ fn show_forms(
             ui.add(Radio::new(form_density, 1, "Comfortable"));
             ui.add(Radio::new(form_density, 2, "Spacious"));
         });
+        ui.add_space(6.0);
+        FormField::new("Density select")
+            .description("Select gives dropdown behavior a form-control name.")
+            .width(220.0)
+            .show(ui, |ui| {
+                ui.add(
+                    Select::new(form_density, ["Compact", "Comfortable", "Spacious"])
+                        .placeholder("Density")
+                        .width(220.0),
+                );
+            });
         ui.horizontal(|ui| {
             ui.add(Switch::new(notifications));
             ui.label("Notifications");
