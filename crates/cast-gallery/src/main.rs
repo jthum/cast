@@ -2,13 +2,16 @@ use std::sync::Arc;
 
 mod patterns;
 
+use patterns::entity_table_with_details::{
+    EntityRecord, EntityTableState, rows_per_page_limit, show_entity_table_with_details,
+};
 use patterns::related_activity::show_related_activity;
 
 use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dropdown, Intent, Label,
     Link, MenuItem, Notice, Panel as CastPanel, Radio, SearchInput, SegmentedControl,
-    SemanticColorTokens, Separator, Size, Slider, Switch, Table, Tabs, TextInput, ThemeMode,
-    ThemeSeed, TypographyTokens, Variant,
+    SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed,
+    TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -1633,231 +1636,24 @@ fn show_lists_and_tables(
     page: &mut usize,
     exported_count: &mut Option<usize>,
 ) {
-    let filtered_leads = LEADS.iter().enumerate().collect::<Vec<_>>();
-    let filtered_count = filtered_leads.len();
-    let row_limit = rows_per_page_limit(*rows_per_page);
-    let page_count = filtered_count.div_ceil(row_limit).max(1);
-    if *page >= page_count {
-        *page = page_count - 1;
-    }
-    let row_offset = *page * row_limit;
-    let visible_rows = filtered_leads
-        .iter()
-        .copied()
-        .skip(row_offset)
-        .take(row_limit)
-        .collect::<Vec<_>>();
-    let visible_count = visible_rows.len();
-    let selected_rows = visible_rows
-        .iter()
-        .enumerate()
-        .filter_map(|(visible_index, (lead_index, _))| {
-            lead_selected[*lead_index].then_some(visible_index)
-        })
-        .collect::<Vec<_>>();
-    let expanded_rows = visible_rows
-        .iter()
-        .enumerate()
-        .filter_map(|(visible_index, (lead_index, _))| {
-            lead_expanded[*lead_index].then_some(visible_index)
-        })
-        .collect::<Vec<_>>();
-
     Card::new().show(ui, |ui| {
-        ui.horizontal(|ui| {
-            ui.vertical(|ui| {
-                ui.heading(format!("Leads [{filtered_count}]"));
-                ui.label("Lead records rendered directly by the Cast table component.");
-            });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                if ui
-                    .add(
-                        Button::new("Export as CSV")
-                            .intent(Intent::Neutral)
-                            .variant(Variant::Outline)
-                            .leading_icon("[^]"),
-                    )
-                    .clicked()
-                {
-                    *exported_count = Some(filtered_count);
-                }
-            });
-        });
-        if let Some(count) = *exported_count {
-            ui.add_space(8.0);
-            ui.add(
-                Notice::new(format!("{count} leads exported"))
-                    .body("Export feedback is wired to the current table rows.")
-                    .intent(Intent::Success),
-            );
-        }
-        ui.add_space(14.0);
-        if visible_count == 0 {
-            ui.add(
-                Notice::new("No matching leads")
-                    .body("Change the search query or filters to widen the result set."),
-            );
-        } else {
-            Table::new([
-                "",
-                "Lead name",
-                "Status",
-                "Interest",
-                "Source",
-                "Deal value",
-                "Assigned to",
-                "Interacted",
-            ])
-            .size(Size::Small)
-            .column_weights([0.24, 1.35, 1.20, 1.10, 1.30, 1.10, 1.10, 1.0])
-            .right_aligned_columns([5])
-            .selected_rows(selected_rows)
-            .expanded_rows(expanded_rows)
-            .expanded_row_height(66.0)
-            .sticky_header(320.0)
-            .show_with_details(
-                ui,
-                visible_count,
-                |row, row_index| {
-                    let (lead_index, lead) = visible_rows[row_index];
-                    row.centered_cell(|ui| {
-                        ui.add(Checkbox::new(&mut lead_selected[lead_index], "").size(Size::Small));
-                    });
-                    row.cell(|ui| {
-                        let expanded = lead_expanded[lead_index];
-                        if ui
-                            .add(
-                                Button::new(if expanded { "-" } else { "+" })
-                                    .variant(Variant::Ghost)
-                                    .size(Size::Small),
-                            )
-                            .clicked()
-                        {
-                            lead_expanded[lead_index] = !lead_expanded[lead_index];
-                        }
-                        ui.label(lead.name);
-                    });
-                    row.cell(|ui| {
-                        ui.add(
-                            Badge::new(lead.status)
-                                .intent(lead_status_intent(lead.status))
-                                .status_dot()
-                                .size(Size::Small),
-                        );
-                    });
-                    row.cell(|ui| {
-                        ui.add(
-                            Badge::new(lead.interest)
-                                .intent(lead_interest_intent(lead.interest))
-                                .status_dot()
-                                .size(Size::Small),
-                        );
-                    });
-                    row.text(lead.source);
-                    row.text(lead.deal_value);
-                    row.text(lead.assigned_to);
-                    row.text(lead.interacted);
-                },
-                |detail, row_index| {
-                    let (_, lead) = visible_rows[row_index];
-                    detail.show(|ui| {
-                        lead_detail_content(ui, lead);
-                    });
-                },
-            );
-        }
-        ui.add_space(10.0);
-        ui.horizontal(|ui| {
-            ui.label("Rows per page:");
-            let rows_response = ui.add(
-                Dropdown::new(rows_per_page, ["5", "10", "25"])
-                    .width(82.0)
-                    .size(Size::Small),
-            );
-            if rows_response.changed() {
-                *page = 0;
-            }
-            let visible_start = if visible_count == 0 {
-                0
-            } else {
-                row_offset + 1
-            };
-            let visible_end = row_offset + visible_count;
-            ui.add(
-                Badge::new(format!("Showing {visible_start}-{visible_end}"))
-                    .intent(Intent::Neutral),
-            );
-            ui.add(Badge::new(format!("of {filtered_count}")).intent(Intent::Neutral));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui
-                    .add(
-                        Button::new("Next")
-                            .size(Size::Small)
-                            .variant(Variant::Outline)
-                            .enabled(*page + 1 < page_count && visible_count > 0),
-                    )
-                    .clicked()
-                {
-                    *page += 1;
-                }
-                ui.add(Badge::new(format!("Page {} of {page_count}", *page + 1)));
-                if ui
-                    .add(
-                        Button::new("Previous")
-                            .size(Size::Small)
-                            .variant(Variant::Outline)
-                            .enabled(*page > 0 && visible_count > 0),
-                    )
-                    .clicked()
-                {
-                    *page -= 1;
-                }
-            });
-        });
+        show_entity_table_with_details(
+            ui,
+            &LEADS,
+            EntityTableState {
+                selected: lead_selected,
+                expanded: lead_expanded,
+                rows_per_page,
+                page,
+                exported_count,
+            },
+        );
         ui.add_space(12.0);
         show_related_activity(ui, related_activity_open, related_activity_group);
     });
 }
 
-fn lead_detail_content(ui: &mut egui::Ui, lead: &LeadRecord) {
-    ui.horizontal_wrapped(|ui| {
-        ui.label(
-            RichText::new("Related information")
-                .strong()
-                .color(cast::theme_for_ui(ui).colors.text),
-        );
-        ui.add(
-            Badge::new(format!("Owner {}", lead.assigned_to))
-                .intent(Intent::Neutral)
-                .status_dot()
-                .size(Size::Small),
-        );
-        ui.add(
-            Badge::new(lead.source)
-                .intent(Intent::Info)
-                .status_dot()
-                .size(Size::Small),
-        );
-        ui.label(format!(
-            "{} last interacted; current interest is {}.",
-            lead.interacted, lead.interest
-        ));
-    });
-}
-
-#[allow(dead_code)]
-#[derive(Clone, Copy, Debug)]
-struct LeadRecord {
-    name: &'static str,
-    status: &'static str,
-    interest: &'static str,
-    source: &'static str,
-    deal_value: &'static str,
-    payment: &'static str,
-    assigned_to: &'static str,
-    interacted: &'static str,
-    days_ago: u8,
-}
+type LeadRecord = EntityRecord;
 
 #[cfg(test)]
 const LEAD_USER_FILTERS: [&str; 6] = [
@@ -2194,32 +1990,6 @@ fn lead_matches_date_filter(lead: &LeadRecord, filter: usize) -> bool {
 #[cfg(test)]
 fn lead_matches_choice<const N: usize>(value: &str, labels: [&str; N], index: usize) -> bool {
     index == 0 || labels.get(index).is_some_and(|label| *label == value)
-}
-
-fn rows_per_page_limit(index: usize) -> usize {
-    match index {
-        1 => 10,
-        2 => 25,
-        _ => 5,
-    }
-}
-
-fn lead_status_intent(status: &str) -> Intent {
-    match status {
-        "Won" | "Qualified" => Intent::Success,
-        "Call booked" => Intent::Info,
-        "Lost" | "Unqualified" | "No show" => Intent::Danger,
-        _ => Intent::Neutral,
-    }
-}
-
-fn lead_interest_intent(interest: &str) -> Intent {
-    match interest {
-        "Interested" => Intent::Primary,
-        "Achiever" => Intent::Success,
-        "Broke" => Intent::Warning,
-        _ => Intent::Neutral,
-    }
 }
 
 fn show_text_and_feedback(ui: &mut egui::Ui) {
