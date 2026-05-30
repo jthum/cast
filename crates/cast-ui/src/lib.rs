@@ -8,10 +8,10 @@ pub mod theme;
 
 pub use color::{contrast_ratio, mix_with_transparent};
 pub use components::{
-    Accordion, AccordionItem, Alert, Badge, Button, Card, Checkbox, Disclosure, DisclosureResponse,
-    Dropdown, FilterBar, Label, Link, ListRow, MenuItem, NavList, Notice, Panel, Popover, Radio,
-    SearchInput, SegmentedControl, Separator, Slider, Switch, Table, TableDetailRow, TableRow,
-    Tabs, TextInput, TextTable, Tooltip,
+    Accordion, AccordionItem, Alert, Badge, Button, Card, Checkbox, Dialog, DialogController,
+    Disclosure, DisclosureResponse, Dropdown, FilterBar, Label, Link, ListRow, MenuItem, NavList,
+    Notice, Panel, Popover, Radio, SearchInput, SegmentedControl, Separator, Slider, Switch, Table,
+    TableDetailRow, TableRow, Tabs, TextInput, TextTable, Tooltip,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};

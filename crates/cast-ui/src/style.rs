@@ -238,6 +238,24 @@ pub(crate) fn popover_frame(theme: &CastTheme) -> egui::Frame {
         .inner_margin(Margin::same(theme.spacing.md as i8))
 }
 
+pub(crate) fn dialog_frame(theme: &CastTheme) -> egui::Frame {
+    egui::Frame::new()
+        .fill(theme.colors.surface_overlay)
+        .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
+        .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+        .shadow(surface_shadow(theme, 0.82, 22, 0, 8))
+        .inner_margin(Margin::same(theme.spacing.lg as i8))
+}
+
+pub(crate) fn dialog_backdrop(theme: &CastTheme) -> Color32 {
+    let alpha = match theme.mode {
+        crate::theme::ThemeMode::Light => 92,
+        crate::theme::ThemeMode::Dark => 148,
+    };
+
+    with_alpha(Color32::BLACK, alpha)
+}
+
 pub(crate) fn alert_intent_colors(theme: &CastTheme, intent: Intent) -> IntentColors {
     if intent == Intent::Neutral {
         return IntentColors {

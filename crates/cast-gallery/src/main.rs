@@ -8,10 +8,10 @@ use patterns::entity_table_with_details::{
 use patterns::related_activity::show_related_activity;
 
 use cast::{
-    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dropdown, Intent, Label,
-    Link, MenuItem, Notice, Panel as CastPanel, Popover, Radio, SearchInput, SegmentedControl,
-    SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed,
-    Tooltip, TypographyTokens, Variant,
+    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dialog, Dropdown, Intent,
+    Label, Link, MenuItem, Notice, Panel as CastPanel, Popover, Radio, SearchInput,
+    SegmentedControl, SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput,
+    ThemeMode, ThemeSeed, Tooltip, TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -49,6 +49,7 @@ struct CastGallery {
     indeterminate: bool,
     form_density: usize,
     menu_choice: usize,
+    dialog_open: bool,
     related_activity_open: bool,
     related_activity_group: Option<usize>,
     lead_selected: [bool; LEAD_COUNT],
@@ -85,6 +86,7 @@ impl CastGallery {
             indeterminate: false,
             form_density: 1,
             menu_choice: 0,
+            dialog_open: false,
             related_activity_open: false,
             related_activity_group: None,
             lead_selected: [false; LEAD_COUNT],
@@ -181,6 +183,7 @@ impl eframe::App for CastGallery {
                                     &mut self.indeterminate,
                                     &mut self.form_density,
                                     &mut self.menu_choice,
+                                    &mut self.dialog_open,
                                     &mut self.lead_search,
                                     &mut self.related_activity_open,
                                     &mut self.related_activity_group,
@@ -432,6 +435,7 @@ fn show_workspace_view(
     indeterminate: &mut bool,
     form_density: &mut usize,
     menu_choice: &mut usize,
+    dialog_open: &mut bool,
     lead_search: &mut String,
     related_activity_open: &mut bool,
     related_activity_group: &mut Option<usize>,
@@ -500,7 +504,7 @@ fn show_workspace_view(
             ui.add_space(12.0);
             show_buttons_and_badges(ui);
             ui.add_space(12.0);
-            show_menus(ui, menu_choice);
+            show_menus(ui, menu_choice, dialog_open);
             ui.add_space(12.0);
             show_lists_and_tables(
                 ui,
@@ -1599,7 +1603,7 @@ fn show_surfaces(ui: &mut egui::Ui) {
     });
 }
 
-fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize) {
+fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize, dialog_open: &mut bool) {
     Card::new().show(ui, |ui| {
         ui.heading("Menus and dropdowns");
         ui.horizontal_wrapped(|ui| {
@@ -1649,7 +1653,48 @@ fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize) {
                     ui.add(Button::new("Apply").size(Size::Small));
                 },
             );
+        ui.add_space(8.0);
+        if ui
+            .add(
+                Button::new("Open dialog")
+                    .intent(Intent::Neutral)
+                    .variant(Variant::Outline),
+            )
+            .clicked()
+        {
+            *dialog_open = true;
+        }
     });
+
+    Dialog::new(dialog_open, "gallery_dialog")
+        .title("Dialog")
+        .description("A blocking surface for focused decisions, confirmations, and short forms.")
+        .width(440.0)
+        .show(ui.ctx(), |ui, dialog| {
+            ui.label("Use dialogs when the surrounding workspace should pause until the user makes a choice.");
+            ui.add_space(12.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.add(Badge::new("Esc closes").intent(Intent::Neutral));
+                ui.add(Badge::new("Backdrop closes").intent(Intent::Info));
+            });
+            ui.add_space(18.0);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.add(Button::new("Confirm").size(Size::Small)).clicked() {
+                    dialog.close();
+                }
+                if ui
+                    .add(
+                        Button::new("Cancel")
+                            .intent(Intent::Neutral)
+                            .variant(Variant::Outline)
+                            .size(Size::Small),
+                    )
+                    .clicked()
+                {
+                    dialog.close();
+                }
+            });
+        });
 }
 
 #[allow(clippy::too_many_arguments)]
