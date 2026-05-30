@@ -108,6 +108,8 @@ pub struct Table {
     column_weights: Option<Vec<f32>>,
     right_aligned_columns: Vec<usize>,
     selected_rows: Vec<usize>,
+    expanded_rows: Vec<usize>,
+    expanded_row_height: f32,
     size: Size,
     sticky_body_height: Option<f32>,
     min_column_width: f32,
@@ -125,6 +127,8 @@ impl Table {
             column_weights: None,
             right_aligned_columns: Vec::new(),
             selected_rows: Vec::new(),
+            expanded_rows: Vec::new(),
+            expanded_row_height: 72.0,
             size: Size::Medium,
             sticky_body_height: None,
             min_column_width: 96.0,
@@ -159,6 +163,21 @@ impl Table {
     }
 
     #[must_use]
+    pub fn expanded_rows<I>(mut self, rows: I) -> Self
+    where
+        I: IntoIterator<Item = usize>,
+    {
+        self.expanded_rows = rows.into_iter().collect();
+        self
+    }
+
+    #[must_use]
+    pub fn expanded_row_height(mut self, height: f32) -> Self {
+        self.expanded_row_height = height.max(32.0);
+        self
+    }
+
+    #[must_use]
     pub fn size(mut self, size: Size) -> Self {
         self.size = size;
         self
@@ -180,6 +199,39 @@ impl Table {
     where
         F: for<'row> FnMut(&mut TableRow<'row>, usize),
     {
+        self.show_with_optional_details(
+            ui,
+            row_count,
+            &mut add_row,
+            None::<&mut fn(&mut TableDetailRow<'_>, usize)>,
+        )
+    }
+
+    pub fn show_with_details<F, D>(
+        self,
+        ui: &mut Ui,
+        row_count: usize,
+        mut add_row: F,
+        mut add_detail: D,
+    ) -> Response
+    where
+        F: for<'row> FnMut(&mut TableRow<'row>, usize),
+        D: for<'detail> FnMut(&mut TableDetailRow<'detail>, usize),
+    {
+        self.show_with_optional_details(ui, row_count, &mut add_row, Some(&mut add_detail))
+    }
+
+    fn show_with_optional_details<F, D>(
+        self,
+        ui: &mut Ui,
+        row_count: usize,
+        add_row: &mut F,
+        add_detail: Option<&mut D>,
+    ) -> Response
+    where
+        F: for<'row> FnMut(&mut TableRow<'row>, usize),
+        D: for<'detail> FnMut(&mut TableDetailRow<'detail>, usize),
+    {
         let theme = theme_for_ui(ui);
         let viewport_width = ui.available_width().max(240.0);
         let columns = self.columns.len().max(1);
@@ -188,7 +240,12 @@ impl Table {
             table_column_widths(table_width, columns, self.column_weights.as_deref());
         let header_height = table_header_height(self.size);
         let row_height = table_row_height(self.size);
-        let rows_height = row_height * row_count as f32;
+        let rows_height = expanded_table_rows_height(
+            row_count,
+            row_height,
+            self.expanded_row_height,
+            &self.expanded_rows,
+        );
         let body_height = table_body_height(rows_height, self.sticky_body_height);
         let table_height = header_height + body_height;
         let table_id = ui.next_auto_id();
@@ -215,7 +272,10 @@ impl Table {
                     self.size,
                     &self.right_aligned_columns,
                     &self.selected_rows,
-                    &mut add_row,
+                    &self.expanded_rows,
+                    self.expanded_row_height,
+                    add_row,
+                    add_detail,
                 )
             });
 
@@ -232,6 +292,29 @@ pub struct TableRow<'a> {
     size: Size,
     row_index: usize,
     column_index: usize,
+}
+
+pub struct TableDetailRow<'a> {
+    ui: &'a mut Ui,
+    theme: &'a CastTheme,
+    rect: egui::Rect,
+    row_index: usize,
+}
+
+impl TableDetailRow<'_> {
+    pub fn show(&mut self, add_contents: impl FnOnce(&mut Ui)) {
+        let content_rect = table_detail_content_rect(self.theme, self.rect);
+        let mut detail_ui = self.ui.new_child(
+            UiBuilder::new()
+                .max_rect(content_rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center))
+                .id_salt(("cast_table_detail", self.row_index)),
+        );
+        detail_ui.set_clip_rect(self.rect.intersect(self.ui.clip_rect()));
+        detail_ui.spacing_mut().item_spacing =
+            egui::vec2(self.theme.spacing.sm, self.theme.spacing.xs);
+        add_contents(&mut detail_ui);
+    }
 }
 
 impl TableRow<'_> {
@@ -513,7 +596,7 @@ fn paint_text_table_surface(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn paint_widget_table_surface<F>(
+fn paint_widget_table_surface<F, D>(
     ui: &mut Ui,
     theme: &CastTheme,
     table_id: egui::Id,
@@ -530,10 +613,14 @@ fn paint_widget_table_surface<F>(
     size: Size,
     right_aligned_columns: &[usize],
     selected_rows: &[usize],
+    expanded_rows: &[usize],
+    expanded_row_height: f32,
     add_row: &mut F,
+    add_detail: Option<&mut D>,
 ) -> Response
 where
     F: for<'row> FnMut(&mut TableRow<'row>, usize),
+    D: for<'detail> FnMut(&mut TableDetailRow<'detail>, usize),
 {
     let (rect, table_response) =
         ui.allocate_exact_size(egui::vec2(table_width, table_height), Sense::hover());
@@ -572,7 +659,10 @@ where
                     size,
                     right_aligned_columns,
                     selected_rows,
+                    expanded_rows,
+                    expanded_row_height,
                     add_row,
+                    add_detail,
                 )
             });
         combined = combined.union(scroll_response.inner);
@@ -589,7 +679,10 @@ where
             size,
             right_aligned_columns,
             selected_rows,
+            expanded_rows,
+            expanded_row_height,
             add_row,
+            add_detail,
         ));
     }
 
@@ -668,22 +761,26 @@ fn paint_table_rows_viewport(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn paint_widget_table_rows_viewport<F>(
+fn paint_widget_table_rows_viewport<F, D>(
     ui: &mut Ui,
     theme: &CastTheme,
     width: f32,
     rows_height: f32,
     row_height: f32,
-    viewport: egui::Rect,
+    _viewport: egui::Rect,
     column_widths: &[f32],
     row_count: usize,
     size: Size,
     right_aligned_columns: &[usize],
     selected_rows: &[usize],
+    expanded_rows: &[usize],
+    expanded_row_height: f32,
     add_row: &mut F,
+    mut add_detail: Option<&mut D>,
 ) -> Response
 where
     F: for<'row> FnMut(&mut TableRow<'row>, usize),
+    D: for<'detail> FnMut(&mut TableDetailRow<'detail>, usize),
 {
     let (_, content_rect) = ui.allocate_space(egui::vec2(width, rows_height));
     let content_response = ui.interact(
@@ -692,19 +789,16 @@ where
         Sense::hover(),
     );
     let mut combined = content_response;
-    let visible_start = (viewport.min.y / row_height).floor().max(0.0) as usize;
-    let visible_end = ((viewport.max.y / row_height).ceil() as usize + 1).min(row_count);
+    let mut y = content_rect.min.y;
 
-    for index in visible_start..visible_end {
+    for index in 0..row_count {
+        let expanded = expanded_rows.contains(&index);
+        let last_row = index + 1 == row_count && !expanded;
         let row_rect = egui::Rect::from_min_size(
-            egui::pos2(
-                content_rect.min.x,
-                content_rect.min.y + row_height * index as f32,
-            ),
+            egui::pos2(content_rect.min.x, y),
             egui::vec2(width, row_height),
         );
         let selected = selected_rows.contains(&index);
-        let last_row = index + 1 == row_count;
         let response = ui.interact(
             row_rect,
             ui.make_persistent_id(("cast_table_row", index)),
@@ -735,6 +829,37 @@ where
         }
 
         combined = combined.union(response);
+
+        y += row_height;
+
+        if expanded {
+            let detail_rect = egui::Rect::from_min_size(
+                egui::pos2(content_rect.min.x, y),
+                egui::vec2(width, expanded_row_height),
+            );
+            let last_detail = index + 1 == row_count;
+            let detail_response = ui.interact(
+                detail_rect,
+                ui.make_persistent_id(("cast_table_detail_row", index)),
+                Sense::hover(),
+            );
+
+            if ui.is_rect_visible(detail_rect) {
+                paint_table_detail_row(ui, theme, detail_rect, last_detail);
+                if let Some(add_detail) = add_detail.as_deref_mut() {
+                    let mut detail = TableDetailRow {
+                        ui,
+                        theme,
+                        rect: detail_rect,
+                        row_index: index,
+                    };
+                    add_detail(&mut detail, index);
+                }
+            }
+
+            combined = combined.union(detail_response);
+            y += expanded_row_height;
+        }
     }
 
     combined
@@ -985,6 +1110,28 @@ fn paint_table_row_background(
     ui.painter().rect_filled(rect, radius, colors.fill);
 }
 
+fn paint_table_detail_row(ui: &Ui, theme: &CastTheme, rect: egui::Rect, last_row: bool) {
+    let radius = if last_row {
+        egui::CornerRadius {
+            nw: 0,
+            ne: 0,
+            sw: theme.radius.lg.round() as u8,
+            se: theme.radius.lg.round() as u8,
+        }
+    } else {
+        egui::CornerRadius::ZERO
+    };
+
+    ui.painter().rect_filled(
+        rect,
+        radius,
+        mix_with_transparent(theme.colors.primary_family.base, 0.018),
+    );
+    if !last_row {
+        paint_table_horizontal_rule(ui, theme, rect.max.y, rect);
+    }
+}
+
 fn paint_table_vertical_rule(ui: &Ui, theme: &CastTheme, x: f32, rect: egui::Rect) {
     paint_table_rule(ui, x, rect, table_rule_color(theme));
 }
@@ -1129,10 +1276,29 @@ fn table_cell_content_rect(theme: &CastTheme, cell_rect: egui::Rect) -> egui::Re
     cell_rect.shrink2(egui::vec2(horizontal_padding, 0.0))
 }
 
+fn table_detail_content_rect(theme: &CastTheme, detail_rect: egui::Rect) -> egui::Rect {
+    detail_rect.shrink2(egui::vec2(table_cell_padding(theme), theme.spacing.sm))
+}
+
 fn table_body_height(rows_height: f32, sticky_body_height: Option<f32>) -> f32 {
     sticky_body_height
         .map(|height| height.min(rows_height))
         .unwrap_or(rows_height)
+}
+
+fn expanded_table_rows_height(
+    row_count: usize,
+    row_height: f32,
+    expanded_row_height: f32,
+    expanded_rows: &[usize],
+) -> f32 {
+    let expanded_count = expanded_rows
+        .iter()
+        .copied()
+        .filter(|index| *index < row_count)
+        .count();
+
+    row_height * row_count as f32 + expanded_row_height * expanded_count as f32
 }
 
 fn table_header_height(size: Size) -> f32 {
@@ -1280,6 +1446,22 @@ mod tests {
         assert_eq!(table_body_height(640.0, Some(320.0)), 320.0);
         assert_eq!(table_body_height(160.0, Some(320.0)), 160.0);
         assert_eq!(table_body_height(640.0, None), 640.0);
+    }
+
+    #[test]
+    fn expanded_table_rows_add_detail_height() {
+        assert_eq!(expanded_table_rows_height(4, 32.0, 64.0, &[1, 3]), 256.0);
+        assert_eq!(expanded_table_rows_height(4, 32.0, 64.0, &[4, 8]), 128.0);
+    }
+
+    #[test]
+    fn table_stores_expanded_row_options() {
+        let table = Table::new(["Name"])
+            .expanded_rows([0, 2])
+            .expanded_row_height(88.0);
+
+        assert_eq!(table.expanded_rows, [0, 2]);
+        assert_eq!(table.expanded_row_height, 88.0);
     }
 
     #[test]

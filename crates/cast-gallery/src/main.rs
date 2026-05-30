@@ -45,6 +45,7 @@ struct CastGallery {
     related_activity_open: bool,
     related_activity_group: Option<usize>,
     lead_selected: [bool; LEAD_COUNT],
+    lead_expanded: [bool; LEAD_COUNT],
     lead_date_filter: usize,
     lead_user_filter: usize,
     lead_status_filter: usize,
@@ -80,6 +81,7 @@ impl CastGallery {
             related_activity_open: false,
             related_activity_group: None,
             lead_selected: [false; LEAD_COUNT],
+            lead_expanded: [false; LEAD_COUNT],
             lead_date_filter: 1,
             lead_user_filter: 0,
             lead_status_filter: 0,
@@ -176,6 +178,7 @@ impl eframe::App for CastGallery {
                                     &mut self.related_activity_open,
                                     &mut self.related_activity_group,
                                     &mut self.lead_selected,
+                                    &mut self.lead_expanded,
                                     &mut self.lead_date_filter,
                                     &mut self.lead_user_filter,
                                     &mut self.lead_status_filter,
@@ -426,6 +429,7 @@ fn show_workspace_view(
     related_activity_open: &mut bool,
     related_activity_group: &mut Option<usize>,
     lead_selected: &mut [bool; LEAD_COUNT],
+    lead_expanded: &mut [bool; LEAD_COUNT],
     lead_date_filter: &mut usize,
     lead_user_filter: &mut usize,
     lead_status_filter: &mut usize,
@@ -497,6 +501,7 @@ fn show_workspace_view(
                 related_activity_open,
                 related_activity_group,
                 lead_selected,
+                lead_expanded,
                 lead_date_filter,
                 lead_user_filter,
                 lead_status_filter,
@@ -1615,6 +1620,7 @@ fn show_lists_and_tables(
     related_activity_open: &mut bool,
     related_activity_group: &mut Option<usize>,
     lead_selected: &mut [bool; LEAD_COUNT],
+    lead_expanded: &mut [bool; LEAD_COUNT],
     _date_filter: &mut usize,
     _user_filter: &mut usize,
     _status_filter: &mut usize,
@@ -1643,6 +1649,13 @@ fn show_lists_and_tables(
         .enumerate()
         .filter_map(|(visible_index, (lead_index, _))| {
             lead_selected[*lead_index].then_some(visible_index)
+        })
+        .collect::<Vec<_>>();
+    let expanded_rows = visible_rows
+        .iter()
+        .enumerate()
+        .filter_map(|(visible_index, (lead_index, _))| {
+            lead_expanded[*lead_index].then_some(visible_index)
         })
         .collect::<Vec<_>>();
 
@@ -1695,34 +1708,59 @@ fn show_lists_and_tables(
             .column_weights([0.24, 1.35, 1.20, 1.10, 1.30, 1.10, 1.10, 1.0])
             .right_aligned_columns([5])
             .selected_rows(selected_rows)
+            .expanded_rows(expanded_rows)
+            .expanded_row_height(66.0)
             .sticky_header(320.0)
-            .show(ui, visible_count, |row, row_index| {
-                let (lead_index, lead) = visible_rows[row_index];
-                row.centered_cell(|ui| {
-                    ui.add(Checkbox::new(&mut lead_selected[lead_index], "").size(Size::Small));
-                });
-                row.text(lead.name);
-                row.cell(|ui| {
-                    ui.add(
-                        Badge::new(lead.status)
-                            .intent(lead_status_intent(lead.status))
-                            .status_dot()
-                            .size(Size::Small),
-                    );
-                });
-                row.cell(|ui| {
-                    ui.add(
-                        Badge::new(lead.interest)
-                            .intent(lead_interest_intent(lead.interest))
-                            .status_dot()
-                            .size(Size::Small),
-                    );
-                });
-                row.text(lead.source);
-                row.text(lead.deal_value);
-                row.text(lead.assigned_to);
-                row.text(lead.interacted);
-            });
+            .show_with_details(
+                ui,
+                visible_count,
+                |row, row_index| {
+                    let (lead_index, lead) = visible_rows[row_index];
+                    row.centered_cell(|ui| {
+                        ui.add(Checkbox::new(&mut lead_selected[lead_index], "").size(Size::Small));
+                    });
+                    row.cell(|ui| {
+                        let expanded = lead_expanded[lead_index];
+                        if ui
+                            .add(
+                                Button::new(if expanded { "-" } else { "+" })
+                                    .variant(Variant::Ghost)
+                                    .size(Size::Small),
+                            )
+                            .clicked()
+                        {
+                            lead_expanded[lead_index] = !lead_expanded[lead_index];
+                        }
+                        ui.label(lead.name);
+                    });
+                    row.cell(|ui| {
+                        ui.add(
+                            Badge::new(lead.status)
+                                .intent(lead_status_intent(lead.status))
+                                .status_dot()
+                                .size(Size::Small),
+                        );
+                    });
+                    row.cell(|ui| {
+                        ui.add(
+                            Badge::new(lead.interest)
+                                .intent(lead_interest_intent(lead.interest))
+                                .status_dot()
+                                .size(Size::Small),
+                        );
+                    });
+                    row.text(lead.source);
+                    row.text(lead.deal_value);
+                    row.text(lead.assigned_to);
+                    row.text(lead.interacted);
+                },
+                |detail, row_index| {
+                    let (_, lead) = visible_rows[row_index];
+                    detail.show(|ui| {
+                        lead_detail_content(ui, lead);
+                    });
+                },
+            );
         }
         ui.add_space(10.0);
         ui.horizontal(|ui| {
@@ -1774,6 +1812,32 @@ fn show_lists_and_tables(
         });
         ui.add_space(12.0);
         show_related_activity(ui, related_activity_open, related_activity_group);
+    });
+}
+
+fn lead_detail_content(ui: &mut egui::Ui, lead: &LeadRecord) {
+    ui.horizontal_wrapped(|ui| {
+        ui.label(
+            RichText::new("Related information")
+                .strong()
+                .color(cast::theme_for_ui(ui).colors.text),
+        );
+        ui.add(
+            Badge::new(format!("Owner {}", lead.assigned_to))
+                .intent(Intent::Neutral)
+                .status_dot()
+                .size(Size::Small),
+        );
+        ui.add(
+            Badge::new(lead.source)
+                .intent(Intent::Info)
+                .status_dot()
+                .size(Size::Small),
+        );
+        ui.label(format!(
+            "{} last interacted; current interest is {}.",
+            lead.interacted, lead.interest
+        ));
     });
 }
 
