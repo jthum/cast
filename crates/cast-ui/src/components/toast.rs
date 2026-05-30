@@ -235,8 +235,14 @@ impl<'a> ToastStack<'a> {
                         expanded,
                     };
 
-                    paint_stack_backing(ui, &theme, width, self.toasts.len(), expansion);
                     let latest_response = self.toasts[0].clone().width(width).show(ui);
+                    paint_stack_backing(
+                        ui,
+                        &theme,
+                        latest_response.response.rect,
+                        self.toasts.len(),
+                        expansion,
+                    );
                     if latest_response.dismissed {
                         stack_response.dismissed_indices.push(0);
                     }
@@ -335,21 +341,27 @@ fn show_stack_toast(ui: &mut Ui, toast: Toast, width: f32, inset: f32) -> ToastR
     response.expect("toast stack row must render a toast")
 }
 
-fn paint_stack_backing(ui: &mut Ui, theme: &CastTheme, width: f32, count: usize, expansion: f32) {
+fn paint_stack_backing(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    front_rect: egui::Rect,
+    count: usize,
+    expansion: f32,
+) {
     let visible_backing = count.saturating_sub(1).min(2);
     let alpha = (1.0 - expansion).clamp(0.0, 1.0);
     if visible_backing == 0 || alpha <= 0.02 {
         return;
     }
 
-    let top_left = ui.cursor().min;
     for depth in (1..=visible_backing).rev() {
         let layer = depth as f32;
-        let inset = layer * 10.0 * alpha;
-        let y_offset = layer * 9.0 * alpha;
+        let inset = layer * 8.0 * alpha;
+        let edge_height = (6.0 + layer) * alpha;
+        let y = front_rect.max.y + (layer - 1.0) * 5.0 * alpha;
         let rect = egui::Rect::from_min_size(
-            egui::pos2(top_left.x + inset, top_left.y + y_offset),
-            egui::vec2((width - inset * 2.0).max(180.0), 76.0),
+            egui::pos2(front_rect.min.x + inset, y),
+            egui::vec2((front_rect.width() - inset * 2.0).max(180.0), edge_height),
         );
         ui.painter().rect(
             rect,
