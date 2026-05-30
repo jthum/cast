@@ -1,9 +1,12 @@
-use egui::{Color32, Id, Response, RichText, Sense, StrokeKind, Ui, Vec2, epaint::Stroke};
+use egui::{
+    Color32, Id, InnerResponse, Pos2, Rect, Response, RichText, Sense, StrokeKind, Ui, Vec2,
+    epaint::Stroke,
+};
 
 use crate::{
     color::mix_with_transparent,
     components::Button,
-    foundation::{Intent, Size, Variant},
+    foundation::{Intent, Placement, Size, Variant},
     style::{dialog_backdrop, dialog_frame},
     theme::{CastTheme, current_theme},
 };
@@ -226,6 +229,192 @@ pub enum ConfirmDialogResponse {
     Cancelled,
 }
 
+#[derive(Debug)]
+pub struct Sheet<'a> {
+    open: &'a mut bool,
+    id: Id,
+    title: Option<String>,
+    description: Option<String>,
+    placement: Placement,
+    extent: Option<f32>,
+    closable: bool,
+}
+
+impl<'a> Sheet<'a> {
+    #[must_use]
+    pub fn new(open: &'a mut bool, id_source: impl std::hash::Hash) -> Self {
+        Self {
+            open,
+            id: Id::new(id_source),
+            title: None,
+            description: None,
+            placement: Placement::Right,
+            extent: None,
+            closable: true,
+        }
+    }
+
+    #[must_use]
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    #[must_use]
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    #[must_use]
+    pub fn placement(mut self, placement: Placement) -> Self {
+        self.placement = placement;
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.extent = Some(width.max(sheet_extent_floor()));
+        self
+    }
+
+    #[must_use]
+    pub fn height(mut self, height: f32) -> Self {
+        self.extent = Some(height.max(sheet_extent_floor()));
+        self
+    }
+
+    #[must_use]
+    pub fn closable(mut self, closable: bool) -> Self {
+        self.closable = closable;
+        self
+    }
+
+    pub fn show<R>(
+        self,
+        ctx: &egui::Context,
+        add_contents: impl FnOnce(&mut Ui, &mut SheetController) -> R,
+    ) -> Option<InnerResponse<R>> {
+        if !*self.open {
+            return None;
+        }
+
+        let theme = current_theme(ctx).unwrap_or_else(CastTheme::light);
+        let screen_rect = ctx.content_rect();
+        let extent = self.extent.unwrap_or(420.0).max(sheet_extent_floor());
+        let (pos, size) = sheet_geometry(screen_rect, self.placement, extent);
+        let backdrop_id = self.id.with("backdrop");
+        let backdrop_response = egui::Area::new(backdrop_id)
+            .order(egui::Order::Middle)
+            .fixed_pos(screen_rect.min)
+            .show(ctx, |ui| {
+                ui.painter()
+                    .rect_filled(screen_rect, 0.0, dialog_backdrop(&theme));
+                let (_, response) = ui.allocate_exact_size(screen_rect.size(), Sense::click());
+                response
+            });
+
+        let mut controller = SheetController::default();
+        let area_response = egui::Area::new(self.id)
+            .order(egui::Order::Foreground)
+            .fixed_pos(pos)
+            .show(ctx, |ui| {
+                sheet_frame(&theme).show(ui, |ui| {
+                    let content_size = sheet_content_size(size, &theme);
+                    ui.set_min_size(content_size);
+                    ui.set_max_size(content_size);
+                    let mut header_controller = DialogController::default();
+
+                    paint_dialog_header(
+                        ui,
+                        &theme,
+                        self.title.as_deref(),
+                        self.description.as_deref(),
+                        self.closable,
+                        &mut header_controller,
+                    );
+
+                    if header_controller.close_requested() {
+                        controller.close();
+                    }
+
+                    add_contents(ui, &mut controller)
+                })
+            });
+
+        if (self.closable && backdrop_response.inner.clicked()) || controller.close_requested {
+            *self.open = false;
+        }
+
+        Some(area_response.inner)
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct SheetController {
+    close_requested: bool,
+}
+
+impl SheetController {
+    pub fn close(&mut self) {
+        self.close_requested = true;
+    }
+
+    #[must_use]
+    pub fn close_requested(&self) -> bool {
+        self.close_requested
+    }
+}
+
+fn sheet_frame(theme: &CastTheme) -> egui::Frame {
+    egui::Frame::new()
+        .fill(theme.colors.surface_overlay)
+        .stroke(Stroke::new(theme.stroke.sm.max(1.0), theme.colors.border))
+        .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+        .shadow(egui::epaint::Shadow {
+            offset: [0, 10],
+            blur: 28,
+            spread: 0,
+            color: mix_with_transparent(Color32::BLACK, 0.24),
+        })
+        .inner_margin(egui::Margin::same(theme.spacing.lg as i8))
+}
+
+fn sheet_geometry(screen: Rect, placement: Placement, extent: f32) -> (Pos2, Vec2) {
+    let extent = extent.max(sheet_extent_floor());
+
+    match placement {
+        Placement::Left => (
+            screen.min,
+            egui::vec2(extent.min(screen.width()), screen.height()),
+        ),
+        Placement::Right => (
+            egui::pos2(screen.max.x - extent.min(screen.width()), screen.min.y),
+            egui::vec2(extent.min(screen.width()), screen.height()),
+        ),
+        Placement::Top => (
+            screen.min,
+            egui::vec2(screen.width(), extent.min(screen.height())),
+        ),
+        Placement::Bottom => (
+            egui::pos2(screen.min.x, screen.max.y - extent.min(screen.height())),
+            egui::vec2(screen.width(), extent.min(screen.height())),
+        ),
+    }
+}
+
+fn sheet_content_size(frame_size: Vec2, theme: &CastTheme) -> Vec2 {
+    let margin = theme.spacing.lg * 2.0;
+    egui::vec2(
+        (frame_size.x - margin).max(sheet_extent_floor() - margin),
+        (frame_size.y - margin).max(0.0),
+    )
+}
+
+fn sheet_extent_floor() -> f32 {
+    260.0
+}
+
 fn paint_dialog_header(
     ui: &mut Ui,
     theme: &CastTheme,
@@ -369,5 +558,41 @@ mod tests {
         let dialog = ConfirmDialog::new(&mut open, "confirm").width(120.0);
 
         assert_eq!(dialog.width, Some(280.0));
+    }
+
+    #[test]
+    fn sheet_defaults_to_right_side_and_closable() {
+        let mut open = true;
+        let sheet = Sheet::new(&mut open, "sheet");
+
+        assert_eq!(sheet.placement, Placement::Right);
+        assert!(sheet.closable);
+        assert!(sheet.title.is_none());
+    }
+
+    #[test]
+    fn sheet_extent_has_floor() {
+        let mut open = true;
+        let sheet = Sheet::new(&mut open, "sheet").width(120.0);
+
+        assert_eq!(sheet.extent, Some(sheet_extent_floor()));
+    }
+
+    #[test]
+    fn sheet_geometry_places_right_sheet_at_screen_edge() {
+        let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(1000.0, 700.0));
+        let (pos, size) = sheet_geometry(screen, Placement::Right, 320.0);
+
+        assert_eq!(pos, Pos2::new(680.0, 0.0));
+        assert_eq!(size, Vec2::new(320.0, 700.0));
+    }
+
+    #[test]
+    fn sheet_content_size_accounts_for_frame_margin() {
+        let theme = CastTheme::light();
+        let size = sheet_content_size(Vec2::new(420.0, 700.0), &theme);
+
+        assert!(size.x < 420.0);
+        assert!(size.y < 700.0);
     }
 }

@@ -15,9 +15,9 @@ use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, ConfirmDialog,
     ConfirmDialogResponse, Dialog, Dropdown, EmptyState, FormField, Intent, Label, Link, Loader,
     LoaderStyle, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar, RadioGroup,
-    SearchInput, SegmentedControl, Select, SemanticColorTokens, Separator, Size, Skeleton, Slider,
-    Switch, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack,
-    Tooltip, TypographyTokens, Variant,
+    SearchInput, SegmentedControl, Select, SemanticColorTokens, Separator, Sheet, Size, Skeleton,
+    Slider, Switch, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement,
+    ToastStack, Tooltip, TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -53,6 +53,7 @@ struct CastGallery {
     form_density: usize,
     menu_choice: usize,
     dialog_open: bool,
+    sheet_open: bool,
     confirm_dialog_open: bool,
     confirm_result: Option<ConfirmDialogResponse>,
     toast_preview_open: bool,
@@ -95,6 +96,7 @@ impl CastGallery {
             form_density: 1,
             menu_choice: 0,
             dialog_open: false,
+            sheet_open: false,
             confirm_dialog_open: false,
             confirm_result: None,
             toast_preview_open: false,
@@ -229,6 +231,7 @@ impl eframe::App for CastGallery {
                                     &mut self.form_density,
                                     &mut self.menu_choice,
                                     &mut self.dialog_open,
+                                    &mut self.sheet_open,
                                     &mut self.confirm_dialog_open,
                                     &mut self.confirm_result,
                                     &mut self.toast_preview_open,
@@ -298,6 +301,7 @@ fn show_workspace_view(
     form_density: &mut usize,
     menu_choice: &mut usize,
     dialog_open: &mut bool,
+    sheet_open: &mut bool,
     confirm_dialog_open: &mut bool,
     confirm_result: &mut Option<ConfirmDialogResponse>,
     toast_preview_open: &mut bool,
@@ -376,6 +380,7 @@ fn show_workspace_view(
                 ui,
                 menu_choice,
                 dialog_open,
+                sheet_open,
                 confirm_dialog_open,
                 confirm_result,
                 command_palette,
@@ -1507,6 +1512,7 @@ fn show_menus(
     ui: &mut egui::Ui,
     menu_choice: &mut usize,
     dialog_open: &mut bool,
+    sheet_open: &mut bool,
     confirm_dialog_open: &mut bool,
     confirm_result: &mut Option<ConfirmDialogResponse>,
     command_palette: &mut CommandPaletteState,
@@ -1580,6 +1586,17 @@ fn show_menus(
         ui.horizontal_wrapped(|ui| {
             if ui
                 .add(
+                    Button::new("Open sheet")
+                        .intent(Intent::Neutral)
+                        .variant(Variant::Outline),
+                )
+                .clicked()
+            {
+                *sheet_open = true;
+            }
+
+            if ui
+                .add(
                     Button::new("Open confirm dialog")
                         .intent(Intent::Danger)
                         .variant(Variant::Outline),
@@ -1598,6 +1615,22 @@ fn show_menus(
             }
         });
     });
+
+    Sheet::new(sheet_open, "gallery_sheet")
+        .title("Run settings")
+        .description("A non-blocking side surface for secondary tasks and detailed controls.")
+        .width(380.0)
+        .show(ui.ctx(), |ui, sheet| {
+            ui.label("Sheets keep the workspace visible while exposing a focused panel.");
+            ui.add_space(12.0);
+            ui.add(Badge::new("Right edge").intent(Intent::Info));
+            ui.add_space(12.0);
+            ui.add(Separator::new());
+            ui.add_space(12.0);
+            if ui.add(Button::new("Done").size(Size::Small)).clicked() {
+                sheet.close();
+            }
+        });
 
     Dialog::new(dialog_open, "gallery_dialog")
         .title("Dialog")
