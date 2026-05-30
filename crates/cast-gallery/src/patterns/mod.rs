@@ -6,3 +6,4 @@
 pub mod command_palette;
 pub mod entity_table_with_details;
 pub mod related_activity;
+pub mod shell;
