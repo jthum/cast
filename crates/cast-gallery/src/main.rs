@@ -3,13 +3,13 @@ use std::sync::Arc;
 mod patterns;
 
 use patterns::entity_table_with_details::{
-    EntityRecord, EntityTableState, rows_per_page_limit, show_entity_table_with_details,
+    EntityRecord, EntityTableState, show_entity_table_with_details,
 };
 use patterns::related_activity::show_related_activity;
 
 use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dropdown, Intent, Label,
-    Link, MenuItem, Notice, Panel as CastPanel, Radio, SearchInput, SegmentedControl,
+    Link, MenuItem, Notice, Panel as CastPanel, Popover, Radio, SearchInput, SegmentedControl,
     SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed,
     Tooltip, TypographyTokens, Variant,
     egui::{
@@ -1626,6 +1626,29 @@ fn show_menus(ui: &mut egui::Ui, menu_choice: &mut usize) {
             ui.add(MenuItem::new("Delete preset").intent(Intent::Danger));
             ui.add(MenuItem::new("Unavailable action").disabled());
         });
+        ui.add_space(8.0);
+        Popover::new()
+            .title("Popover")
+            .body("A richer anchored overlay for compact settings and contextual actions.")
+            .width(280.0)
+            .show(
+                ui,
+                |ui| {
+                    ui.add(
+                        Button::new("Open popover")
+                            .intent(Intent::Neutral)
+                            .variant(Variant::Outline),
+                    );
+                },
+                |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.add(Badge::new("Anchored").intent(Intent::Info));
+                        ui.add(Badge::new("Composable").intent(Intent::Secondary));
+                    });
+                    ui.add_space(6.0);
+                    ui.add(Button::new("Apply").size(Size::Small));
+                },
+            );
     });
 }
 
@@ -2160,8 +2183,17 @@ mod tests {
 
     #[test]
     fn rows_per_page_limit_is_state_backed() {
-        assert_eq!(rows_per_page_limit(0), 5);
-        assert_eq!(rows_per_page_limit(1), 10);
-        assert_eq!(rows_per_page_limit(2), 25);
+        assert_eq!(
+            patterns::entity_table_with_details::rows_per_page_limit(0),
+            5
+        );
+        assert_eq!(
+            patterns::entity_table_with_details::rows_per_page_limit(1),
+            10
+        );
+        assert_eq!(
+            patterns::entity_table_with_details::rows_per_page_limit(2),
+            25
+        );
     }
 }

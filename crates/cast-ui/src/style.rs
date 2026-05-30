@@ -229,6 +229,15 @@ pub(crate) fn tooltip_frame(theme: &CastTheme) -> egui::Frame {
         ))
 }
 
+pub(crate) fn popover_frame(theme: &CastTheme) -> egui::Frame {
+    egui::Frame::new()
+        .fill(theme.colors.surface_overlay)
+        .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
+        .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+        .shadow(surface_shadow(theme, 0.68, 14, 0, 4))
+        .inner_margin(Margin::same(theme.spacing.md as i8))
+}
+
 pub(crate) fn alert_intent_colors(theme: &CastTheme, intent: Intent) -> IntentColors {
     if intent == Intent::Neutral {
         return IntentColors {

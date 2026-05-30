@@ -13,6 +13,7 @@ pub struct EntityRecord {
     pub payment: &'static str,
     pub assigned_to: &'static str,
     pub interacted: &'static str,
+    #[allow(dead_code)]
     pub days_ago: u8,
 }
 
