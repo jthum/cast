@@ -114,7 +114,6 @@ pub enum SpinnerStyle {
     Ticks,
     Signal,
     PixelSnake,
-    SquareSnake,
 }
 
 impl Default for Spinner {
@@ -135,9 +134,7 @@ impl Widget for Spinner {
             match self.style {
                 SpinnerStyle::Ticks => paint_tick_spinner(ui, &theme, rect, self.intent),
                 SpinnerStyle::Signal => paint_signal_spinner(ui, &theme, rect, self.intent),
-                SpinnerStyle::PixelSnake | SpinnerStyle::SquareSnake => {
-                    paint_pixel_snake_spinner(ui, &theme, rect, self.intent);
-                }
+                SpinnerStyle::PixelSnake => paint_pixel_snake_spinner(ui, rect, self.intent),
             }
         }
 
@@ -201,9 +198,9 @@ fn paint_signal_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: In
     }
 }
 
-fn paint_pixel_snake_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
-    let side = rect.width().min(rect.height());
-    let accent = progress_accent(theme, intent);
+fn paint_pixel_snake_spinner(ui: &Ui, rect: egui::Rect, intent: Intent) {
+    let theme = theme_for_ui(ui);
+    let accent = progress_accent(&theme, intent);
     let time = ui.input(|input| input.time) as f32;
     let cells = pixel_snake_cells(rect, 5);
     let step = (time * 12.0).floor() as usize;
@@ -212,10 +209,9 @@ fn paint_pixel_snake_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, inten
     for tail_index in 0..tail_len {
         let index = (step + cells.len() - tail_index) % cells.len();
         let fade = 1.0 - tail_index as f32 / tail_len as f32;
-        let cell = cells[index].shrink(side * 0.012);
         ui.painter().rect_filled(
-            cell,
-            egui::CornerRadius::same((theme.radius.sm * 0.35).round() as u8),
+            cells[index],
+            egui::CornerRadius::ZERO,
             color_with_scaled_alpha(accent, 0.18 + fade * 0.76),
         );
     }
@@ -223,32 +219,36 @@ fn paint_pixel_snake_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, inten
 
 fn pixel_snake_cells(rect: egui::Rect, grid: usize) -> Vec<egui::Rect> {
     let grid = grid.max(3);
-    let side = rect.width().min(rect.height());
-    let cell = side / grid as f32;
-    let origin = egui::pos2(rect.center().x - side / 2.0, rect.center().y - side / 2.0);
+    let outer_side = rect.width().min(rect.height()) * 0.78;
+    let pitch = outer_side / grid as f32;
+    let cell = pitch * 0.58;
+    let origin = egui::pos2(
+        rect.center().x - outer_side / 2.0 + (pitch - cell) / 2.0,
+        rect.center().y - outer_side / 2.0 + (pitch - cell) / 2.0,
+    );
     let mut cells = Vec::with_capacity((grid - 1) * 4);
 
     for column in 0..grid {
-        cells.push(pixel_cell(origin, cell, column, 0));
+        cells.push(pixel_cell(origin, pitch, cell, column, 0));
     }
     for row in 1..grid {
-        cells.push(pixel_cell(origin, cell, grid - 1, row));
+        cells.push(pixel_cell(origin, pitch, cell, grid - 1, row));
     }
     for column in (0..grid - 1).rev() {
-        cells.push(pixel_cell(origin, cell, column, grid - 1));
+        cells.push(pixel_cell(origin, pitch, cell, column, grid - 1));
     }
     for row in (1..grid - 1).rev() {
-        cells.push(pixel_cell(origin, cell, 0, row));
+        cells.push(pixel_cell(origin, pitch, cell, 0, row));
     }
 
     cells
 }
 
-fn pixel_cell(origin: egui::Pos2, size: f32, column: usize, row: usize) -> egui::Rect {
+fn pixel_cell(origin: egui::Pos2, pitch: f32, size: f32, column: usize, row: usize) -> egui::Rect {
     egui::Rect::from_min_size(
         egui::pos2(
-            origin.x + column as f32 * size,
-            origin.y + row as f32 * size,
+            origin.x + column as f32 * pitch,
+            origin.y + row as f32 * pitch,
         ),
         Vec2::splat(size),
     )
@@ -341,8 +341,10 @@ mod tests {
         let cells = pixel_snake_cells(rect, 3);
 
         assert_eq!(cells.len(), 8);
-        assert_eq!(cells[0].min, egui::pos2(2.0, 4.0));
         assert_eq!(cells[2].min.x, cells[3].min.x);
         assert_eq!(cells[4].min.y, cells[5].min.y);
+        assert!(cells[1].min.x > cells[0].max.x);
+        assert!(cells[3].min.y > cells[2].max.y);
+        assert!(cells[0].width() < rect.width() / 3.0);
     }
 }
