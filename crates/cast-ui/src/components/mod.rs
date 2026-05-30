@@ -31,7 +31,7 @@ pub use badge::Badge;
 pub use button::Button;
 pub use card::Card;
 pub use checkbox::{Checkbox, Radio};
-pub use dialog::{Dialog, DialogController};
+pub use dialog::{ConfirmDialog, ConfirmDialogResponse, Dialog, DialogController};
 pub use disclosure::{Accordion, AccordionItem, Disclosure, DisclosureResponse};
 pub use empty_state::EmptyState;
 pub use filter_bar::FilterBar;

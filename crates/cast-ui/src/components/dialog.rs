@@ -2,6 +2,8 @@ use egui::{Color32, Id, Response, RichText, Sense, StrokeKind, Ui, Vec2, epaint:
 
 use crate::{
     color::mix_with_transparent,
+    components::Button,
+    foundation::{Intent, Size, Variant},
     style::{dialog_backdrop, dialog_frame},
     theme::{CastTheme, current_theme},
 };
@@ -106,6 +108,122 @@ impl DialogController {
     pub fn close_requested(&self) -> bool {
         self.close_requested
     }
+}
+
+#[derive(Debug)]
+pub struct ConfirmDialog<'a> {
+    open: &'a mut bool,
+    id: Id,
+    title: String,
+    description: String,
+    confirm_label: String,
+    cancel_label: String,
+    intent: Intent,
+    width: Option<f32>,
+}
+
+impl<'a> ConfirmDialog<'a> {
+    #[must_use]
+    pub fn new(open: &'a mut bool, id_source: impl std::hash::Hash) -> Self {
+        Self {
+            open,
+            id: Id::new(id_source),
+            title: "Confirm action".to_owned(),
+            description: "This action needs confirmation before continuing.".to_owned(),
+            confirm_label: "Confirm".to_owned(),
+            cancel_label: "Cancel".to_owned(),
+            intent: Intent::Danger,
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+
+    #[must_use]
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = description.into();
+        self
+    }
+
+    #[must_use]
+    pub fn confirm_label(mut self, confirm_label: impl Into<String>) -> Self {
+        self.confirm_label = confirm_label.into();
+        self
+    }
+
+    #[must_use]
+    pub fn cancel_label(mut self, cancel_label: impl Into<String>) -> Self {
+        self.cancel_label = cancel_label.into();
+        self
+    }
+
+    #[must_use]
+    pub fn intent(mut self, intent: Intent) -> Self {
+        self.intent = intent;
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width.max(280.0));
+        self
+    }
+
+    pub fn show(self, ctx: &egui::Context) -> Option<ConfirmDialogResponse> {
+        let mut result = None;
+        let open = self.open;
+        let width = self.width;
+        let title = self.title;
+        let description = self.description;
+        let confirm_label = self.confirm_label;
+        let cancel_label = self.cancel_label;
+        let intent = self.intent;
+
+        Dialog {
+            open,
+            id: self.id,
+            title: Some(title),
+            description: Some(description),
+            width,
+            closable: true,
+        }
+        .show(ctx, |ui, dialog| {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .add(Button::new(confirm_label).intent(intent).size(Size::Small))
+                    .clicked()
+                {
+                    result = Some(ConfirmDialogResponse::Confirmed);
+                    dialog.close();
+                }
+
+                if ui
+                    .add(
+                        Button::new(cancel_label)
+                            .intent(Intent::Neutral)
+                            .variant(Variant::Outline)
+                            .size(Size::Small),
+                    )
+                    .clicked()
+                {
+                    result = Some(ConfirmDialogResponse::Cancelled);
+                    dialog.close();
+                }
+            });
+        });
+
+        result
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConfirmDialogResponse {
+    Confirmed,
+    Cancelled,
 }
 
 fn paint_dialog_header(
@@ -233,5 +351,23 @@ mod tests {
         assert!(!controller.close_requested());
         controller.close();
         assert!(controller.close_requested());
+    }
+
+    #[test]
+    fn confirm_dialog_defaults_to_danger_confirmation() {
+        let mut open = true;
+        let dialog = ConfirmDialog::new(&mut open, "confirm");
+
+        assert_eq!(dialog.intent, Intent::Danger);
+        assert_eq!(dialog.confirm_label, "Confirm");
+        assert_eq!(dialog.cancel_label, "Cancel");
+    }
+
+    #[test]
+    fn confirm_dialog_width_has_floor() {
+        let mut open = true;
+        let dialog = ConfirmDialog::new(&mut open, "confirm").width(120.0);
+
+        assert_eq!(dialog.width, Some(280.0));
     }
 }

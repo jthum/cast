@@ -12,11 +12,12 @@ use patterns::shell::{
 };
 
 use cast::{
-    Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dialog, Dropdown,
-    EmptyState, FormField, Intent, Label, Link, Loader, LoaderStyle, MenuItem, Notice,
-    Panel as CastPanel, Popover, ProgressBar, Radio, SearchInput, SegmentedControl,
-    SemanticColorTokens, Separator, Size, Skeleton, Slider, Switch, Tabs, TextArea, TextInput,
-    ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip, TypographyTokens, Variant,
+    Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, ConfirmDialog,
+    ConfirmDialogResponse, Dialog, Dropdown, EmptyState, FormField, Intent, Label, Link, Loader,
+    LoaderStyle, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar, Radio, SearchInput,
+    SegmentedControl, SemanticColorTokens, Separator, Size, Skeleton, Slider, Switch, Tabs,
+    TextArea, TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip,
+    TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -52,6 +53,8 @@ struct CastGallery {
     form_density: usize,
     menu_choice: usize,
     dialog_open: bool,
+    confirm_dialog_open: bool,
+    confirm_result: Option<ConfirmDialogResponse>,
     toast_preview_open: bool,
     toast_preview_toasts: Vec<Toast>,
     command_palette: CommandPaletteState,
@@ -92,6 +95,8 @@ impl CastGallery {
             form_density: 1,
             menu_choice: 0,
             dialog_open: false,
+            confirm_dialog_open: false,
+            confirm_result: None,
             toast_preview_open: false,
             toast_preview_toasts: Vec::new(),
             command_palette: CommandPaletteState::default(),
@@ -224,6 +229,8 @@ impl eframe::App for CastGallery {
                                     &mut self.form_density,
                                     &mut self.menu_choice,
                                     &mut self.dialog_open,
+                                    &mut self.confirm_dialog_open,
+                                    &mut self.confirm_result,
                                     &mut self.toast_preview_open,
                                     &mut self.toast_preview_toasts,
                                     &mut self.command_palette,
@@ -291,6 +298,8 @@ fn show_workspace_view(
     form_density: &mut usize,
     menu_choice: &mut usize,
     dialog_open: &mut bool,
+    confirm_dialog_open: &mut bool,
+    confirm_result: &mut Option<ConfirmDialogResponse>,
     toast_preview_open: &mut bool,
     toast_preview_toasts: &mut Vec<Toast>,
     command_palette: &mut CommandPaletteState,
@@ -363,7 +372,14 @@ fn show_workspace_view(
             ui.add_space(12.0);
             show_buttons_and_badges(ui);
             ui.add_space(12.0);
-            show_menus(ui, menu_choice, dialog_open, command_palette);
+            show_menus(
+                ui,
+                menu_choice,
+                dialog_open,
+                confirm_dialog_open,
+                confirm_result,
+                command_palette,
+            );
             ui.add_space(12.0);
             show_lists_and_tables(
                 ui,
@@ -1491,6 +1507,8 @@ fn show_menus(
     ui: &mut egui::Ui,
     menu_choice: &mut usize,
     dialog_open: &mut bool,
+    confirm_dialog_open: &mut bool,
+    confirm_result: &mut Option<ConfirmDialogResponse>,
     command_palette: &mut CommandPaletteState,
 ) {
     Card::new().show(ui, |ui| {
@@ -1558,6 +1576,27 @@ fn show_menus(
         {
             *dialog_open = true;
         }
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .add(
+                    Button::new("Open confirm dialog")
+                        .intent(Intent::Danger)
+                        .variant(Variant::Outline),
+                )
+                .clicked()
+            {
+                *confirm_dialog_open = true;
+            }
+
+            if let Some(result) = *confirm_result {
+                let (label, intent) = match result {
+                    ConfirmDialogResponse::Confirmed => ("Confirmed", Intent::Success),
+                    ConfirmDialogResponse::Cancelled => ("Cancelled", Intent::Neutral),
+                };
+                ui.add(Badge::new(label).intent(intent));
+            }
+        });
     });
 
     Dialog::new(dialog_open, "gallery_dialog")
@@ -1589,6 +1628,19 @@ fn show_menus(
                 }
             });
         });
+
+    if let Some(result) = ConfirmDialog::new(confirm_dialog_open, "gallery_confirm_dialog")
+        .title("Delete generated report?")
+        .description(
+            "This keeps the project intact, but removes the exported report from the current run.",
+        )
+        .confirm_label("Delete report")
+        .cancel_label("Keep report")
+        .width(420.0)
+        .show(ui.ctx())
+    {
+        *confirm_result = Some(result);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
