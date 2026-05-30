@@ -227,6 +227,7 @@ impl<'a> ToastStack<'a> {
                     };
                     let collapsed = expansion <= 0.02 && self.toasts.len() > 1;
                     ui.set_width(width);
+                    ui.add_space(toast_stack_top_padding(expansion));
                     ui.spacing_mut().item_spacing.y =
                         toast_stack_spacing(theme.spacing.sm, expansion);
                     let mut stack_response = ToastStackResponse {
@@ -368,6 +369,10 @@ fn toast_stack_spacing(expanded_spacing: f32, expansion: f32) -> f32 {
     compact_overlap + (expanded_spacing - compact_overlap) * expansion.clamp(0.0, 1.0)
 }
 
+fn toast_stack_top_padding(expansion: f32) -> f32 {
+    8.0 - expansion.clamp(0.0, 1.0) * 4.0
+}
+
 fn toast_stack_inset(index: usize, expansion: f32) -> f32 {
     let depth = index.min(2) as f32;
     depth * 10.0 * (1.0 - expansion.clamp(0.0, 1.0))
@@ -453,6 +458,12 @@ mod tests {
     fn toast_stack_spacing_animates_from_overlap_to_gap() {
         assert!(toast_stack_spacing(8.0, 0.0) < 0.0);
         assert_eq!(toast_stack_spacing(8.0, 1.0), 8.0);
+    }
+
+    #[test]
+    fn toast_stack_top_padding_keeps_front_card_visible() {
+        assert_eq!(toast_stack_top_padding(0.0), 8.0);
+        assert_eq!(toast_stack_top_padding(1.0), 4.0);
     }
 
     #[test]
