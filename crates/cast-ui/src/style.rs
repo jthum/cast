@@ -217,6 +217,18 @@ pub(crate) fn menu_frame(theme: &CastTheme) -> egui::Frame {
         .inner_margin(Margin::same(theme.spacing.xs as i8))
 }
 
+pub(crate) fn tooltip_frame(theme: &CastTheme) -> egui::Frame {
+    egui::Frame::new()
+        .fill(theme.colors.surface_overlay)
+        .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
+        .corner_radius(egui::CornerRadius::same(theme.radius.md as u8))
+        .shadow(surface_shadow(theme, 0.62, 10, 0, 2))
+        .inner_margin(Margin::symmetric(
+            theme.spacing.sm as i8,
+            theme.spacing.xs as i8,
+        ))
+}
+
 pub(crate) fn alert_intent_colors(theme: &CastTheme, intent: Intent) -> IntentColors {
     if intent == Intent::Neutral {
         return IntentColors {

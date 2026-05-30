@@ -11,7 +11,7 @@ use cast::{
     Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dropdown, Intent, Label,
     Link, MenuItem, Notice, Panel as CastPanel, Radio, SearchInput, SegmentedControl,
     SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed,
-    TypographyTokens, Variant,
+    Tooltip, TypographyTokens, Variant,
     egui::{
         self, CentralPanel, Color32, Panel as EguiPanel, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -1528,6 +1528,15 @@ fn show_buttons_and_badges(ui: &mut egui::Ui) {
             ui.add(Button::new("Next").trailing_icon("[>]"));
             ui.add(Button::new("Saving").loading(true));
             ui.add(Button::new("Disabled").disabled());
+            Tooltip::new("Tooltips inherit Cast theme colors, type, radius, and elevation.")
+                .title("Tooltip")
+                .show(ui, |ui| {
+                    ui.add(
+                        Button::new("Hover details")
+                            .intent(Intent::Neutral)
+                            .variant(Variant::Outline),
+                    );
+                });
         });
 
         ui.add_space(8.0);

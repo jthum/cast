@@ -15,6 +15,7 @@ mod separator;
 mod slider;
 mod switch;
 mod text_input;
+mod tooltip;
 
 pub use alert::{Alert, Notice};
 pub use badge::Badge;
@@ -33,3 +34,4 @@ pub use separator::Separator;
 pub use slider::Slider;
 pub use switch::Switch;
 pub use text_input::{SearchInput, TextInput};
+pub use tooltip::Tooltip;
