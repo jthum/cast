@@ -1989,6 +1989,17 @@ fn show_text_and_feedback(ui: &mut egui::Ui) {
                     .intent(Intent::Success)
                     .style(SpinnerStyle::PixelSnake),
             );
+            ui.add(
+                Spinner::new()
+                    .intent(Intent::Primary)
+                    .style(SpinnerStyle::PixelEqualizer)
+                    .size(Size::Large),
+            );
+            ui.add(
+                Spinner::new()
+                    .intent(Intent::Info)
+                    .style(SpinnerStyle::PixelEqualizer),
+            );
             ui.label("Async work can use spinner and progress primitives together.");
         });
         ui.add_space(8.0);

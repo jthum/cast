@@ -114,6 +114,7 @@ pub enum SpinnerStyle {
     Ticks,
     Signal,
     PixelSnake,
+    PixelEqualizer,
 }
 
 impl Default for Spinner {
@@ -135,6 +136,9 @@ impl Widget for Spinner {
                 SpinnerStyle::Ticks => paint_tick_spinner(ui, &theme, rect, self.intent),
                 SpinnerStyle::Signal => paint_signal_spinner(ui, &theme, rect, self.intent),
                 SpinnerStyle::PixelSnake => paint_pixel_snake_spinner(ui, rect, self.intent),
+                SpinnerStyle::PixelEqualizer => {
+                    paint_pixel_equalizer_spinner(ui, rect, self.intent)
+                }
             }
         }
 
@@ -202,9 +206,9 @@ fn paint_pixel_snake_spinner(ui: &Ui, rect: egui::Rect, intent: Intent) {
     let theme = theme_for_ui(ui);
     let accent = progress_accent(&theme, intent);
     let time = ui.input(|input| input.time) as f32;
-    let cells = pixel_snake_cells(rect, 5);
+    let cells = pixel_snake_cells(rect, 4);
     let step = (time * 12.0).floor() as usize;
-    let tail_len = 6;
+    let tail_len = 5;
 
     for tail_index in 0..tail_len {
         let index = (step + cells.len() - tail_index) % cells.len();
@@ -217,11 +221,46 @@ fn paint_pixel_snake_spinner(ui: &Ui, rect: egui::Rect, intent: Intent) {
     }
 }
 
+fn paint_pixel_equalizer_spinner(ui: &Ui, rect: egui::Rect, intent: Intent) {
+    let theme = theme_for_ui(ui);
+    let accent = progress_accent(&theme, intent);
+    let time = ui.input(|input| input.time) as f32;
+    let side = rect.width().min(rect.height());
+    let columns = 4;
+    let rows = 5;
+    let outer_width = side * 0.76;
+    let outer_height = side * 0.82;
+    let pitch = (outer_width / columns as f32).min(outer_height / rows as f32);
+    let cell = pitch * 0.66;
+    let origin = egui::pos2(
+        rect.center().x - (pitch * columns as f32) / 2.0 + (pitch - cell) / 2.0,
+        rect.center().y - (pitch * rows as f32) / 2.0 + (pitch - cell) / 2.0,
+    );
+
+    for column in 0..columns {
+        let phase = time * 5.2 + column as f32 * 1.18;
+        let wave = (phase.sin() + 1.0) * 0.5;
+        let active_rows = 1 + (wave * (rows - 1) as f32).round() as usize;
+
+        for level in 0..active_rows {
+            let row = rows - 1 - level;
+            let cell_rect = pixel_cell(origin, pitch, cell, column, row);
+            let level_alpha = level as f32 / rows as f32;
+            let alpha = 0.22 + level_alpha * 0.38 + wave * 0.28;
+            ui.painter().rect_filled(
+                cell_rect,
+                egui::CornerRadius::ZERO,
+                color_with_scaled_alpha(accent, alpha),
+            );
+        }
+    }
+}
+
 fn pixel_snake_cells(rect: egui::Rect, grid: usize) -> Vec<egui::Rect> {
     let grid = grid.max(3);
-    let outer_side = rect.width().min(rect.height()) * 0.78;
+    let outer_side = rect.width().min(rect.height()) * 0.64;
     let pitch = outer_side / grid as f32;
-    let cell = pitch * 0.58;
+    let cell = pitch * 0.74;
     let origin = egui::pos2(
         rect.center().x - outer_side / 2.0 + (pitch - cell) / 2.0,
         rect.center().y - outer_side / 2.0 + (pitch - cell) / 2.0,
@@ -330,8 +369,8 @@ mod tests {
     #[test]
     fn spinner_style_can_be_changed() {
         assert_eq!(
-            Spinner::new().style(SpinnerStyle::PixelSnake).style,
-            SpinnerStyle::PixelSnake
+            Spinner::new().style(SpinnerStyle::PixelEqualizer).style,
+            SpinnerStyle::PixelEqualizer
         );
     }
 
