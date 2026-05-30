@@ -12,8 +12,8 @@ pub use components::{
     DialogController, Disclosure, DisclosureResponse, Dropdown, EmptyState, FilterBar, FormField,
     Label, Link, ListRow, Loader, LoaderStyle, MenuItem, NavList, Notice, Panel, Popover,
     ProgressBar, Radio, SearchInput, SegmentedControl, Separator, Skeleton, Slider, Spinner,
-    SpinnerStyle, Switch, Table, TableDetailRow, TableRow, Tabs, TextInput, TextTable, Toast,
-    ToastPlacement, ToastResponse, ToastStack, ToastStackMode, ToastStackResponse, Tooltip,
+    SpinnerStyle, Switch, Table, TableDetailRow, TableRow, Tabs, TextArea, TextInput, TextTable,
+    Toast, ToastPlacement, ToastResponse, ToastStack, ToastStackMode, ToastStackResponse, Tooltip,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};

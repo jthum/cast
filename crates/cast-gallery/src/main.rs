@@ -15,8 +15,8 @@ use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dialog, Dropdown,
     EmptyState, FormField, Intent, Label, Link, Loader, LoaderStyle, MenuItem, Notice,
     Panel as CastPanel, Popover, ProgressBar, Radio, SearchInput, SegmentedControl,
-    SemanticColorTokens, Separator, Size, Skeleton, Slider, Switch, Tabs, TextInput, ThemeMode,
-    ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip, TypographyTokens, Variant,
+    SemanticColorTokens, Separator, Size, Skeleton, Slider, Switch, Tabs, TextArea, TextInput,
+    ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip, TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -327,6 +327,7 @@ fn show_workspace_view(
                 ui,
                 search,
                 name,
+                command,
                 handle,
                 enabled,
                 notifications,
@@ -388,6 +389,7 @@ fn show_workspace_view(
                 ui,
                 search,
                 name,
+                command,
                 handle,
                 enabled,
                 notifications,
@@ -2116,6 +2118,7 @@ fn show_forms(
     ui: &mut egui::Ui,
     search: &mut String,
     name: &mut String,
+    notes: &mut String,
     handle: &mut String,
     enabled: &mut bool,
     notifications: &mut bool,
@@ -2139,6 +2142,20 @@ fn show_forms(
                     ui.add(SearchInput::new(search).width(240.0));
                 });
         });
+        ui.add_space(8.0);
+        FormField::new("Instructions")
+            .description(
+                "Multiline text areas use the same input frame, halo, and status treatment.",
+            )
+            .width(520.0)
+            .show(ui, |ui| {
+                ui.add(
+                    TextArea::new(notes)
+                        .hint_text("Describe what the agent should do...")
+                        .rows(4)
+                        .width(520.0),
+                );
+            });
         ui.add_space(8.0);
         ui.horizontal_wrapped(|ui| {
             FormField::new("Handle")

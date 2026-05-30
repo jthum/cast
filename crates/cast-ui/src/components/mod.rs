@@ -48,7 +48,7 @@ pub use separator::Separator;
 pub use skeleton::Skeleton;
 pub use slider::Slider;
 pub use switch::Switch;
-pub use text_input::{SearchInput, TextInput};
+pub use text_input::{SearchInput, TextArea, TextInput};
 pub use toast::{
     Toast, ToastPlacement, ToastResponse, ToastStack, ToastStackMode, ToastStackResponse,
 };

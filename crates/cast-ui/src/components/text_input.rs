@@ -185,6 +185,128 @@ impl Widget for TextInput<'_> {
     }
 }
 
+#[derive(Debug)]
+pub struct TextArea<'a> {
+    text: &'a mut String,
+    hint_text: Option<String>,
+    width: Option<f32>,
+    rows: usize,
+    size: Option<Size>,
+    variant: Variant,
+    enabled: bool,
+    status_intent: Option<Intent>,
+}
+
+impl<'a> TextArea<'a> {
+    #[must_use]
+    pub fn new(text: &'a mut String) -> Self {
+        Self {
+            text,
+            hint_text: None,
+            width: None,
+            rows: 4,
+            size: None,
+            variant: Variant::Solid,
+            enabled: true,
+            status_intent: None,
+        }
+    }
+
+    #[must_use]
+    pub fn hint_text(mut self, hint_text: impl Into<String>) -> Self {
+        self.hint_text = Some(hint_text.into());
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    #[must_use]
+    pub fn rows(mut self, rows: usize) -> Self {
+        self.rows = rows.max(2);
+        self
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = Some(size);
+        self
+    }
+
+    #[must_use]
+    pub fn variant(mut self, variant: Variant) -> Self {
+        self.variant = variant;
+        self
+    }
+
+    #[must_use]
+    pub fn status(mut self, intent: Intent) -> Self {
+        self.status_intent = Some(intent);
+        self
+    }
+
+    #[must_use]
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    #[must_use]
+    pub fn disabled(mut self) -> Self {
+        self.enabled = false;
+        self
+    }
+}
+
+impl Widget for TextArea<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let size = self
+            .size
+            .or_else(|| crate::style::contextual_control_size(ui))
+            .unwrap_or(Size::Medium);
+        let metrics = resolve_control_metrics(&theme, size);
+        let mut font = theme.typography.body.clone();
+        font.size = metrics.text_size;
+        let enabled = self.enabled;
+        let input_radius = egui::CornerRadius::same(theme.components.input.radius as u8);
+        let mut edit = TextEdit::multiline(self.text)
+            .frame(input_frame(&theme, self.variant))
+            .font(font.clone())
+            .desired_rows(self.rows)
+            .min_size(egui::vec2(
+                0.0,
+                text_area_min_height(&theme, size, metrics, self.rows),
+            ))
+            .text_color(if enabled {
+                theme.components.input.fg
+            } else {
+                theme.colors.text_subtle
+            });
+
+        if let Some(hint_text) = self.hint_text {
+            edit = edit.hint_text(
+                RichText::new(hint_text)
+                    .font(font)
+                    .color(theme.components.input.placeholder)
+                    .extra_letter_spacing(theme.typography.letter_spacing),
+            );
+        }
+
+        if let Some(width) = self.width {
+            edit = edit.desired_width(width);
+        }
+
+        let response = ui.add_enabled(enabled, edit);
+        paint_input_state(ui, &response, input_radius, enabled, self.status_intent);
+
+        response
+    }
+}
+
 fn paint_input_state(
     ui: &Ui,
     response: &Response,
@@ -255,6 +377,19 @@ fn input_min_height(theme: &CastTheme, size: Size, metrics: crate::style::Contro
     } else {
         metrics.min_height.max(theme.components.input.min_height)
     }
+}
+
+fn text_area_min_height(
+    theme: &CastTheme,
+    size: Size,
+    metrics: crate::style::ControlMetrics,
+    rows: usize,
+) -> f32 {
+    let row_height = metrics.text_size * 1.35;
+    let padding = theme.components.input.padding_y * 2.0;
+    let min_height = row_height * rows.max(2) as f32 + padding;
+
+    min_height.max(input_min_height(theme, size, metrics))
 }
 
 fn status_color(theme: &CastTheme, intent: Intent) -> Color32 {
@@ -394,6 +529,25 @@ mod tests {
         let input = TextInput::new(&mut value);
 
         assert_eq!(input.size, None);
+    }
+
+    #[test]
+    fn text_area_rows_have_floor() {
+        let mut value = String::new();
+        let area = TextArea::new(&mut value).rows(1);
+
+        assert_eq!(area.rows, 2);
+    }
+
+    #[test]
+    fn text_area_min_height_scales_with_rows() {
+        let theme = CastTheme::light();
+        let metrics = resolve_control_metrics(&theme, Size::Medium);
+
+        assert!(
+            text_area_min_height(&theme, Size::Medium, metrics, 5)
+                > text_area_min_height(&theme, Size::Medium, metrics, 2)
+        );
     }
 
     #[test]
