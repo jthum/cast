@@ -113,6 +113,7 @@ pub enum SpinnerStyle {
     #[default]
     Ticks,
     Signal,
+    SquareSnake,
 }
 
 impl Default for Spinner {
@@ -133,6 +134,9 @@ impl Widget for Spinner {
             match self.style {
                 SpinnerStyle::Ticks => paint_tick_spinner(ui, &theme, rect, self.intent),
                 SpinnerStyle::Signal => paint_signal_spinner(ui, &theme, rect, self.intent),
+                SpinnerStyle::SquareSnake => {
+                    paint_square_snake_spinner(ui, &theme, rect, self.intent);
+                }
             }
         }
 
@@ -194,6 +198,55 @@ fn paint_signal_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: In
             color_with_scaled_alpha(accent, 0.62 + index as f32 * 0.12),
         );
     }
+}
+
+fn paint_square_snake_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
+    let side = rect.width().min(rect.height());
+    let accent = progress_accent(theme, intent);
+    let time = ui.input(|input| input.time) as f32;
+    let inset = (side * 0.18).max(3.0);
+    let dot_count = 7;
+    let head = (time * 0.72).fract();
+
+    let path_rect = rect.shrink(inset);
+    ui.painter().rect_stroke(
+        path_rect,
+        egui::CornerRadius::same((theme.radius.sm * 0.5).round() as u8),
+        Stroke::new(theme.stroke.sm, color_with_scaled_alpha(accent, 0.14)),
+        egui::StrokeKind::Inside,
+    );
+
+    for index in 0..dot_count {
+        let trail = index as f32 / dot_count as f32;
+        let progress = (head + 1.0 - trail * 0.30).fract();
+        let pos = square_path_position(path_rect, progress);
+        let fade = 1.0 - index as f32 / dot_count as f32;
+        let radius = side * (0.075 + fade * 0.025);
+
+        ui.painter().circle_filled(
+            pos,
+            radius,
+            color_with_scaled_alpha(accent, 0.20 + fade * 0.72),
+        );
+    }
+}
+
+fn square_path_position(rect: egui::Rect, progress: f32) -> egui::Pos2 {
+    let t = progress.rem_euclid(1.0) * 4.0;
+
+    if t < 1.0 {
+        egui::pos2(lerp(rect.min.x, rect.max.x, t), rect.min.y)
+    } else if t < 2.0 {
+        egui::pos2(rect.max.x, lerp(rect.min.y, rect.max.y, t - 1.0))
+    } else if t < 3.0 {
+        egui::pos2(lerp(rect.max.x, rect.min.x, t - 2.0), rect.max.y)
+    } else {
+        egui::pos2(rect.min.x, lerp(rect.max.y, rect.min.y, t - 3.0))
+    }
+}
+
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t.clamp(0.0, 1.0)
 }
 
 fn progress_height(size: Size) -> f32 {
@@ -272,8 +325,18 @@ mod tests {
     #[test]
     fn spinner_style_can_be_changed() {
         assert_eq!(
-            Spinner::new().style(SpinnerStyle::Signal).style,
-            SpinnerStyle::Signal
+            Spinner::new().style(SpinnerStyle::SquareSnake).style,
+            SpinnerStyle::SquareSnake
         );
+    }
+
+    #[test]
+    fn square_path_position_traces_square_edges() {
+        let rect = egui::Rect::from_min_max(egui::pos2(2.0, 4.0), egui::pos2(12.0, 14.0));
+
+        assert_eq!(square_path_position(rect, 0.0), egui::pos2(2.0, 4.0));
+        assert_eq!(square_path_position(rect, 0.25), egui::pos2(12.0, 4.0));
+        assert_eq!(square_path_position(rect, 0.50), egui::pos2(12.0, 14.0));
+        assert_eq!(square_path_position(rect, 0.75), egui::pos2(2.0, 14.0));
     }
 }

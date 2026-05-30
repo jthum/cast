@@ -1978,6 +1978,17 @@ fn show_text_and_feedback(ui: &mut egui::Ui) {
                     .intent(Intent::Info)
                     .style(SpinnerStyle::Signal),
             );
+            ui.add(
+                Spinner::new()
+                    .intent(Intent::Primary)
+                    .style(SpinnerStyle::SquareSnake)
+                    .size(Size::Large),
+            );
+            ui.add(
+                Spinner::new()
+                    .intent(Intent::Success)
+                    .style(SpinnerStyle::SquareSnake),
+            );
             ui.label("Async work can use spinner and progress primitives together.");
         });
         ui.add_space(8.0);
