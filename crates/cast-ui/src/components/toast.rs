@@ -225,26 +225,26 @@ impl<'a> ToastStack<'a> {
                     } else {
                         0.0
                     };
-                    let collapsed = expansion <= 0.02 && self.toasts.len() > 1;
+                    let has_extra_toasts = self.toasts.len() > 1;
+                    let expanded = expansion > 0.02 || !has_extra_toasts;
                     ui.set_width(width);
                     ui.add_space(toast_stack_top_padding(expansion));
-                    ui.spacing_mut().item_spacing.y =
-                        toast_stack_spacing(theme.spacing.sm, expansion);
+                    ui.spacing_mut().item_spacing.y = 0.0;
                     let mut stack_response = ToastStackResponse {
                         dismissed_indices: Vec::new(),
-                        expanded: !collapsed,
+                        expanded,
                     };
 
-                    if collapsed {
-                        paint_stack_backing(ui, &theme, width, self.toasts.len(), expansion);
-                        let response = self.toasts[0].clone().width(width).show(ui);
-                        if response.dismissed {
-                            stack_response.dismissed_indices.push(0);
-                        }
-                    } else {
-                        paint_stack_backing(ui, &theme, width, self.toasts.len(), expansion);
-                        for (index, toast) in self.toasts.iter().cloned().enumerate() {
-                            let inset = toast_stack_inset(index, expansion);
+                    paint_stack_backing(ui, &theme, width, self.toasts.len(), expansion);
+                    let latest_response = self.toasts[0].clone().width(width).show(ui);
+                    if latest_response.dismissed {
+                        stack_response.dismissed_indices.push(0);
+                    }
+
+                    if expanded {
+                        for (index, toast) in self.toasts.iter().cloned().enumerate().skip(1) {
+                            ui.add_space(toast_stack_reveal_gap(theme.spacing.sm, expansion));
+                            let inset = toast_stack_inset(index - 1, expansion);
                             let response = show_stack_toast(ui, toast, width, inset);
                             if response.dismissed {
                                 stack_response.dismissed_indices.push(index);
@@ -364,17 +364,16 @@ fn paint_stack_backing(ui: &mut Ui, theme: &CastTheme, width: f32, count: usize,
     }
 }
 
-fn toast_stack_spacing(expanded_spacing: f32, expansion: f32) -> f32 {
-    let compact_overlap = -44.0;
-    compact_overlap + (expanded_spacing - compact_overlap) * expansion.clamp(0.0, 1.0)
-}
-
 fn toast_stack_top_padding(expansion: f32) -> f32 {
     8.0 - expansion.clamp(0.0, 1.0) * 4.0
 }
 
+fn toast_stack_reveal_gap(expanded_spacing: f32, expansion: f32) -> f32 {
+    expanded_spacing * expansion.clamp(0.0, 1.0)
+}
+
 fn toast_stack_inset(index: usize, expansion: f32) -> f32 {
-    let depth = index.min(2) as f32;
+    let depth = (index + 1).min(2) as f32;
     depth * 10.0 * (1.0 - expansion.clamp(0.0, 1.0))
 }
 
@@ -455,9 +454,9 @@ mod tests {
     }
 
     #[test]
-    fn toast_stack_spacing_animates_from_overlap_to_gap() {
-        assert!(toast_stack_spacing(8.0, 0.0) < 0.0);
-        assert_eq!(toast_stack_spacing(8.0, 1.0), 8.0);
+    fn toast_stack_reveal_gap_animates_from_zero_to_gap() {
+        assert_eq!(toast_stack_reveal_gap(8.0, 0.0), 0.0);
+        assert_eq!(toast_stack_reveal_gap(8.0, 1.0), 8.0);
     }
 
     #[test]
@@ -469,7 +468,7 @@ mod tests {
     #[test]
     fn toast_stack_inset_animates_to_zero() {
         assert_eq!(toast_stack_inset(2, 1.0), 0.0);
-        assert!(toast_stack_inset(2, 0.0) > toast_stack_inset(1, 0.0));
+        assert!(toast_stack_inset(1, 0.0) > toast_stack_inset(0, 0.0));
     }
 
     #[test]
