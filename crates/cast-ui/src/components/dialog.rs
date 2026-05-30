@@ -319,7 +319,7 @@ impl<'a> Sheet<'a> {
             .order(egui::Order::Foreground)
             .fixed_pos(pos)
             .show(ctx, |ui| {
-                sheet_frame(&theme).show(ui, |ui| {
+                sheet_frame(&theme, self.placement).show(ui, |ui| {
                     let content_size = sheet_content_size(size, &theme);
                     ui.set_min_size(content_size);
                     ui.set_max_size(content_size);
@@ -366,11 +366,11 @@ impl SheetController {
     }
 }
 
-fn sheet_frame(theme: &CastTheme) -> egui::Frame {
+fn sheet_frame(theme: &CastTheme, placement: Placement) -> egui::Frame {
     egui::Frame::new()
         .fill(theme.colors.surface_overlay)
         .stroke(Stroke::new(theme.stroke.sm.max(1.0), theme.colors.border))
-        .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+        .corner_radius(sheet_corner_radius(theme, placement))
         .shadow(egui::epaint::Shadow {
             offset: [0, 10],
             blur: 28,
@@ -378,6 +378,37 @@ fn sheet_frame(theme: &CastTheme) -> egui::Frame {
             color: mix_with_transparent(Color32::BLACK, 0.24),
         })
         .inner_margin(egui::Margin::same(theme.spacing.lg as i8))
+}
+
+fn sheet_corner_radius(theme: &CastTheme, placement: Placement) -> egui::CornerRadius {
+    let radius = theme.radius.lg as u8;
+
+    match placement {
+        Placement::Left => egui::CornerRadius {
+            nw: 0,
+            ne: radius,
+            sw: 0,
+            se: radius,
+        },
+        Placement::Right => egui::CornerRadius {
+            nw: radius,
+            ne: 0,
+            sw: radius,
+            se: 0,
+        },
+        Placement::Top => egui::CornerRadius {
+            nw: 0,
+            ne: 0,
+            sw: radius,
+            se: radius,
+        },
+        Placement::Bottom => egui::CornerRadius {
+            nw: radius,
+            ne: radius,
+            sw: 0,
+            se: 0,
+        },
+    }
 }
 
 fn sheet_geometry(screen: Rect, placement: Placement, extent: f32) -> (Pos2, Vec2) {
@@ -594,5 +625,22 @@ mod tests {
 
         assert!(size.x < 420.0);
         assert!(size.y < 700.0);
+    }
+
+    #[test]
+    fn sheet_corner_radius_only_rounds_exposed_edge() {
+        let theme = CastTheme::light();
+        let radius = theme.radius.lg as u8;
+        let right = sheet_corner_radius(&theme, Placement::Right);
+        let bottom = sheet_corner_radius(&theme, Placement::Bottom);
+
+        assert_eq!(right.nw, radius);
+        assert_eq!(right.sw, radius);
+        assert_eq!(right.ne, 0);
+        assert_eq!(right.se, 0);
+        assert_eq!(bottom.nw, radius);
+        assert_eq!(bottom.ne, radius);
+        assert_eq!(bottom.sw, 0);
+        assert_eq!(bottom.se, 0);
     }
 }
