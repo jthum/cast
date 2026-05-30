@@ -15,7 +15,8 @@ use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dialog, Dropdown,
     EmptyState, Intent, Label, Link, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar,
     Radio, SearchInput, SegmentedControl, SemanticColorTokens, Separator, Size, Skeleton, Slider,
-    Spinner, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, Tooltip, TypographyTokens, Variant,
+    Spinner, SpinnerStyle, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, Tooltip,
+    TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -1966,6 +1967,17 @@ fn show_text_and_feedback(ui: &mut egui::Ui) {
             ui.add(Spinner::new().size(Size::Small));
             ui.add(Spinner::new().intent(Intent::Info));
             ui.add(Spinner::new().intent(Intent::Success).size(Size::Large));
+            ui.add(
+                Spinner::new()
+                    .intent(Intent::Primary)
+                    .style(SpinnerStyle::Signal)
+                    .size(Size::Large),
+            );
+            ui.add(
+                Spinner::new()
+                    .intent(Intent::Info)
+                    .style(SpinnerStyle::Signal),
+            );
             ui.label("Async work can use spinner and progress primitives together.");
         });
         ui.add_space(8.0);

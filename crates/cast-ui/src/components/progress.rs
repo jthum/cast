@@ -76,6 +76,7 @@ impl Widget for ProgressBar {
 pub struct Spinner {
     intent: Intent,
     size: Size,
+    style: SpinnerStyle,
 }
 
 impl Spinner {
@@ -84,6 +85,7 @@ impl Spinner {
         Self {
             intent: Intent::Primary,
             size: Size::Medium,
+            style: SpinnerStyle::Ticks,
         }
     }
 
@@ -98,6 +100,19 @@ impl Spinner {
         self.size = size;
         self
     }
+
+    #[must_use]
+    pub fn style(mut self, style: SpinnerStyle) -> Self {
+        self.style = style;
+        self
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SpinnerStyle {
+    #[default]
+    Ticks,
+    Signal,
 }
 
 impl Default for Spinner {
@@ -115,14 +130,17 @@ impl Widget for Spinner {
         if ui.is_rect_visible(rect) {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(16));
-            paint_spinner(ui, &theme, rect, self.intent);
+            match self.style {
+                SpinnerStyle::Ticks => paint_tick_spinner(ui, &theme, rect, self.intent),
+                SpinnerStyle::Signal => paint_signal_spinner(ui, &theme, rect, self.intent),
+            }
         }
 
         response
     }
 }
 
-fn paint_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
+fn paint_tick_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
     let center = rect.center();
     let radius = rect.width().min(rect.height()) * 0.38;
     let accent = progress_accent(theme, intent);
@@ -141,6 +159,39 @@ fn paint_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
                 theme.stroke.md.max(1.6),
                 color_with_scaled_alpha(accent, alpha),
             ),
+        );
+    }
+}
+
+fn paint_signal_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
+    let center = rect.center();
+    let side = rect.width().min(rect.height());
+    let accent = progress_accent(theme, intent);
+    let time = ui.input(|input| input.time) as f32;
+    let pulse = ((time * std::f32::consts::TAU * 1.2).sin() + 1.0) * 0.5;
+    let orbit = time * std::f32::consts::TAU * 0.72;
+    let orbit_radius = side * (0.28 + pulse * 0.035);
+
+    ui.painter().circle_filled(
+        center,
+        side * (0.26 + pulse * 0.035),
+        color_with_scaled_alpha(accent, 0.12 + pulse * 0.08),
+    );
+    ui.painter().circle_stroke(
+        center,
+        side * 0.36,
+        Stroke::new(theme.stroke.sm, color_with_scaled_alpha(accent, 0.28)),
+    );
+
+    for index in 0..3 {
+        let angle = orbit + (index as f32 * std::f32::consts::TAU / 3.0);
+        let dot_center = center + egui::vec2(angle.cos(), angle.sin()) * orbit_radius;
+        let phase = ((time * std::f32::consts::TAU * 1.6) + index as f32 * 1.3).sin();
+        let radius = side * (0.075 + (phase + 1.0) * 0.012);
+        ui.painter().circle_filled(
+            dot_center,
+            radius,
+            color_with_scaled_alpha(accent, 0.62 + index as f32 * 0.12),
         );
     }
 }
@@ -211,5 +262,18 @@ mod tests {
     #[test]
     fn progress_width_has_floor() {
         assert_eq!(ProgressBar::new(0.5).width(20.0).width, Some(48.0));
+    }
+
+    #[test]
+    fn spinner_defaults_to_tick_style() {
+        assert_eq!(Spinner::new().style, SpinnerStyle::Ticks);
+    }
+
+    #[test]
+    fn spinner_style_can_be_changed() {
+        assert_eq!(
+            Spinner::new().style(SpinnerStyle::Signal).style,
+            SpinnerStyle::Signal
+        );
     }
 }

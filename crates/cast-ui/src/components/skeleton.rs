@@ -1,6 +1,10 @@
 use egui::{Color32, Response, Sense, Ui, Vec2, Widget};
 
-use crate::{color::mix_with_transparent, foundation::Size, theme::theme_for_ui};
+use crate::{
+    color::mix_with_transparent,
+    foundation::Size,
+    theme::{ThemeMode, theme_for_ui},
+};
 
 #[derive(Clone, Debug)]
 pub struct Skeleton {
@@ -67,7 +71,7 @@ impl Widget for Skeleton {
             if self.animated && !theme.animation.reduced_motion {
                 ui.ctx()
                     .request_repaint_after(std::time::Duration::from_millis(24));
-                paint_skeleton_shimmer(ui, rect, radius);
+                paint_skeleton_shimmer(ui, &theme, rect, radius);
             }
         }
 
@@ -75,7 +79,12 @@ impl Widget for Skeleton {
     }
 }
 
-fn paint_skeleton_shimmer(ui: &Ui, rect: egui::Rect, radius: egui::CornerRadius) {
+fn paint_skeleton_shimmer(
+    ui: &Ui,
+    theme: &crate::CastTheme,
+    rect: egui::Rect,
+    radius: egui::CornerRadius,
+) {
     let time = ui.input(|input| input.time) as f32;
     let sweep = rect.width() * 0.28;
     let travel = rect.width() + sweep * 2.0;
@@ -87,11 +96,8 @@ fn paint_skeleton_shimmer(ui: &Ui, rect: egui::Rect, radius: egui::CornerRadius)
     .intersect(rect);
 
     if shimmer_rect.is_positive() {
-        ui.painter().rect_filled(
-            shimmer_rect,
-            radius,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 28),
-        );
+        ui.painter()
+            .rect_filled(shimmer_rect, radius, skeleton_shimmer_color(theme));
     }
 }
 
@@ -105,6 +111,13 @@ fn skeleton_height(size: Size) -> f32 {
 
 fn skeleton_fill(theme: &crate::CastTheme) -> Color32 {
     mix_with_transparent(theme.colors.text_muted, 0.14)
+}
+
+fn skeleton_shimmer_color(theme: &crate::CastTheme) -> Color32 {
+    match theme.mode {
+        ThemeMode::Light => Color32::from_rgba_unmultiplied(0, 0, 0, 20),
+        ThemeMode::Dark => Color32::from_rgba_unmultiplied(255, 255, 255, 34),
+    }
 }
 
 #[cfg(test)]
@@ -123,5 +136,13 @@ mod tests {
 
         assert_eq!(skeleton.width, Some(8.0));
         assert_eq!(skeleton.height, Some(4.0));
+    }
+
+    #[test]
+    fn skeleton_shimmer_changes_by_mode() {
+        assert_ne!(
+            skeleton_shimmer_color(&crate::CastTheme::light()),
+            skeleton_shimmer_color(&crate::CastTheme::dark())
+        );
     }
 }

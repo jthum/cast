@@ -40,7 +40,7 @@ pub use menu::{Dropdown, MenuItem};
 pub use navigation::{NavList, SegmentedControl, Tabs};
 pub use panel::Panel;
 pub use popover::Popover;
-pub use progress::{ProgressBar, Spinner};
+pub use progress::{ProgressBar, Spinner, SpinnerStyle};
 pub use separator::Separator;
 pub use skeleton::Skeleton;
 pub use slider::Slider;
