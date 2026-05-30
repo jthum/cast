@@ -30,7 +30,7 @@ pub use avatar::Avatar;
 pub use badge::Badge;
 pub use button::Button;
 pub use card::Card;
-pub use checkbox::{Checkbox, Radio};
+pub use checkbox::{Checkbox, Radio, RadioGroup};
 pub use dialog::{ConfirmDialog, ConfirmDialogResponse, Dialog, DialogController};
 pub use disclosure::{Accordion, AccordionItem, Disclosure, DisclosureResponse};
 pub use empty_state::EmptyState;

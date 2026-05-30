@@ -5,7 +5,7 @@ use egui::{
 
 use crate::{
     color::{mix_with_transparent, with_alpha},
-    foundation::Size,
+    foundation::{Orientation, Size},
     style::resolve_control_metrics,
     theme::{CastTheme, theme_for_ui},
 };
@@ -148,6 +148,126 @@ where
 
         response
     }
+}
+
+#[derive(Debug)]
+pub struct RadioGroup<'a, T> {
+    selected: &'a mut T,
+    options: Vec<(T, String)>,
+    size: Size,
+    orientation: Orientation,
+    enabled: bool,
+}
+
+impl<'a, T> RadioGroup<'a, T>
+where
+    T: PartialEq + Clone,
+{
+    #[must_use]
+    pub fn new<I, L>(selected: &'a mut T, options: I) -> Self
+    where
+        I: IntoIterator<Item = (T, L)>,
+        L: Into<String>,
+    {
+        Self {
+            selected,
+            options: options
+                .into_iter()
+                .map(|(value, label)| (value, label.into()))
+                .collect(),
+            size: Size::Medium,
+            orientation: Orientation::Horizontal,
+            enabled: true,
+        }
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = size;
+        self
+    }
+
+    #[must_use]
+    pub fn orientation(mut self, orientation: Orientation) -> Self {
+        self.orientation = orientation;
+        self
+    }
+
+    #[must_use]
+    pub fn vertical(mut self) -> Self {
+        self.orientation = Orientation::Vertical;
+        self
+    }
+
+    #[must_use]
+    pub fn horizontal(mut self) -> Self {
+        self.orientation = Orientation::Horizontal;
+        self
+    }
+
+    #[must_use]
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    #[must_use]
+    pub fn disabled(mut self) -> Self {
+        self.enabled = false;
+        self
+    }
+}
+
+impl<T> Widget for RadioGroup<'_, T>
+where
+    T: PartialEq + Clone,
+{
+    fn ui(self, ui: &mut Ui) -> Response {
+        let RadioGroup {
+            selected,
+            options,
+            size,
+            orientation,
+            enabled,
+        } = self;
+
+        let inner = if orientation == Orientation::Horizontal {
+            ui.horizontal_wrapped(|ui| radio_group_content(ui, selected, options, size, enabled))
+        } else {
+            ui.vertical(|ui| radio_group_content(ui, selected, options, size, enabled))
+        };
+        let mut response = inner.response;
+
+        if inner.inner {
+            response.mark_changed();
+        }
+
+        response
+    }
+}
+
+fn radio_group_content<T>(
+    ui: &mut Ui,
+    selected: &mut T,
+    options: Vec<(T, String)>,
+    size: Size,
+    enabled: bool,
+) -> bool
+where
+    T: PartialEq + Clone,
+{
+    let mut changed = false;
+
+    for (value, label) in options {
+        let response = ui.add(
+            Radio::new(selected, value, label)
+                .size(size)
+                .enabled(enabled),
+        );
+        changed |= response.changed();
+    }
+
+    changed
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -467,5 +587,29 @@ mod tests {
         theme.stroke.sm = 1.0;
 
         assert_eq!(choice_border_width(&theme), 1.5);
+    }
+
+    #[test]
+    fn radio_group_collects_options_and_defaults_horizontal() {
+        let mut selected = 0;
+        let group = RadioGroup::new(&mut selected, [(0, "Compact"), (1, "Comfortable")]);
+
+        assert_eq!(group.options.len(), 2);
+        assert_eq!(group.size, Size::Medium);
+        assert_eq!(group.orientation, Orientation::Horizontal);
+        assert!(group.enabled);
+    }
+
+    #[test]
+    fn radio_group_can_be_vertical_and_disabled() {
+        let mut selected = 0;
+        let group = RadioGroup::new(&mut selected, [(0, "A"), (1, "B")])
+            .vertical()
+            .disabled()
+            .size(Size::Small);
+
+        assert_eq!(group.orientation, Orientation::Vertical);
+        assert_eq!(group.size, Size::Small);
+        assert!(!group.enabled);
     }
 }

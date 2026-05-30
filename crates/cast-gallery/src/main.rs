@@ -14,10 +14,10 @@ use patterns::shell::{
 use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, ConfirmDialog,
     ConfirmDialogResponse, Dialog, Dropdown, EmptyState, FormField, Intent, Label, Link, Loader,
-    LoaderStyle, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar, Radio, SearchInput,
-    SegmentedControl, Select, SemanticColorTokens, Separator, Size, Skeleton, Slider, Switch, Tabs,
-    TextArea, TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack, Tooltip,
-    TypographyTokens, Variant,
+    LoaderStyle, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar, RadioGroup,
+    SearchInput, SegmentedControl, Select, SemanticColorTokens, Separator, Size, Skeleton, Slider,
+    Switch, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack,
+    Tooltip, TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -2262,11 +2262,18 @@ fn show_forms(
             ui.add(Checkbox::new(indeterminate, "Mixed").indeterminate(true));
             ui.add(Checkbox::new(notifications, "Disabled").disabled());
         });
-        ui.horizontal_wrapped(|ui| {
-            ui.add(Radio::new(form_density, 0, "Compact"));
-            ui.add(Radio::new(form_density, 1, "Comfortable"));
-            ui.add(Radio::new(form_density, 2, "Spacious"));
-        });
+        FormField::new("Density")
+            .description("RadioGroup keeps related choices together.")
+            .width(360.0)
+            .show(ui, |ui| {
+                ui.add(
+                    RadioGroup::new(
+                        form_density,
+                        [(0, "Compact"), (1, "Comfortable"), (2, "Spacious")],
+                    )
+                    .size(Size::Small),
+                );
+            });
         ui.add_space(6.0);
         FormField::new("Density select")
             .description("Select gives dropdown behavior a form-control name.")
