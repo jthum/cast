@@ -229,6 +229,18 @@ pub(crate) fn tooltip_frame(theme: &CastTheme) -> egui::Frame {
         ))
 }
 
+pub(crate) fn toast_frame(theme: &CastTheme, border: Color32) -> egui::Frame {
+    egui::Frame::new()
+        .fill(theme.colors.surface_overlay)
+        .stroke(Stroke::new(theme.stroke.sm, border))
+        .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+        .shadow(surface_shadow(theme, 0.58, 14, 0, 4))
+        .inner_margin(Margin::symmetric(
+            theme.spacing.md as i8,
+            theme.spacing.sm as i8,
+        ))
+}
+
 pub(crate) fn popover_frame(theme: &CastTheme) -> egui::Frame {
     egui::Frame::new()
         .fill(theme.colors.surface_overlay)

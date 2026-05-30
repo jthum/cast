@@ -15,8 +15,8 @@ use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dialog, Dropdown,
     EmptyState, Intent, Label, Link, Loader, LoaderStyle, MenuItem, Notice, Panel as CastPanel,
     Popover, ProgressBar, Radio, SearchInput, SegmentedControl, SemanticColorTokens, Separator,
-    Size, Skeleton, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, Tooltip,
-    TypographyTokens, Variant,
+    Size, Skeleton, Slider, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement,
+    ToastStack, Tooltip, TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -52,6 +52,7 @@ struct CastGallery {
     form_density: usize,
     menu_choice: usize,
     dialog_open: bool,
+    toast_preview_open: bool,
     command_palette: CommandPaletteState,
     related_activity_open: bool,
     related_activity_group: Option<usize>,
@@ -90,6 +91,7 @@ impl CastGallery {
             form_density: 1,
             menu_choice: 0,
             dialog_open: false,
+            toast_preview_open: false,
             command_palette: CommandPaletteState::default(),
             related_activity_open: false,
             related_activity_group: None,
@@ -220,6 +222,7 @@ impl eframe::App for CastGallery {
                                     &mut self.form_density,
                                     &mut self.menu_choice,
                                     &mut self.dialog_open,
+                                    &mut self.toast_preview_open,
                                     &mut self.command_palette,
                                     &mut self.lead_search,
                                     &mut self.related_activity_open,
@@ -242,6 +245,12 @@ impl eframe::App for CastGallery {
 
         if let Some(action) = show_command_palette(&ctx, &mut self.command_palette) {
             theme_changed |= self.apply_command_palette_action(action);
+        }
+
+        if self.toast_preview_open {
+            ToastStack::new("gallery_toast_stack", &gallery_toasts())
+                .placement(ToastPlacement::TopRight)
+                .show(&ctx);
         }
 
         if theme_changed {
@@ -269,6 +278,7 @@ fn show_workspace_view(
     form_density: &mut usize,
     menu_choice: &mut usize,
     dialog_open: &mut bool,
+    toast_preview_open: &mut bool,
     command_palette: &mut CommandPaletteState,
     lead_search: &mut String,
     related_activity_open: &mut bool,
@@ -358,7 +368,7 @@ fn show_workspace_view(
             ui.add_space(12.0);
             show_surfaces(ui);
             ui.add_space(12.0);
-            show_text_and_feedback(ui);
+            show_text_and_feedback(ui, toast_preview_open);
             ui.add_space(12.0);
             show_forms(
                 ui,
@@ -1937,7 +1947,21 @@ fn lead_matches_choice<const N: usize>(value: &str, labels: [&str; N], index: us
     index == 0 || labels.get(index).is_some_and(|label| *label == value)
 }
 
-fn show_text_and_feedback(ui: &mut egui::Ui) {
+fn gallery_toasts() -> [Toast; 3] {
+    [
+        Toast::new("Run complete")
+            .body("The latest component pass is ready to review.")
+            .intent(Intent::Success),
+        Toast::new("Theme changed")
+            .body("Runtime tokens were re-applied to the gallery.")
+            .intent(Intent::Info),
+        Toast::new("Action queued")
+            .body("The host app owns timeout and dismissal behavior.")
+            .intent(Intent::Neutral),
+    ]
+}
+
+fn show_text_and_feedback(ui: &mut egui::Ui, toast_preview_open: &mut bool) {
     Card::new().show(ui, |ui| {
         ui.heading("Text and feedback");
         ui.horizontal_wrapped(|ui| {
@@ -1961,6 +1985,31 @@ fn show_text_and_feedback(ui: &mut egui::Ui) {
         );
         ui.add_space(8.0);
         ui.add(Notice::new("Neutral notice").body("Notices use the same feedback foundation."));
+        ui.add(Separator::new().spacing(10.0));
+        ui.heading("Toasts");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(
+                Toast::new("Run complete")
+                    .body("Patch, format, and focused checks finished.")
+                    .intent(Intent::Success)
+                    .width(280.0),
+            );
+            ui.add(
+                Toast::new("Review needed")
+                    .body("Two generated files are waiting for inspection.")
+                    .intent(Intent::Warning)
+                    .width(280.0),
+            );
+        });
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            if ui.add(Button::new("Show toast stack")).clicked() {
+                *toast_preview_open = true;
+            }
+            if ui.add(Button::new("Hide")).clicked() {
+                *toast_preview_open = false;
+            }
+        });
         ui.add(Separator::new().spacing(10.0));
         ui.heading("Loading");
         ui.horizontal_wrapped(|ui| {

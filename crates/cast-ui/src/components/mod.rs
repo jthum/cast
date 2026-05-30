@@ -21,6 +21,7 @@ mod skeleton;
 mod slider;
 mod switch;
 mod text_input;
+mod toast;
 mod tooltip;
 
 pub use alert::{Alert, Notice};
@@ -46,4 +47,5 @@ pub use skeleton::Skeleton;
 pub use slider::Slider;
 pub use switch::Switch;
 pub use text_input::{SearchInput, TextInput};
+pub use toast::{Toast, ToastPlacement, ToastStack};
 pub use tooltip::Tooltip;
