@@ -185,7 +185,7 @@ fn resolve_badge_colors(
         let family = badge_semantic_family(theme, intent);
         return IntentColors {
             fill: egui::Color32::TRANSPARENT,
-            fg: family.base,
+            fg: family.emphasis,
             border: mix_with_transparent(family.base, 0.30),
         };
     }
@@ -197,7 +197,7 @@ fn resolve_badge_colors(
     let family = badge_semantic_family(theme, intent);
     IntentColors {
         fill: mix_with_transparent(family.base, 0.05),
-        fg: family.base,
+        fg: family.emphasis,
         border: mix_with_transparent(family.base, 0.30),
     }
 }
@@ -255,7 +255,7 @@ mod tests {
 
         assert_eq!(fill_alpha, 13);
         assert_eq!(border_alpha, 77);
-        assert_eq!(colors.fg, theme.colors.success_family.base);
+        assert_eq!(colors.fg, theme.colors.success_family.emphasis);
     }
 
     #[test]
@@ -265,7 +265,7 @@ mod tests {
         let [_, _, _, fill_alpha] = colors.fill.to_srgba_unmultiplied();
 
         assert_eq!(fill_alpha, 13);
-        assert_eq!(colors.fg, theme.colors.primary_family.base);
+        assert_eq!(colors.fg, theme.colors.primary_family.emphasis);
     }
 
     #[test]
@@ -285,6 +285,20 @@ mod tests {
 
         assert_eq!(colors.fill, egui::Color32::TRANSPARENT);
         assert_eq!(border_alpha, 77);
+        assert_eq!(colors.fg, theme.colors.primary_family.emphasis);
+    }
+
+    #[test]
+    fn dark_outline_badge_text_uses_readable_emphasis() {
+        let theme = CastTheme::from_palette(
+            ThemeMode::Dark,
+            crate::CastPaletteInput::from_primary(Color32::from_rgb(88, 28, 135)),
+        );
+        let colors = resolve_badge_colors(&theme, Intent::Primary, Some(Variant::Outline));
+
+        assert_eq!(colors.fg, theme.colors.primary_family.emphasis);
+        assert!(contrast_ratio(theme.colors.surface, colors.fg) >= 4.5);
+        assert_ne!(colors.fg, theme.colors.primary_family.base);
     }
 
     #[test]
