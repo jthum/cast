@@ -29,6 +29,7 @@ mod tooltip;
 
 pub use agent::{
     AgentComposer, AgentComposerResponse, ChatMessage, ChatRole, ToolCall, ToolCallStatus,
+    ToolOutput, ToolOutputKind,
 };
 pub use alert::{Alert, Notice};
 pub use avatar::Avatar;

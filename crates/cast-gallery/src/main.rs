@@ -18,7 +18,8 @@ use cast::{
     Notice, Panel as CastPanel, Popover, ProgressBar, RadioGroup, SearchInput, SegmentedControl,
     Select, SemanticColorTokens, Separator, Sheet, Size, Skeleton, Slider, Switch, Tabs, TextArea,
     TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallStatus,
-    Tooltip, TypographyTokens, ValidationIssue, ValidationSummary, Variant,
+    ToolOutput, ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary,
+    Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -483,96 +484,140 @@ fn show_workbench_preview(
     command: &mut String,
     workflow_segment: &mut usize,
 ) {
-    ui.columns(2, |columns| {
-        CastPanel::new().show(&mut columns[0], |ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.heading("Agent thread");
-                ui.add(Badge::new("Ready").intent(Intent::Success).status_dot());
-            });
-            ui.add_space(8.0);
-            ui.add(
-                ChatMessage::user("Refine the component gallery into an app-like workspace.")
-                    .metadata("Just now")
-                    .width(ui.available_width()),
-            );
-            ui.add_space(8.0);
-            ui.add(
-                ChatMessage::assistant(
-                    "I will inspect the current surface, update the reusable widgets, and keep the gallery as the visual checkpoint.",
-                )
-                .metadata("Planning")
+    show_responsive_pair(
+        ui,
+        |ui| show_workbench_agent_thread(ui, command),
+        |ui| show_workbench_interface_state(ui, theme, workflow_segment),
+    );
+}
+
+fn show_workbench_agent_thread(ui: &mut egui::Ui, command: &mut String) {
+    CastPanel::new().show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.heading("Agent thread");
+            ui.add(Badge::new("Ready").intent(Intent::Success).status_dot());
+        });
+        ui.add_space(8.0);
+        ui.add(
+            ChatMessage::user("Refine the component gallery into an app-like workspace.")
+                .metadata("Just now")
                 .width(ui.available_width()),
-            );
-            ui.add_space(8.0);
-            ui.add(
-                ToolCall::new("cargo test -p cast-ui")
-                    .status(ToolCallStatus::Succeeded)
-                    .metadata("1.2s")
-                    .body("179 tests passed")
-                    .width(ui.available_width()),
-            );
-            ui.add_space(8.0);
-            AgentComposer::new(command)
-                .placeholder("Ask Cast to adjust this surface...")
-                .send_label("Run")
-                .secondary_label("Attach")
-                .rows(2)
-                .width(ui.available_width())
-                .show(ui);
-            ui.add(Separator::new().spacing(12.0));
-            activity_row(ui, "01", "Inspect theme tokens", "Done", Intent::Success);
-            activity_row(
+        );
+        ui.add_space(8.0);
+        ui.add(
+            ChatMessage::assistant(
+                "I will inspect the current surface, update the reusable widgets, and keep the gallery as the visual checkpoint.",
+            )
+            .metadata("Planning")
+            .width(ui.available_width()),
+        );
+        ui.add_space(8.0);
+        ui.add(
+            ToolCall::new("cargo test -p cast-ui")
+                .status(ToolCallStatus::Succeeded)
+                .metadata("1.2s")
+                .body("179 tests passed")
+                .width(ui.available_width()),
+        );
+        ui.add_space(8.0);
+        AgentComposer::new(command)
+            .placeholder("Ask Cast to adjust this surface...")
+            .send_label("Run")
+            .secondary_label("Attach")
+            .rows(2)
+            .width(ui.available_width())
+            .show(ui);
+        ui.add(Separator::new().spacing(12.0));
+        activity_row(ui, "01", "Inspect theme tokens", "Done", Intent::Success);
+        activity_row(
+            ui,
+            "02",
+            "Tune input and navigation states",
+            "Active",
+            Intent::Info,
+        );
+        activity_row(
+            ui,
+            "03",
+            "Review widget-specific feedback",
+            "Next",
+            Intent::Neutral,
+        );
+    });
+}
+
+fn show_workbench_interface_state(
+    ui: &mut egui::Ui,
+    theme: &CastTheme,
+    workflow_segment: &mut usize,
+) {
+    CastPanel::new().show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.heading("Interface state");
+            ui.add(SegmentedControl::new(
+                workflow_segment,
+                ["Design", "Build", "Ship"],
+            ));
+        });
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            metric_tile(ui, "Accent", "Primary", theme.colors.primary_family.base);
+            metric_tile(
                 ui,
-                "02",
-                "Tune input and navigation states",
-                "Active",
-                Intent::Info,
+                "Radius",
+                format!("{:.0}px", theme.radius.md),
+                theme.colors.border,
             );
-            activity_row(
+            metric_tile(
                 ui,
-                "03",
-                "Review widget-specific feedback",
-                "Next",
-                Intent::Neutral,
+                "Type",
+                format!("{:.0}px", theme.typography.body.size),
+                theme.colors.secondary_family.base,
             );
         });
+        ui.add(Separator::new().spacing(12.0));
+        ui.add(
+            Alert::new("Theme-safe by default")
+                .body("The preview is using the same runtime tokens exposed in the editor.")
+                .intent(Intent::Info),
+        );
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Badge::new("Accessible").intent(Intent::Success));
+            ui.add(Badge::new("Immediate mode").intent(Intent::Secondary));
+            ui.add(Badge::new("Runtime theme").intent(Intent::Primary));
+        });
+    });
+}
 
-        CastPanel::new().show(&mut columns[1], |ui| {
-            ui.horizontal_wrapped(|ui| {
-                ui.heading("Interface state");
-                ui.add(SegmentedControl::new(
-                    workflow_segment,
-                    ["Design", "Build", "Ship"],
-                ));
-            });
-            ui.add_space(8.0);
-            ui.horizontal_wrapped(|ui| {
-                metric_tile(ui, "Accent", "Primary", theme.colors.primary_family.base);
-                metric_tile(
-                    ui,
-                    "Radius",
-                    format!("{:.0}px", theme.radius.md),
-                    theme.colors.border,
-                );
-                metric_tile(
-                    ui,
-                    "Type",
-                    format!("{:.0}px", theme.typography.body.size),
-                    theme.colors.secondary_family.base,
-                );
-            });
-            ui.add(Separator::new().spacing(12.0));
-            ui.add(
-                Alert::new("Theme-safe by default")
-                    .body("The preview is using the same runtime tokens exposed in the editor.")
-                    .intent(Intent::Info),
-            );
-            ui.add_space(8.0);
-            ui.horizontal_wrapped(|ui| {
-                ui.add(Badge::new("Accessible").intent(Intent::Success));
-                ui.add(Badge::new("Immediate mode").intent(Intent::Secondary));
-                ui.add(Badge::new("Runtime theme").intent(Intent::Primary));
-            });
+fn show_responsive_pair<L, R>(ui: &mut egui::Ui, left: L, right: R)
+where
+    L: FnOnce(&mut egui::Ui),
+    R: FnOnce(&mut egui::Ui),
+{
+    let theme = cast::theme_for_ui(ui);
+    let available = ui.available_width();
+    let gap = theme.spacing.md;
+
+    if available < 720.0 {
+        left(ui);
+        ui.add_space(gap);
+        right(ui);
+        return;
+    }
+
+    let column_width = ((available - gap) / 2.0).max(260.0);
+    ui.horizontal_top(|ui| {
+        ui.vertical(|ui| {
+            ui.set_width(column_width);
+            ui.set_max_width(column_width);
+            left(ui);
+        });
+        ui.add_space(gap);
+        ui.vertical(|ui| {
+            ui.set_width(column_width);
+            ui.set_max_width(column_width);
+            right(ui);
         });
     });
 }
@@ -1519,73 +1564,11 @@ fn show_agent_components(ui: &mut egui::Ui, command: &mut String) {
     Card::new().show(ui, |ui| {
         ui.heading("Conversation primitives");
         ui.add_space(8.0);
-        ui.columns(2, |columns| {
-            CastPanel::new().show(&mut columns[0], |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.add(Badge::new("Transcript").intent(Intent::Primary).status_dot());
-                    ui.add(Badge::new("Streaming-ready").intent(Intent::Info));
-                });
-                ui.add_space(8.0);
-                ui.add(
-                    ChatMessage::system("Use compact, theme-aware surfaces for agent state.")
-                        .metadata("Policy")
-                        .width(ui.available_width()),
-                );
-                ui.add_space(8.0);
-                ui.add(
-                    ChatMessage::user("Compare the table states and propose the next polish pass.")
-                        .metadata("You")
-                        .width(ui.available_width()),
-                );
-                ui.add_space(8.0);
-                ui.add(
-                    ChatMessage::assistant(
-                        "I will review selection, hover, dark-mode contrast, and the expandable-row pattern before changing code.",
-                    )
-                    .metadata("Assistant")
-                    .width(ui.available_width()),
-                );
-            });
-
-            CastPanel::new().show(&mut columns[1], |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.add(Badge::new("Tool calls").intent(Intent::Success).status_dot());
-                    ui.add(Badge::new("Composable").intent(Intent::Secondary));
-                });
-                ui.add_space(8.0);
-                ui.add(
-                    ToolCall::new("rg selected_row")
-                        .status(ToolCallStatus::Succeeded)
-                        .metadata("120ms")
-                        .body("Found table selection and row hover helpers.")
-                        .width(ui.available_width()),
-                );
-                ui.add_space(8.0);
-                ui.add(
-                    ToolCall::new("cargo test -p cast-ui")
-                        .status(ToolCallStatus::Running)
-                        .metadata("active")
-                        .body("Focused component tests are running.")
-                        .width(ui.available_width()),
-                );
-                ui.add_space(8.0);
-                ui.add(
-                    ToolCall::new("visual snapshot")
-                        .status(ToolCallStatus::Queued)
-                        .metadata("next")
-                        .body("Capture gallery state after the build finishes.")
-                        .width(ui.available_width()),
-                );
-                ui.add_space(8.0);
-                ui.add(
-                    ToolCall::new("deploy preview")
-                        .status(ToolCallStatus::Failed)
-                        .metadata("blocked")
-                        .body("Missing release token in the local environment.")
-                        .width(ui.available_width()),
-                );
-            });
-        });
+        show_responsive_pair(
+            ui,
+            show_agent_transcript_examples,
+            show_agent_tool_call_examples,
+        );
     });
 
     ui.add_space(12.0);
@@ -1600,6 +1583,133 @@ fn show_agent_components(ui: &mut egui::Ui, command: &mut String) {
             .rows(4)
             .width(ui.available_width())
             .show(ui);
+    });
+
+    ui.add_space(12.0);
+    Card::new().show(ui, |ui| {
+        ui.heading("Tool outputs");
+        ui.label("Outputs use compact mono-friendly frames without forcing app-specific parsing.");
+        ui.add_space(8.0);
+        show_responsive_pair(
+            ui,
+            |ui| {
+                ui.add(
+                    ToolOutput::new(
+                        "Patch summary",
+                        "crates/cast-ui/src/components/agent.rs\n+ ToolOutput\n+ streaming message state\n+ wrapping fixes",
+                    )
+                    .kind(ToolOutputKind::Log)
+                    .metadata("stdout")
+                    .width(ui.available_width()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    ToolOutput::new(
+                        "Structured result",
+                        "{ \"tests\": \"passed\", \"components\": [\"ChatMessage\", \"ToolCall\", \"ToolOutput\"] }",
+                    )
+                    .kind(ToolOutputKind::Json)
+                    .metadata("result.json")
+                    .width(ui.available_width()),
+                );
+            },
+            |ui| {
+                ui.add(
+                    ToolOutput::new(
+                        "Generated snippet",
+                        "AgentComposer::new(&mut prompt)\n    .send_label(\"Run\")\n    .secondary_label(\"Attach\")\n    .show(ui);",
+                    )
+                    .kind(ToolOutputKind::Code)
+                    .metadata("rust")
+                    .width(ui.available_width()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    ToolOutput::new(
+                        "Command failure",
+                        "error: missing OPENAI_API_KEY in the current environment",
+                    )
+                    .kind(ToolOutputKind::Error)
+                    .metadata("stderr")
+                    .width(ui.available_width()),
+                );
+            },
+        );
+    });
+}
+
+fn show_agent_transcript_examples(ui: &mut egui::Ui) {
+    CastPanel::new().show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Badge::new("Transcript").intent(Intent::Primary).status_dot());
+            ui.add(Badge::new("Streaming-ready").intent(Intent::Info));
+        });
+        ui.add_space(8.0);
+        ui.add(
+            ChatMessage::system("Use compact, theme-aware surfaces for agent state.")
+                .metadata("Policy")
+                .width(ui.available_width()),
+        );
+        ui.add_space(8.0);
+        ui.add(
+            ChatMessage::user("Compare the table states and propose the next polish pass.")
+                .metadata("You")
+                .width(ui.available_width()),
+        );
+        ui.add_space(8.0);
+        ui.add(
+            ChatMessage::assistant(
+                "I will review selection, hover, dark-mode contrast, and the expandable-row pattern before changing code.",
+            )
+            .metadata("Assistant")
+            .streaming(true)
+            .width(ui.available_width()),
+        );
+    });
+}
+
+fn show_agent_tool_call_examples(ui: &mut egui::Ui) {
+    CastPanel::new().show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.add(
+                Badge::new("Tool calls")
+                    .intent(Intent::Success)
+                    .status_dot(),
+            );
+            ui.add(Badge::new("Composable").intent(Intent::Secondary));
+        });
+        ui.add_space(8.0);
+        ui.add(
+            ToolCall::new("rg selected_row")
+                .status(ToolCallStatus::Succeeded)
+                .metadata("120ms")
+                .body("Found table selection and row hover helpers.")
+                .width(ui.available_width()),
+        );
+        ui.add_space(8.0);
+        ui.add(
+            ToolCall::new("cargo test -p cast-ui")
+                .status(ToolCallStatus::Running)
+                .metadata("active")
+                .body("Focused component tests are running.")
+                .width(ui.available_width()),
+        );
+        ui.add_space(8.0);
+        ui.add(
+            ToolCall::new("visual snapshot")
+                .status(ToolCallStatus::Queued)
+                .metadata("next")
+                .body("Capture gallery state after the build finishes.")
+                .width(ui.available_width()),
+        );
+        ui.add_space(8.0);
+        ui.add(
+            ToolCall::new("deploy preview")
+                .status(ToolCallStatus::Failed)
+                .metadata("blocked")
+                .body("Missing release token in the local environment.")
+                .width(ui.available_width()),
+        );
     });
 }
 

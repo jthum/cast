@@ -2,7 +2,7 @@ use egui::{Color32, InnerResponse, Response, RichText, Ui, Widget};
 
 use crate::{
     color::mix_with_transparent,
-    components::{Badge, Button, TextArea},
+    components::{Badge, Button, Loader, TextArea},
     foundation::{Intent, Size, Variant},
     theme::{CastTheme, ThemeMode, theme_for_ui},
 };
@@ -23,6 +23,7 @@ pub struct ChatMessage {
     body: String,
     metadata: Option<String>,
     intent: Intent,
+    streaming: bool,
     width: Option<f32>,
 }
 
@@ -35,6 +36,7 @@ impl ChatMessage {
             body: body.into(),
             metadata: None,
             intent: chat_role_intent(role),
+            streaming: false,
             width: None,
         }
     }
@@ -78,6 +80,12 @@ impl ChatMessage {
     }
 
     #[must_use]
+    pub fn streaming(mut self, streaming: bool) -> Self {
+        self.streaming = streaming;
+        self
+    }
+
+    #[must_use]
     pub fn width(mut self, width: f32) -> Self {
         self.width = Some(width);
         self
@@ -93,6 +101,7 @@ impl Widget for ChatMessage {
             .show(ui, |ui| {
                 if let Some(width) = self.width {
                     ui.set_width(width);
+                    ui.set_max_width(width);
                 }
 
                 ui.horizontal(|ui| {
@@ -112,13 +121,20 @@ impl Widget for ChatMessage {
                                 .extra_letter_spacing(theme.typography.letter_spacing),
                         );
                     }
+                    if self.streaming {
+                        ui.add_space(theme.spacing.xs);
+                        ui.add(Loader::new().intent(Intent::Info).size(Size::Small));
+                    }
                 });
                 ui.add_space(theme.spacing.xs);
-                ui.label(
-                    RichText::new(self.body)
-                        .font(theme.typography.body.clone())
-                        .color(theme.colors.text)
-                        .extra_letter_spacing(theme.typography.letter_spacing),
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(self.body)
+                            .font(theme.typography.body.clone())
+                            .color(theme.colors.text)
+                            .extra_letter_spacing(theme.typography.letter_spacing),
+                    )
+                    .wrap(),
                 );
             })
             .response
@@ -199,6 +215,7 @@ impl Widget for ToolCall {
             .show(ui, |ui| {
                 if let Some(width) = self.width {
                     ui.set_width(width);
+                    ui.set_max_width(width);
                 }
 
                 ui.horizontal(|ui| {
@@ -227,13 +244,123 @@ impl Widget for ToolCall {
 
                 if let Some(body) = self.body {
                     ui.add_space(theme.spacing.xs);
-                    ui.label(
-                        RichText::new(body)
-                            .font(theme.typography.small.clone())
-                            .color(theme.colors.text_muted)
-                            .extra_letter_spacing(theme.typography.letter_spacing),
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(body)
+                                .font(theme.typography.small.clone())
+                                .color(theme.colors.text_muted)
+                                .extra_letter_spacing(theme.typography.letter_spacing),
+                        )
+                        .wrap(),
                     );
                 }
+            })
+            .response
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ToolOutputKind {
+    #[default]
+    Text,
+    Code,
+    Json,
+    Log,
+    Error,
+}
+
+#[derive(Clone, Debug)]
+pub struct ToolOutput {
+    title: String,
+    body: String,
+    kind: ToolOutputKind,
+    metadata: Option<String>,
+    width: Option<f32>,
+}
+
+impl ToolOutput {
+    #[must_use]
+    pub fn new(title: impl Into<String>, body: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            body: body.into(),
+            kind: ToolOutputKind::Text,
+            metadata: None,
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn kind(mut self, kind: ToolOutputKind) -> Self {
+        self.kind = kind;
+        self
+    }
+
+    #[must_use]
+    pub fn metadata(mut self, metadata: impl Into<String>) -> Self {
+        self.metadata = Some(metadata.into());
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+}
+
+impl Widget for ToolOutput {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let intent = tool_output_intent(self.kind);
+
+        egui::Frame::new()
+            .fill(tool_output_fill(&theme, self.kind))
+            .stroke(egui::Stroke::new(
+                theme.stroke.sm,
+                mix_with_transparent(intent_color(&theme, intent), 0.22),
+            ))
+            .corner_radius(egui::CornerRadius::same(theme.radius.md as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.md as i8))
+            .show(ui, |ui| {
+                if let Some(width) = self.width {
+                    ui.set_width(width);
+                    ui.set_max_width(width);
+                }
+
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(self.title)
+                            .font(theme.typography.button.clone())
+                            .color(theme.colors.text)
+                            .extra_letter_spacing(theme.typography.letter_spacing),
+                    );
+                    if let Some(metadata) = self.metadata {
+                        ui.label(
+                            RichText::new(metadata)
+                                .font(theme.typography.caption.clone())
+                                .color(theme.colors.text_subtle)
+                                .extra_letter_spacing(theme.typography.letter_spacing),
+                        );
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add(
+                            Badge::new(tool_output_kind_label(self.kind))
+                                .intent(intent)
+                                .status_dot(),
+                        );
+                    });
+                });
+                ui.add_space(theme.spacing.xs);
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(self.body)
+                            .font(tool_output_font(&theme, self.kind))
+                            .color(tool_output_text_color(&theme, self.kind))
+                            .extra_letter_spacing(theme.typography.letter_spacing),
+                    )
+                    .wrap(),
+                );
             })
             .response
     }
@@ -453,6 +580,53 @@ fn tool_call_status_label(status: ToolCallStatus) -> &'static str {
     }
 }
 
+fn tool_output_intent(kind: ToolOutputKind) -> Intent {
+    match kind {
+        ToolOutputKind::Text | ToolOutputKind::Code | ToolOutputKind::Log => Intent::Neutral,
+        ToolOutputKind::Json => Intent::Info,
+        ToolOutputKind::Error => Intent::Danger,
+    }
+}
+
+fn tool_output_kind_label(kind: ToolOutputKind) -> &'static str {
+    match kind {
+        ToolOutputKind::Text => "Text",
+        ToolOutputKind::Code => "Code",
+        ToolOutputKind::Json => "JSON",
+        ToolOutputKind::Log => "Log",
+        ToolOutputKind::Error => "Error",
+    }
+}
+
+fn tool_output_fill(theme: &CastTheme, kind: ToolOutputKind) -> Color32 {
+    if kind == ToolOutputKind::Error {
+        return mix_with_transparent(theme.colors.danger_family.base, 0.04);
+    }
+
+    match theme.mode {
+        ThemeMode::Light => theme.colors.surface_muted,
+        ThemeMode::Dark => mix_with_transparent(theme.colors.text, 0.03),
+    }
+}
+
+fn tool_output_font(theme: &CastTheme, kind: ToolOutputKind) -> egui::FontId {
+    match kind {
+        ToolOutputKind::Code
+        | ToolOutputKind::Json
+        | ToolOutputKind::Log
+        | ToolOutputKind::Error => theme.typography.code.clone(),
+        ToolOutputKind::Text => theme.typography.small.clone(),
+    }
+}
+
+fn tool_output_text_color(theme: &CastTheme, kind: ToolOutputKind) -> Color32 {
+    match kind {
+        ToolOutputKind::Error => theme.colors.danger_family.emphasis,
+        ToolOutputKind::Text => theme.colors.text_muted,
+        ToolOutputKind::Code | ToolOutputKind::Json | ToolOutputKind::Log => theme.colors.text,
+    }
+}
+
 fn tool_call_fill(theme: &CastTheme) -> Color32 {
     match theme.mode {
         ThemeMode::Light => theme.colors.surface,
@@ -487,6 +661,7 @@ mod tests {
         assert_eq!(message.role, ChatRole::User);
         assert_eq!(message.title, "You");
         assert_eq!(message.intent, Intent::Primary);
+        assert!(!message.streaming);
     }
 
     #[test]
@@ -519,5 +694,19 @@ mod tests {
             colors.border,
             mix_with_transparent(theme.colors.warning_family.base, 0.22)
         );
+    }
+
+    #[test]
+    fn tool_output_kind_sets_intent_and_label() {
+        assert_eq!(tool_output_intent(ToolOutputKind::Json), Intent::Info);
+        assert_eq!(tool_output_intent(ToolOutputKind::Error), Intent::Danger);
+        assert_eq!(tool_output_kind_label(ToolOutputKind::Code), "Code");
+    }
+
+    #[test]
+    fn streaming_message_records_state() {
+        let message = ChatMessage::assistant("Working").streaming(true);
+
+        assert!(message.streaming);
     }
 }

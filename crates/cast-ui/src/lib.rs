@@ -16,7 +16,8 @@ pub use components::{
     SearchInput, SegmentedControl, Select, Separator, Sheet, SheetController, Skeleton, Slider,
     Spinner, SpinnerStyle, Switch, Table, TableDetailRow, TableRow, Tabs, TextArea, TextInput,
     TextTable, Toast, ToastPlacement, ToastResponse, ToastStack, ToastStackMode,
-    ToastStackResponse, ToolCall, ToolCallStatus, Tooltip, ValidationIssue, ValidationSummary,
+    ToastStackResponse, ToolCall, ToolCallStatus, ToolOutput, ToolOutputKind, Tooltip,
+    ValidationIssue, ValidationSummary,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};
