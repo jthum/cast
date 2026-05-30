@@ -53,6 +53,7 @@ struct CastGallery {
     menu_choice: usize,
     dialog_open: bool,
     toast_preview_open: bool,
+    toast_preview_toasts: Vec<Toast>,
     command_palette: CommandPaletteState,
     related_activity_open: bool,
     related_activity_group: Option<usize>,
@@ -92,6 +93,7 @@ impl CastGallery {
             menu_choice: 0,
             dialog_open: false,
             toast_preview_open: false,
+            toast_preview_toasts: Vec::new(),
             command_palette: CommandPaletteState::default(),
             related_activity_open: false,
             related_activity_group: None,
@@ -223,6 +225,7 @@ impl eframe::App for CastGallery {
                                     &mut self.menu_choice,
                                     &mut self.dialog_open,
                                     &mut self.toast_preview_open,
+                                    &mut self.toast_preview_toasts,
                                     &mut self.command_palette,
                                     &mut self.lead_search,
                                     &mut self.related_activity_open,
@@ -248,9 +251,19 @@ impl eframe::App for CastGallery {
         }
 
         if self.toast_preview_open {
-            ToastStack::new("gallery_toast_stack", &gallery_toasts())
+            let stack_response = ToastStack::new("gallery_toast_stack", &self.toast_preview_toasts)
                 .placement(ToastPlacement::TopRight)
+                .width(340.0)
                 .show(&ctx);
+
+            if let Some(stack_response) = stack_response {
+                for index in stack_response.inner.dismissed_indices.iter().rev() {
+                    self.toast_preview_toasts.remove(*index);
+                }
+                if self.toast_preview_toasts.is_empty() {
+                    self.toast_preview_open = false;
+                }
+            }
         }
 
         if theme_changed {
@@ -279,6 +292,7 @@ fn show_workspace_view(
     menu_choice: &mut usize,
     dialog_open: &mut bool,
     toast_preview_open: &mut bool,
+    toast_preview_toasts: &mut Vec<Toast>,
     command_palette: &mut CommandPaletteState,
     lead_search: &mut String,
     related_activity_open: &mut bool,
@@ -368,7 +382,7 @@ fn show_workspace_view(
             ui.add_space(12.0);
             show_surfaces(ui);
             ui.add_space(12.0);
-            show_text_and_feedback(ui, toast_preview_open);
+            show_text_and_feedback(ui, toast_preview_open, toast_preview_toasts);
             ui.add_space(12.0);
             show_forms(
                 ui,
@@ -1947,8 +1961,8 @@ fn lead_matches_choice<const N: usize>(value: &str, labels: [&str; N], index: us
     index == 0 || labels.get(index).is_some_and(|label| *label == value)
 }
 
-fn gallery_toasts() -> [Toast; 3] {
-    [
+fn gallery_toasts() -> Vec<Toast> {
+    vec![
         Toast::new("Run complete")
             .body("The latest component pass is ready to review.")
             .intent(Intent::Success),
@@ -1961,7 +1975,11 @@ fn gallery_toasts() -> [Toast; 3] {
     ]
 }
 
-fn show_text_and_feedback(ui: &mut egui::Ui, toast_preview_open: &mut bool) {
+fn show_text_and_feedback(
+    ui: &mut egui::Ui,
+    toast_preview_open: &mut bool,
+    toast_preview_toasts: &mut Vec<Toast>,
+) {
     Card::new().show(ui, |ui| {
         ui.heading("Text and feedback");
         ui.horizontal_wrapped(|ui| {
@@ -2000,14 +2018,30 @@ fn show_text_and_feedback(ui: &mut egui::Ui, toast_preview_open: &mut bool) {
                     .intent(Intent::Warning)
                     .width(280.0),
             );
+            Toast::new("Changes archived")
+                .body("A toast can render Cast controls in its action area.")
+                .intent(Intent::Info)
+                .width(280.0)
+                .show_with(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.add(Button::new("Undo").size(Size::Small));
+                        ui.add(
+                            Button::new("View")
+                                .size(Size::Small)
+                                .variant(Variant::Ghost),
+                        );
+                    });
+                });
         });
         ui.add_space(8.0);
         ui.horizontal(|ui| {
             if ui.add(Button::new("Show toast stack")).clicked() {
+                *toast_preview_toasts = gallery_toasts();
                 *toast_preview_open = true;
             }
             if ui.add(Button::new("Hide")).clicked() {
                 *toast_preview_open = false;
+                toast_preview_toasts.clear();
             }
         });
         ui.add(Separator::new().spacing(10.0));
