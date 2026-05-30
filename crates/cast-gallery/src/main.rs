@@ -12,10 +12,10 @@ use patterns::shell::{
 };
 
 use cast::{
-    Alert, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dialog, Dropdown, Intent,
-    Label, Link, MenuItem, Notice, Panel as CastPanel, Popover, Radio, SearchInput,
-    SegmentedControl, SemanticColorTokens, Separator, Size, Slider, Switch, Tabs, TextInput,
-    ThemeMode, ThemeSeed, Tooltip, TypographyTokens, Variant,
+    Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dialog, Dropdown,
+    EmptyState, Intent, Label, Link, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar,
+    Radio, SearchInput, SegmentedControl, SemanticColorTokens, Separator, Size, Slider, Spinner,
+    Switch, Tabs, TextInput, ThemeMode, ThemeSeed, Tooltip, TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -1400,6 +1400,20 @@ fn show_buttons_and_badges(ui: &mut egui::Ui) {
                     .variant(Variant::Outline),
             );
         });
+
+        ui.add_space(8.0);
+        ui.heading("Avatars");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Avatar::new("Sarah Parker").intent(Intent::Primary));
+            ui.add(Avatar::new("Mike Brown").intent(Intent::Info));
+            ui.add(Avatar::new("Linda Chen").intent(Intent::Secondary));
+            ui.add(Avatar::new("A").intent(Intent::Neutral).size(Size::Small));
+            ui.add(
+                Avatar::new("Cast UI")
+                    .intent(Intent::Success)
+                    .size(Size::Large),
+            );
+        });
     });
 }
 
@@ -1432,6 +1446,16 @@ fn show_surfaces(ui: &mut egui::Ui) {
                 ui.add(Badge::new("Panel").intent(Intent::Neutral));
                 ui.label("A raised surface for dense app UI regions.");
             });
+        });
+        ui.add_space(8.0);
+        CastPanel::new().show(ui, |ui| {
+            EmptyState::new("No runs yet")
+                .body("Start a run to populate this workspace with activity, results, and checks.")
+                .icon("+")
+                .intent(Intent::Primary)
+                .show(ui, |ui| {
+                    ui.add(Button::new("Start run").size(Size::Small));
+                });
         });
     });
 }
@@ -1936,6 +1960,28 @@ fn show_text_and_feedback(ui: &mut egui::Ui) {
         );
         ui.add_space(8.0);
         ui.add(Notice::new("Neutral notice").body("Notices use the same feedback foundation."));
+        ui.add(Separator::new().spacing(10.0));
+        ui.heading("Loading");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Spinner::new().size(Size::Small));
+            ui.add(Spinner::new().intent(Intent::Info));
+            ui.add(Spinner::new().intent(Intent::Success).size(Size::Large));
+            ui.label("Async work can use spinner and progress primitives together.");
+        });
+        ui.add_space(8.0);
+        ui.add(ProgressBar::new(0.64).intent(Intent::Primary));
+        ui.add_space(6.0);
+        ui.add(
+            ProgressBar::new(0.38)
+                .intent(Intent::Success)
+                .size(Size::Small),
+        );
+        ui.add_space(6.0);
+        ui.add(
+            ProgressBar::new(0.82)
+                .intent(Intent::Warning)
+                .size(Size::Large),
+        );
     });
 }
 
