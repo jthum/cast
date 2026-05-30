@@ -5,7 +5,8 @@ use egui::{
 
 use crate::{
     color::{mix_oklch, mix_with_transparent, with_alpha},
-    foundation::Size,
+    components::Kbd,
+    foundation::{Intent, Size},
     style::IntentColors,
     theme::{CastTheme, ThemeMode, theme_for_ui},
 };
@@ -96,6 +97,110 @@ impl Widget for ListRow {
             let colors = selectable_row_colors(&theme, self.selected, hovered, pressed);
             paint_selectable_row_background(ui, &theme, rect, colors);
             paint_list_row_content(ui, &theme, rect, self, colors.fg);
+        }
+
+        response
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ActionRow {
+    title: String,
+    detail: Option<String>,
+    intent: Intent,
+    selected: bool,
+    enabled: bool,
+    shortcut: Vec<String>,
+    metadata: Option<String>,
+    size: Size,
+}
+
+impl ActionRow {
+    #[must_use]
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            detail: None,
+            intent: Intent::Neutral,
+            selected: false,
+            enabled: true,
+            shortcut: Vec::new(),
+            metadata: None,
+            size: Size::Medium,
+        }
+    }
+
+    #[must_use]
+    pub fn detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    #[must_use]
+    pub fn intent(mut self, intent: Intent) -> Self {
+        self.intent = intent;
+        self
+    }
+
+    #[must_use]
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.selected = selected;
+        self
+    }
+
+    #[must_use]
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    #[must_use]
+    pub fn disabled(mut self) -> Self {
+        self.enabled = false;
+        self
+    }
+
+    #[must_use]
+    pub fn shortcut<I, K>(mut self, shortcut: I) -> Self
+    where
+        I: IntoIterator<Item = K>,
+        K: Into<String>,
+    {
+        self.shortcut = shortcut.into_iter().map(Into::into).collect();
+        self
+    }
+
+    #[must_use]
+    pub fn metadata(mut self, metadata: impl Into<String>) -> Self {
+        self.metadata = Some(metadata.into());
+        self
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+impl Widget for ActionRow {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let height = action_row_height(self.size, self.detail.is_some());
+        let width = ui.available_width().max(180.0);
+        let sense = if self.enabled {
+            Sense::click()
+        } else {
+            Sense::hover()
+        };
+        let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), sense);
+
+        if ui.is_rect_visible(rect) {
+            let hovered = self.enabled && response.hovered();
+            let pressed = self.enabled && response.is_pointer_button_down_on();
+            let colors = action_row_colors(&theme, self.intent, self.selected, hovered, pressed);
+            paint_selectable_row_background(ui, &theme, rect, colors);
+            paint_action_row_content(ui, &theme, rect, self, colors.fg);
         }
 
         response
@@ -933,6 +1038,76 @@ fn paint_list_row_content(ui: &Ui, theme: &CastTheme, rect: egui::Rect, row: Lis
     }
 }
 
+fn paint_action_row_content(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    rect: egui::Rect,
+    row: ActionRow,
+    fg: Color32,
+) {
+    let padding_x = theme.spacing.md;
+    let trailing_width = action_row_trailing_width(&row, theme);
+    let title_font = match row.size {
+        Size::Small => theme.typography.small.clone(),
+        Size::Medium => theme.typography.button.clone(),
+        Size::Large => theme.typography.body_strong.clone(),
+    };
+    let title = ui.painter().layout_job(row_layout_job(
+        row.title,
+        title_font,
+        theme.typography.letter_spacing,
+    ));
+    let text_x = rect.min.x + padding_x;
+    let text_rect = egui::Rect::from_min_max(
+        rect.min,
+        egui::pos2(
+            (rect.max.x - padding_x - trailing_width).max(rect.min.x + 80.0),
+            rect.max.y,
+        ),
+    );
+    let text_painter = ui.painter().with_clip_rect(text_rect);
+
+    if let Some(detail) = row.detail {
+        let detail = ui.painter().layout_job(row_layout_job(
+            detail,
+            theme.typography.small.clone(),
+            theme.typography.letter_spacing,
+        ));
+        let block_height = title.size().y + 3.0 + detail.size().y;
+        let y = rect.center().y - block_height / 2.0;
+        text_painter.galley(egui::pos2(text_x, y), title, fg);
+        text_painter.galley(
+            egui::pos2(text_x, y + theme.typography.button.size + 3.0),
+            detail,
+            theme.colors.text_muted,
+        );
+    } else {
+        text_painter.galley(
+            egui::pos2(text_x, rect.center().y - title.size().y / 2.0),
+            title,
+            fg,
+        );
+    }
+
+    if trailing_width > 0.0 {
+        ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_space(theme.spacing.md);
+                if !row.shortcut.is_empty() {
+                    ui.add(Kbd::shortcut(row.shortcut).size(Size::Small));
+                } else if let Some(metadata) = row.metadata {
+                    ui.label(
+                        RichText::new(metadata)
+                            .font(theme.typography.caption.clone())
+                            .color(theme.colors.text_muted)
+                            .extra_letter_spacing(theme.typography.letter_spacing),
+                    );
+                }
+            });
+        });
+    }
+}
+
 fn paint_table_frame(ui: &Ui, theme: &CastTheme, rect: egui::Rect, header_height: f32) {
     ui.painter().rect(
         rect,
@@ -1258,6 +1433,54 @@ fn selectable_row_colors(
     }
 }
 
+fn action_row_colors(
+    theme: &CastTheme,
+    intent: Intent,
+    selected: bool,
+    hovered: bool,
+    pressed: bool,
+) -> IntentColors {
+    let accent = action_row_accent(theme, intent);
+
+    if selected {
+        IntentColors {
+            fill: mix_with_transparent(accent, if pressed { 0.10 } else { 0.07 }),
+            fg: theme.colors.text,
+            border: mix_with_transparent(accent, 0.24),
+        }
+    } else if pressed {
+        IntentColors {
+            fill: mix_with_transparent(accent, 0.05),
+            fg: theme.colors.text,
+            border: Color32::TRANSPARENT,
+        }
+    } else if hovered {
+        IntentColors {
+            fill: theme.colors.surface_muted,
+            fg: theme.colors.text,
+            border: Color32::TRANSPARENT,
+        }
+    } else {
+        IntentColors {
+            fill: Color32::TRANSPARENT,
+            fg: theme.colors.text,
+            border: Color32::TRANSPARENT,
+        }
+    }
+}
+
+fn action_row_accent(theme: &CastTheme, intent: Intent) -> Color32 {
+    match intent {
+        Intent::Primary => theme.colors.primary_family.base,
+        Intent::Secondary => theme.colors.secondary_family.base,
+        Intent::Success => theme.colors.success_family.base,
+        Intent::Warning => theme.colors.warning_family.base,
+        Intent::Danger => theme.colors.danger_family.base,
+        Intent::Info => theme.colors.info_family.base,
+        Intent::Neutral => theme.colors.primary_family.base,
+    }
+}
+
 fn table_content_width(viewport_width: f32, columns: usize, min_column_width: f32) -> f32 {
     viewport_width.max(columns as f32 * min_column_width)
 }
@@ -1332,6 +1555,36 @@ fn list_row_height(size: Size, has_subtitle: bool) -> f32 {
     if has_subtitle { base + 14.0 } else { base }
 }
 
+fn action_row_height(size: Size, has_detail: bool) -> f32 {
+    let base = match size {
+        Size::Small => 34.0,
+        Size::Medium => 38.0,
+        Size::Large => 44.0,
+    };
+
+    if has_detail { base + 14.0 } else { base }
+}
+
+fn action_row_trailing_width(row: &ActionRow, theme: &CastTheme) -> f32 {
+    if !row.shortcut.is_empty() {
+        let key_width = row
+            .shortcut
+            .iter()
+            .map(|key| {
+                key.len() as f32 * theme.typography.small.size * 0.58 + theme.spacing.sm * 2.0
+            })
+            .sum::<f32>();
+        let joiner_width = row.shortcut.len().saturating_sub(1) as f32
+            * (theme.typography.small.size * 0.6 + theme.spacing.xs * 2.0);
+
+        key_width + joiner_width + theme.spacing.md
+    } else if let Some(metadata) = &row.metadata {
+        metadata.len() as f32 * theme.typography.caption.size * 0.55 + theme.spacing.md
+    } else {
+        0.0
+    }
+}
+
 fn table_row_height(size: Size) -> f32 {
     match size {
         Size::Small => 32.0,
@@ -1367,6 +1620,47 @@ mod tests {
     #[test]
     fn list_row_height_accounts_for_subtitle() {
         assert!(list_row_height(Size::Medium, true) > list_row_height(Size::Medium, false));
+    }
+
+    #[test]
+    fn action_row_collects_detail_and_shortcut() {
+        let row = ActionRow::new("Open workspace")
+            .detail("Jump to the main agent workspace")
+            .intent(Intent::Primary)
+            .selected(true)
+            .shortcut(["Ctrl", "K"])
+            .size(Size::Small);
+
+        assert_eq!(row.title, "Open workspace");
+        assert_eq!(
+            row.detail.as_deref(),
+            Some("Jump to the main agent workspace")
+        );
+        assert_eq!(row.intent, Intent::Primary);
+        assert!(row.selected);
+        assert_eq!(row.shortcut, ["Ctrl", "K"]);
+        assert_eq!(row.size, Size::Small);
+    }
+
+    #[test]
+    fn action_row_height_accounts_for_detail() {
+        assert!(action_row_height(Size::Medium, true) > action_row_height(Size::Medium, false));
+    }
+
+    #[test]
+    fn selected_action_row_uses_intent_tint() {
+        let theme = CastTheme::light();
+        let colors = action_row_colors(&theme, Intent::Success, true, false, false);
+
+        assert_eq!(
+            colors.fill,
+            mix_with_transparent(theme.colors.success_family.base, 0.07)
+        );
+        assert_eq!(
+            colors.border,
+            mix_with_transparent(theme.colors.success_family.base, 0.24)
+        );
+        assert_eq!(colors.fg, theme.colors.text);
     }
 
     #[test]

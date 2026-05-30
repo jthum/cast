@@ -42,7 +42,7 @@ pub use form::{FormActions, FormField, FormSection, ValidationIssue, ValidationS
 pub use kbd::Kbd;
 pub use label::Label;
 pub use link::Link;
-pub use list::{ListRow, Table, TableDetailRow, TableRow, TextTable};
+pub use list::{ActionRow, ListRow, Table, TableDetailRow, TableRow, TextTable};
 pub use menu::{Combobox, Dropdown, MenuItem, Select};
 pub use navigation::{NavList, SegmentedControl, Tabs};
 pub use panel::Panel;

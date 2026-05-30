@@ -8,7 +8,7 @@ pub mod theme;
 
 pub use color::{contrast_ratio, mix_with_transparent};
 pub use components::{
-    Accordion, AccordionItem, Alert, Avatar, Badge, Button, Card, Checkbox, Combobox,
+    Accordion, AccordionItem, ActionRow, Alert, Avatar, Badge, Button, Card, Checkbox, Combobox,
     ConfirmDialog, ConfirmDialogResponse, Dialog, DialogController, Disclosure, DisclosureResponse,
     Dropdown, EmptyState, FilterBar, FormActions, FormField, FormSection, Kbd, Label, Link,
     ListRow, Loader, LoaderStyle, MenuItem, NavList, Notice, Panel, Popover, ProgressBar, Radio,

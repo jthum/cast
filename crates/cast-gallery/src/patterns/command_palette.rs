@@ -1,6 +1,6 @@
 use cast::{
-    Dialog, Intent, Kbd, SearchInput, Size, Variant,
-    egui::{self, Color32, RichText, Sense, StrokeKind, text::LayoutJob},
+    ActionRow, Dialog, Intent, SearchInput, Size, Variant,
+    egui::{self, RichText},
 };
 
 const COMMANDS: [CommandPaletteItem; 7] = [
@@ -154,74 +154,14 @@ fn handle_palette_keys(
 }
 
 fn command_row(ui: &mut egui::Ui, command: CommandPaletteItem, selected: bool) -> egui::Response {
-    let theme = cast::theme_for_ui(ui);
-    let height = 52.0;
-    let width = ui.available_width().max(220.0);
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), Sense::click());
-
-    if ui.is_rect_visible(rect) {
-        let hovered = response.hovered();
-        let accent = match command.intent {
-            Intent::Primary => theme.colors.primary_family.base,
-            Intent::Secondary => theme.colors.secondary_family.base,
-            Intent::Success => theme.colors.success_family.base,
-            Intent::Warning => theme.colors.warning_family.base,
-            Intent::Danger => theme.colors.danger_family.base,
-            Intent::Info => theme.colors.info_family.base,
-            Intent::Neutral => theme.colors.text_muted,
-        };
-        let fill = if selected {
-            cast::mix_with_transparent(accent, 0.08)
-        } else if hovered {
-            theme.colors.surface_muted
-        } else {
-            Color32::TRANSPARENT
-        };
-        let border = if selected {
-            cast::mix_with_transparent(accent, 0.24)
-        } else {
-            Color32::TRANSPARENT
-        };
-
-        ui.painter().rect(
-            rect,
-            egui::CornerRadius::same(theme.radius.md as u8),
-            fill,
-            egui::Stroke::new(theme.stroke.sm, border),
-            StrokeKind::Outside,
-        );
-
-        let title = ui.painter().layout_job(command_layout_job(
-            command.title,
-            theme.typography.button.clone(),
-            theme.colors.text,
-            theme.typography.letter_spacing,
-        ));
-        let detail = ui.painter().layout_job(command_layout_job(
-            command.detail,
-            theme.typography.small.clone(),
-            theme.colors.text_muted,
-            theme.typography.letter_spacing,
-        ));
-        let text_x = rect.min.x + theme.spacing.md;
-        let text_y = rect.center().y - (title.size().y + 3.0 + detail.size().y) / 2.0;
-        ui.painter()
-            .galley(egui::pos2(text_x, text_y), title, theme.colors.text);
-        ui.painter().galley(
-            egui::pos2(text_x, text_y + theme.typography.button.size + 3.0),
-            detail,
-            theme.colors.text_muted,
-        );
-
-        ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.add_space(theme.spacing.md);
-                ui.add(Kbd::new(command.shortcut).size(Size::Small));
-            });
-        });
-    }
-
-    response
+    ui.add(
+        ActionRow::new(command.title)
+            .detail(command.detail)
+            .intent(command.intent)
+            .selected(selected)
+            .shortcut([command.shortcut])
+            .size(Size::Medium),
+    )
 }
 
 fn filtered_command_indices(query: &str) -> Vec<usize> {
@@ -248,23 +188,6 @@ fn clamp_selected(selected: &mut usize, match_count: usize) {
     } else {
         *selected = (*selected).min(match_count - 1);
     }
-}
-
-fn command_layout_job(
-    text: &'static str,
-    font_id: egui::FontId,
-    color: Color32,
-    letter_spacing: f32,
-) -> LayoutJob {
-    LayoutJob::single_section(
-        text.to_owned(),
-        egui::text::TextFormat {
-            font_id,
-            color,
-            extra_letter_spacing: letter_spacing,
-            ..Default::default()
-        },
-    )
 }
 
 #[cfg(test)]
