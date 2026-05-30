@@ -62,9 +62,15 @@ pub fn show_shell_sidebar(ui: &mut egui::Ui, theme: &CastTheme, selected: &mut u
     sidebar_workspace_switcher(ui, theme);
     ui.add_space(18.0);
     sidebar_group_label(ui, "Workspace");
-    for (index, label) in ["Workbench", "Foundations", "Components", "Theme lab"]
-        .iter()
-        .enumerate()
+    for (index, label) in [
+        "Workbench",
+        "Foundations",
+        "Components",
+        "Agent components",
+        "Theme lab",
+    ]
+    .iter()
+    .enumerate()
     {
         if sidebar_nav_item(ui, theme, label, *selected == index).clicked() {
             *selected = index;

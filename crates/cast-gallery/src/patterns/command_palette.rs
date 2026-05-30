@@ -3,7 +3,7 @@ use cast::{
     egui::{self, RichText},
 };
 
-const COMMANDS: [CommandPaletteItem; 7] = [
+const COMMANDS: [CommandPaletteItem; 8] = [
     CommandPaletteItem {
         id: "open-workspace",
         title: "Open workspace",
@@ -17,6 +17,13 @@ const COMMANDS: [CommandPaletteItem; 7] = [
         detail: "Review primitive Cast widgets",
         shortcut: "2",
         intent: Intent::Secondary,
+    },
+    CommandPaletteItem {
+        id: "agent-components",
+        title: "Show agent components",
+        detail: "Review chat, composer, and tool-call primitives",
+        shortcut: "A",
+        intent: Intent::Primary,
     },
     CommandPaletteItem {
         id: "theme-lab",
@@ -196,8 +203,14 @@ mod tests {
 
     #[test]
     fn command_filter_matches_title_and_detail() {
-        assert_eq!(filtered_command_indices("theme"), vec![2, 3, 6]);
-        assert_eq!(filtered_command_indices("diagnostics"), vec![5]);
+        assert_eq!(
+            filtered_command_ids("theme"),
+            vec!["theme-lab", "toggle-mode", "reset-theme"]
+        );
+        assert_eq!(
+            filtered_command_ids("diagnostics"),
+            vec!["review-diagnostics"]
+        );
     }
 
     #[test]
@@ -214,5 +227,12 @@ mod tests {
 
         clamp_selected(&mut selected, 0);
         assert_eq!(selected, 0);
+    }
+
+    fn filtered_command_ids(query: &str) -> Vec<&'static str> {
+        filtered_command_indices(query)
+            .into_iter()
+            .map(|index| COMMANDS[index].id)
+            .collect()
     }
 }

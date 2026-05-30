@@ -76,6 +76,7 @@ struct CastGallery {
     lead_exported_count: Option<usize>,
     foundation_tab: usize,
     workflow_segment: usize,
+    component_tab: usize,
     sidebar_section: usize,
 }
 
@@ -122,6 +123,7 @@ impl CastGallery {
             lead_exported_count: None,
             foundation_tab: 0,
             workflow_segment: 0,
+            component_tab: 0,
             sidebar_section: 0,
         }
     }
@@ -135,7 +137,8 @@ impl CastGallery {
         match action {
             "open-workspace" => self.sidebar_section = 0,
             "show-components" => self.sidebar_section = 2,
-            "theme-lab" => self.sidebar_section = 1,
+            "agent-components" => self.sidebar_section = 3,
+            "theme-lab" => self.sidebar_section = 4,
             "export-table" => {
                 self.lead_exported_count = Some(
                     self.lead_selected
@@ -261,6 +264,7 @@ impl eframe::App for CastGallery {
                                     &mut self.lead_exported_count,
                                     &mut self.foundation_tab,
                                     &mut self.workflow_segment,
+                                    &mut self.component_tab,
                                 );
                             });
                     });
@@ -334,6 +338,7 @@ fn show_workspace_view(
     lead_exported_count: &mut Option<usize>,
     foundation_tab: &mut usize,
     workflow_segment: &mut usize,
+    component_tab: &mut usize,
 ) -> bool {
     let mut theme_changed = false;
     match section {
@@ -388,22 +393,26 @@ fn show_workspace_view(
                 Intent::Secondary,
             );
             ui.add_space(12.0);
-            show_override_preview(ui);
-            ui.add_space(12.0);
-            show_buttons_and_badges(ui);
-            ui.add_space(12.0);
-            show_menus(
+            show_component_gallery(
                 ui,
+                component_tab,
+                search,
+                name,
+                command,
+                handle,
+                preset_query,
+                preset_choice,
+                form_validation_attention,
+                enabled,
+                notifications,
+                indeterminate,
+                form_density,
                 menu_choice,
                 dialog_open,
                 sheet_open,
                 confirm_dialog_open,
                 confirm_result,
                 command_palette,
-            );
-            ui.add_space(12.0);
-            show_lists_and_tables(
-                ui,
                 lead_search,
                 related_activity_open,
                 related_activity_group,
@@ -416,28 +425,19 @@ fn show_workspace_view(
                 lead_rows_per_page,
                 lead_page,
                 lead_exported_count,
+                toast_preview_open,
+                toast_preview_toasts,
             );
-            ui.add_space(12.0);
-            show_surfaces(ui);
-            ui.add_space(12.0);
-            show_text_and_feedback(ui, toast_preview_open, toast_preview_toasts);
-            ui.add_space(12.0);
-            show_forms(
+        }
+        3 => {
+            workspace_header(
                 ui,
-                search,
-                name,
-                command,
-                handle,
-                preset_query,
-                preset_choice,
-                form_validation_attention,
-                enabled,
-                notifications,
-                indeterminate,
-                form_density,
+                "Agent components",
+                "Composer, transcript, tool-call, and workflow primitives for agentic desktop surfaces.",
+                Intent::Primary,
             );
             ui.add_space(12.0);
-            show_raw_egui_controls(ui, search, enabled);
+            show_agent_components(ui, command);
         }
         _ => {
             workspace_header(
@@ -1411,6 +1411,195 @@ fn show_navigation_layout(
                 });
             });
         });
+    });
+}
+
+#[allow(clippy::too_many_arguments)]
+fn show_component_gallery(
+    ui: &mut egui::Ui,
+    component_tab: &mut usize,
+    search: &mut String,
+    name: &mut String,
+    command: &mut String,
+    handle: &mut String,
+    preset_query: &mut String,
+    preset_choice: &mut usize,
+    form_validation_attention: &mut bool,
+    enabled: &mut bool,
+    notifications: &mut bool,
+    indeterminate: &mut bool,
+    form_density: &mut usize,
+    menu_choice: &mut usize,
+    dialog_open: &mut bool,
+    sheet_open: &mut bool,
+    confirm_dialog_open: &mut bool,
+    confirm_result: &mut Option<ConfirmDialogResponse>,
+    command_palette: &mut CommandPaletteState,
+    lead_search: &mut String,
+    related_activity_open: &mut bool,
+    related_activity_group: &mut Option<usize>,
+    lead_selected: &mut [bool; LEAD_COUNT],
+    lead_expanded: &mut [bool; LEAD_COUNT],
+    lead_date_filter: &mut usize,
+    lead_user_filter: &mut usize,
+    lead_status_filter: &mut usize,
+    lead_payment_filter: &mut usize,
+    lead_rows_per_page: &mut usize,
+    lead_page: &mut usize,
+    lead_exported_count: &mut Option<usize>,
+    toast_preview_open: &mut bool,
+    toast_preview_toasts: &mut Vec<Toast>,
+) {
+    Card::new().show(ui, |ui| {
+        ui.add(Tabs::new(
+            component_tab,
+            ["Core", "Inputs", "Menus", "Data", "Feedback", "Surfaces"],
+        ));
+    });
+    ui.add_space(12.0);
+
+    match *component_tab {
+        0 => {
+            show_override_preview(ui);
+            ui.add_space(12.0);
+            show_buttons_and_badges(ui);
+            ui.add_space(12.0);
+            let mut nav_tab = 0;
+            let mut nav_segment = 0;
+            show_navigation_layout(ui, &mut nav_tab, &mut nav_segment);
+        }
+        1 => show_forms(
+            ui,
+            search,
+            name,
+            command,
+            handle,
+            preset_query,
+            preset_choice,
+            form_validation_attention,
+            enabled,
+            notifications,
+            indeterminate,
+            form_density,
+        ),
+        2 => show_menus(
+            ui,
+            menu_choice,
+            dialog_open,
+            sheet_open,
+            confirm_dialog_open,
+            confirm_result,
+            command_palette,
+        ),
+        3 => show_lists_and_tables(
+            ui,
+            lead_search,
+            related_activity_open,
+            related_activity_group,
+            lead_selected,
+            lead_expanded,
+            lead_date_filter,
+            lead_user_filter,
+            lead_status_filter,
+            lead_payment_filter,
+            lead_rows_per_page,
+            lead_page,
+            lead_exported_count,
+        ),
+        4 => show_text_and_feedback(ui, toast_preview_open, toast_preview_toasts),
+        _ => {
+            show_surfaces(ui);
+            ui.add_space(12.0);
+            show_raw_egui_controls(ui, search, enabled);
+        }
+    }
+}
+
+fn show_agent_components(ui: &mut egui::Ui, command: &mut String) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Conversation primitives");
+        ui.add_space(8.0);
+        ui.columns(2, |columns| {
+            CastPanel::new().show(&mut columns[0], |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.add(Badge::new("Transcript").intent(Intent::Primary).status_dot());
+                    ui.add(Badge::new("Streaming-ready").intent(Intent::Info));
+                });
+                ui.add_space(8.0);
+                ui.add(
+                    ChatMessage::system("Use compact, theme-aware surfaces for agent state.")
+                        .metadata("Policy")
+                        .width(ui.available_width()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    ChatMessage::user("Compare the table states and propose the next polish pass.")
+                        .metadata("You")
+                        .width(ui.available_width()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    ChatMessage::assistant(
+                        "I will review selection, hover, dark-mode contrast, and the expandable-row pattern before changing code.",
+                    )
+                    .metadata("Assistant")
+                    .width(ui.available_width()),
+                );
+            });
+
+            CastPanel::new().show(&mut columns[1], |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.add(Badge::new("Tool calls").intent(Intent::Success).status_dot());
+                    ui.add(Badge::new("Composable").intent(Intent::Secondary));
+                });
+                ui.add_space(8.0);
+                ui.add(
+                    ToolCall::new("rg selected_row")
+                        .status(ToolCallStatus::Succeeded)
+                        .metadata("120ms")
+                        .body("Found table selection and row hover helpers.")
+                        .width(ui.available_width()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    ToolCall::new("cargo test -p cast-ui")
+                        .status(ToolCallStatus::Running)
+                        .metadata("active")
+                        .body("Focused component tests are running.")
+                        .width(ui.available_width()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    ToolCall::new("visual snapshot")
+                        .status(ToolCallStatus::Queued)
+                        .metadata("next")
+                        .body("Capture gallery state after the build finishes.")
+                        .width(ui.available_width()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    ToolCall::new("deploy preview")
+                        .status(ToolCallStatus::Failed)
+                        .metadata("blocked")
+                        .body("Missing release token in the local environment.")
+                        .width(ui.available_width()),
+                );
+            });
+        });
+    });
+
+    ui.add_space(12.0);
+    Card::new().show(ui, |ui| {
+        ui.heading("Composer");
+        ui.label("A framed multiline prompt box with attached actions and submit state.");
+        ui.add_space(8.0);
+        AgentComposer::new(command)
+            .placeholder("Ask the agent to inspect, patch, or explain...")
+            .send_label("Run")
+            .secondary_label("Attach")
+            .rows(4)
+            .width(ui.available_width())
+            .show(ui);
     });
 }
 
