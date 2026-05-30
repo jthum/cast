@@ -118,7 +118,7 @@ pub fn show_entity_table_with_details(
         .right_aligned_columns([5])
         .selected_rows(selected_rows)
         .expanded_rows(expanded_rows)
-        .expanded_row_height(88.0)
+        .expanded_row_height(96.0)
         .sticky_header(320.0)
         .show_with_details(
             ui,

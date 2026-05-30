@@ -1277,7 +1277,10 @@ fn table_cell_content_rect(theme: &CastTheme, cell_rect: egui::Rect) -> egui::Re
 }
 
 fn table_detail_content_rect(theme: &CastTheme, detail_rect: egui::Rect) -> egui::Rect {
-    detail_rect.shrink2(egui::vec2(table_cell_padding(theme), theme.spacing.sm))
+    detail_rect.shrink2(egui::vec2(
+        table_cell_padding(theme) + theme.spacing.xs,
+        theme.spacing.md,
+    ))
 }
 
 fn table_body_height(rows_height: f32, sticky_body_height: Option<f32>) -> f32 {
