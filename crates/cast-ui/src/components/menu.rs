@@ -1,11 +1,11 @@
 use egui::{
-    Color32, Response, Sense, StrokeKind, Ui, Widget,
+    Color32, Response, Sense, StrokeKind, TextEdit, Ui, Widget,
     text::{LayoutJob, TextFormat},
 };
 
 use crate::{
     color::{mix_with_transparent, with_alpha},
-    foundation::{Intent, Size},
+    foundation::{Intent, Size, Variant},
     style::{IntentColors, menu_frame, resolve_control_metrics},
     theme::{CastTheme, theme_for_ui},
 };
@@ -164,6 +164,173 @@ impl Widget for Select<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
         self.inner.ui(ui)
     }
+}
+
+#[derive(Debug)]
+pub struct Combobox<'a> {
+    selected: &'a mut usize,
+    query: &'a mut String,
+    labels: Vec<String>,
+    placeholder: String,
+    search_hint: String,
+    width: Option<f32>,
+    size: Option<Size>,
+    enabled: bool,
+    clear_query_on_select: bool,
+}
+
+impl<'a> Combobox<'a> {
+    #[must_use]
+    pub fn new<I, L>(selected: &'a mut usize, query: &'a mut String, labels: I) -> Self
+    where
+        I: IntoIterator<Item = L>,
+        L: Into<String>,
+    {
+        Self {
+            selected,
+            query,
+            labels: labels.into_iter().map(Into::into).collect(),
+            placeholder: "Select".to_owned(),
+            search_hint: "Search options".to_owned(),
+            width: None,
+            size: None,
+            enabled: true,
+            clear_query_on_select: true,
+        }
+    }
+
+    #[must_use]
+    pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
+        self.placeholder = placeholder.into();
+        self
+    }
+
+    #[must_use]
+    pub fn search_hint(mut self, search_hint: impl Into<String>) -> Self {
+        self.search_hint = search_hint.into();
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = Some(size);
+        self
+    }
+
+    #[must_use]
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    #[must_use]
+    pub fn disabled(mut self) -> Self {
+        self.enabled = false;
+        self
+    }
+
+    #[must_use]
+    pub fn clear_query_on_select(mut self, clear: bool) -> Self {
+        self.clear_query_on_select = clear;
+        self
+    }
+}
+
+impl Widget for Combobox<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let label = self
+            .labels
+            .get(*self.selected)
+            .map(String::as_str)
+            .unwrap_or(&self.placeholder);
+        let width = self.width.unwrap_or(220.0);
+        let size = self
+            .size
+            .or_else(|| crate::style::contextual_control_size(ui))
+            .unwrap_or(Size::Medium);
+        let mut response = dropdown_trigger(ui, label, width, size, self.enabled);
+        let mut changed = false;
+
+        if self.enabled {
+            egui::Popup::menu(&response)
+                .frame(menu_frame(&theme))
+                .width(width.max(response.rect.width()))
+                .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                .show(|ui| {
+                    ui.set_min_width(width.max(response.rect.width()) - theme.spacing.sm);
+                    ui.spacing_mut().item_spacing.y = theme.spacing.xs;
+
+                    let mut font = theme.typography.body.clone();
+                    font.size = resolve_control_metrics(&theme, Size::Small).text_size;
+                    let edit = TextEdit::singleline(self.query)
+                        .hint_text(
+                            egui::RichText::new(self.search_hint)
+                                .font(font.clone())
+                                .color(theme.components.input.placeholder)
+                                .extra_letter_spacing(theme.typography.letter_spacing),
+                        )
+                        .font(font)
+                        .desired_width(width - theme.spacing.lg)
+                        .frame(crate::style::input_frame(&theme, Variant::Solid));
+                    ui.add(edit);
+                    ui.add_space(theme.spacing.xs);
+
+                    let matches = combobox_matches(&self.labels, self.query);
+                    if matches.is_empty() {
+                        ui.label(
+                            egui::RichText::new("No options")
+                                .font(theme.typography.small.clone())
+                                .color(theme.colors.text_muted)
+                                .extra_letter_spacing(theme.typography.letter_spacing),
+                        );
+                    } else {
+                        for index in matches {
+                            let item_response = ui.add(
+                                MenuItem::new(&self.labels[index])
+                                    .selected(*self.selected == index),
+                            );
+                            if item_response.clicked() && *self.selected != index {
+                                *self.selected = index;
+                                if self.clear_query_on_select {
+                                    self.query.clear();
+                                }
+                                changed = true;
+                                ui.close();
+                            }
+                        }
+                    }
+                });
+        }
+
+        if changed {
+            response.mark_changed();
+        }
+
+        response
+    }
+}
+
+fn combobox_matches(labels: &[String], query: &str) -> Vec<usize> {
+    let normalized_query = query.trim().to_lowercase();
+
+    labels
+        .iter()
+        .enumerate()
+        .filter_map(|(index, label)| {
+            if normalized_query.is_empty() || label.to_lowercase().contains(&normalized_query) {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn dropdown_trigger(ui: &mut Ui, label: &str, width: f32, size: Size, enabled: bool) -> Response {
@@ -481,6 +648,38 @@ mod tests {
         assert_eq!(select.inner.placeholder, "Density");
         assert_eq!(select.inner.size, Some(Size::Small));
         assert_eq!(select.inner.width, Some(144.0));
+    }
+
+    #[test]
+    fn combobox_stores_search_state_and_options() {
+        let mut selected = 0;
+        let mut query = String::new();
+        let combo = Combobox::new(&mut selected, &mut query, ["Light", "Dark"])
+            .placeholder("Theme")
+            .search_hint("Find theme")
+            .size(Size::Small)
+            .width(180.0)
+            .clear_query_on_select(false);
+
+        assert_eq!(combo.labels, ["Light", "Dark"]);
+        assert_eq!(combo.placeholder, "Theme");
+        assert_eq!(combo.search_hint, "Find theme");
+        assert_eq!(combo.size, Some(Size::Small));
+        assert_eq!(combo.width, Some(180.0));
+        assert!(!combo.clear_query_on_select);
+    }
+
+    #[test]
+    fn combobox_matching_is_case_insensitive_and_trimmed() {
+        let labels = vec![
+            "Agent Workspace".to_owned(),
+            "Theme Lab".to_owned(),
+            "Diagnostics".to_owned(),
+        ];
+
+        assert_eq!(combobox_matches(&labels, ""), vec![0, 1, 2]);
+        assert_eq!(combobox_matches(&labels, " lab "), vec![1]);
+        assert_eq!(combobox_matches(&labels, "AGENT"), vec![0]);
     }
 
     #[test]

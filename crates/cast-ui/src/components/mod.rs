@@ -41,7 +41,7 @@ pub use form::FormField;
 pub use label::Label;
 pub use link::Link;
 pub use list::{ListRow, Table, TableDetailRow, TableRow, TextTable};
-pub use menu::{Dropdown, MenuItem, Select};
+pub use menu::{Combobox, Dropdown, MenuItem, Select};
 pub use navigation::{NavList, SegmentedControl, Tabs};
 pub use panel::Panel;
 pub use popover::Popover;

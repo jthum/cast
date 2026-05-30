@@ -12,12 +12,12 @@ use patterns::shell::{
 };
 
 use cast::{
-    Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, ConfirmDialog,
-    ConfirmDialogResponse, Dialog, Dropdown, EmptyState, FormField, Intent, Label, Link, Loader,
-    LoaderStyle, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar, RadioGroup,
-    SearchInput, SegmentedControl, Select, SemanticColorTokens, Separator, Sheet, Size, Skeleton,
-    Slider, Switch, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement,
-    ToastStack, Tooltip, TypographyTokens, Variant,
+    Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Combobox,
+    ConfirmDialog, ConfirmDialogResponse, Dialog, Dropdown, EmptyState, FormField, Intent, Label,
+    Link, Loader, LoaderStyle, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar,
+    RadioGroup, SearchInput, SegmentedControl, Select, SemanticColorTokens, Separator, Sheet, Size,
+    Skeleton, Slider, Switch, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, Toast,
+    ToastPlacement, ToastStack, Tooltip, TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -47,6 +47,8 @@ struct CastGallery {
     command: String,
     name: String,
     handle: String,
+    preset_query: String,
+    preset_choice: usize,
     enabled: bool,
     notifications: bool,
     indeterminate: bool,
@@ -90,6 +92,8 @@ impl CastGallery {
             command: String::from("Refine the component gallery into an app-like surface"),
             name: String::from("Cast"),
             handle: String::new(),
+            preset_query: String::new(),
+            preset_choice: 0,
             enabled: true,
             notifications: true,
             indeterminate: false,
@@ -225,6 +229,8 @@ impl eframe::App for CastGallery {
                                     &mut self.search,
                                     &mut self.name,
                                     &mut self.handle,
+                                    &mut self.preset_query,
+                                    &mut self.preset_choice,
                                     &mut self.enabled,
                                     &mut self.notifications,
                                     &mut self.indeterminate,
@@ -295,6 +301,8 @@ fn show_workspace_view(
     search: &mut String,
     name: &mut String,
     handle: &mut String,
+    preset_query: &mut String,
+    preset_choice: &mut usize,
     enabled: &mut bool,
     notifications: &mut bool,
     indeterminate: &mut bool,
@@ -342,6 +350,8 @@ fn show_workspace_view(
                 name,
                 command,
                 handle,
+                preset_query,
+                preset_choice,
                 enabled,
                 notifications,
                 indeterminate,
@@ -412,6 +422,8 @@ fn show_workspace_view(
                 name,
                 command,
                 handle,
+                preset_query,
+                preset_choice,
                 enabled,
                 notifications,
                 indeterminate,
@@ -2205,6 +2217,8 @@ fn show_forms(
     name: &mut String,
     notes: &mut String,
     handle: &mut String,
+    preset_query: &mut String,
+    preset_choice: &mut usize,
     enabled: &mut bool,
     notifications: &mut bool,
     indeterminate: &mut bool,
@@ -2316,6 +2330,29 @@ fn show_forms(
                     Select::new(form_density, ["Compact", "Comfortable", "Spacious"])
                         .placeholder("Density")
                         .width(220.0),
+                );
+            });
+        ui.add_space(6.0);
+        FormField::new("Preset combobox")
+            .description("Combobox filters larger option sets before choosing.")
+            .width(260.0)
+            .show(ui, |ui| {
+                ui.add(
+                    Combobox::new(
+                        preset_choice,
+                        preset_query,
+                        [
+                            "Compact",
+                            "Comfortable",
+                            "Spacious",
+                            "Agent workspace",
+                            "Dense table",
+                            "Presentation",
+                        ],
+                    )
+                    .placeholder("Preset")
+                    .search_hint("Search presets")
+                    .width(260.0),
                 );
             });
         ui.horizontal(|ui| {

@@ -8,13 +8,13 @@ pub mod theme;
 
 pub use color::{contrast_ratio, mix_with_transparent};
 pub use components::{
-    Accordion, AccordionItem, Alert, Avatar, Badge, Button, Card, Checkbox, ConfirmDialog,
-    ConfirmDialogResponse, Dialog, DialogController, Disclosure, DisclosureResponse, Dropdown,
-    EmptyState, FilterBar, FormField, Label, Link, ListRow, Loader, LoaderStyle, MenuItem, NavList,
-    Notice, Panel, Popover, ProgressBar, Radio, RadioGroup, SearchInput, SegmentedControl, Select,
-    Separator, Sheet, SheetController, Skeleton, Slider, Spinner, SpinnerStyle, Switch, Table,
-    TableDetailRow, TableRow, Tabs, TextArea, TextInput, TextTable, Toast, ToastPlacement,
-    ToastResponse, ToastStack, ToastStackMode, ToastStackResponse, Tooltip,
+    Accordion, AccordionItem, Alert, Avatar, Badge, Button, Card, Checkbox, Combobox,
+    ConfirmDialog, ConfirmDialogResponse, Dialog, DialogController, Disclosure, DisclosureResponse,
+    Dropdown, EmptyState, FilterBar, FormField, Label, Link, ListRow, Loader, LoaderStyle,
+    MenuItem, NavList, Notice, Panel, Popover, ProgressBar, Radio, RadioGroup, SearchInput,
+    SegmentedControl, Select, Separator, Sheet, SheetController, Skeleton, Slider, Spinner,
+    SpinnerStyle, Switch, Table, TableDetailRow, TableRow, Tabs, TextArea, TextInput, TextTable,
+    Toast, ToastPlacement, ToastResponse, ToastStack, ToastStackMode, ToastStackResponse, Tooltip,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};
