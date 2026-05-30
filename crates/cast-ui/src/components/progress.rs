@@ -113,6 +113,7 @@ pub enum SpinnerStyle {
     #[default]
     Ticks,
     Signal,
+    PixelSnake,
     SquareSnake,
 }
 
@@ -134,8 +135,8 @@ impl Widget for Spinner {
             match self.style {
                 SpinnerStyle::Ticks => paint_tick_spinner(ui, &theme, rect, self.intent),
                 SpinnerStyle::Signal => paint_signal_spinner(ui, &theme, rect, self.intent),
-                SpinnerStyle::SquareSnake => {
-                    paint_square_snake_spinner(ui, &theme, rect, self.intent);
+                SpinnerStyle::PixelSnake | SpinnerStyle::SquareSnake => {
+                    paint_pixel_snake_spinner(ui, &theme, rect, self.intent);
                 }
             }
         }
@@ -200,53 +201,57 @@ fn paint_signal_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: In
     }
 }
 
-fn paint_square_snake_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
+fn paint_pixel_snake_spinner(ui: &Ui, theme: &CastTheme, rect: egui::Rect, intent: Intent) {
     let side = rect.width().min(rect.height());
     let accent = progress_accent(theme, intent);
     let time = ui.input(|input| input.time) as f32;
-    let inset = (side * 0.18).max(3.0);
-    let dot_count = 7;
-    let head = (time * 0.72).fract();
+    let cells = pixel_snake_cells(rect, 5);
+    let step = (time * 12.0).floor() as usize;
+    let tail_len = 6;
 
-    let path_rect = rect.shrink(inset);
-    ui.painter().rect_stroke(
-        path_rect,
-        egui::CornerRadius::same((theme.radius.sm * 0.5).round() as u8),
-        Stroke::new(theme.stroke.sm, color_with_scaled_alpha(accent, 0.14)),
-        egui::StrokeKind::Inside,
-    );
-
-    for index in 0..dot_count {
-        let trail = index as f32 / dot_count as f32;
-        let progress = (head + 1.0 - trail * 0.30).fract();
-        let pos = square_path_position(path_rect, progress);
-        let fade = 1.0 - index as f32 / dot_count as f32;
-        let radius = side * (0.075 + fade * 0.025);
-
-        ui.painter().circle_filled(
-            pos,
-            radius,
-            color_with_scaled_alpha(accent, 0.20 + fade * 0.72),
+    for tail_index in 0..tail_len {
+        let index = (step + cells.len() - tail_index) % cells.len();
+        let fade = 1.0 - tail_index as f32 / tail_len as f32;
+        let cell = cells[index].shrink(side * 0.012);
+        ui.painter().rect_filled(
+            cell,
+            egui::CornerRadius::same((theme.radius.sm * 0.35).round() as u8),
+            color_with_scaled_alpha(accent, 0.18 + fade * 0.76),
         );
     }
 }
 
-fn square_path_position(rect: egui::Rect, progress: f32) -> egui::Pos2 {
-    let t = progress.rem_euclid(1.0) * 4.0;
+fn pixel_snake_cells(rect: egui::Rect, grid: usize) -> Vec<egui::Rect> {
+    let grid = grid.max(3);
+    let side = rect.width().min(rect.height());
+    let cell = side / grid as f32;
+    let origin = egui::pos2(rect.center().x - side / 2.0, rect.center().y - side / 2.0);
+    let mut cells = Vec::with_capacity((grid - 1) * 4);
 
-    if t < 1.0 {
-        egui::pos2(lerp(rect.min.x, rect.max.x, t), rect.min.y)
-    } else if t < 2.0 {
-        egui::pos2(rect.max.x, lerp(rect.min.y, rect.max.y, t - 1.0))
-    } else if t < 3.0 {
-        egui::pos2(lerp(rect.max.x, rect.min.x, t - 2.0), rect.max.y)
-    } else {
-        egui::pos2(rect.min.x, lerp(rect.max.y, rect.min.y, t - 3.0))
+    for column in 0..grid {
+        cells.push(pixel_cell(origin, cell, column, 0));
     }
+    for row in 1..grid {
+        cells.push(pixel_cell(origin, cell, grid - 1, row));
+    }
+    for column in (0..grid - 1).rev() {
+        cells.push(pixel_cell(origin, cell, column, grid - 1));
+    }
+    for row in (1..grid - 1).rev() {
+        cells.push(pixel_cell(origin, cell, 0, row));
+    }
+
+    cells
 }
 
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t.clamp(0.0, 1.0)
+fn pixel_cell(origin: egui::Pos2, size: f32, column: usize, row: usize) -> egui::Rect {
+    egui::Rect::from_min_size(
+        egui::pos2(
+            origin.x + column as f32 * size,
+            origin.y + row as f32 * size,
+        ),
+        Vec2::splat(size),
+    )
 }
 
 fn progress_height(size: Size) -> f32 {
@@ -325,18 +330,19 @@ mod tests {
     #[test]
     fn spinner_style_can_be_changed() {
         assert_eq!(
-            Spinner::new().style(SpinnerStyle::SquareSnake).style,
-            SpinnerStyle::SquareSnake
+            Spinner::new().style(SpinnerStyle::PixelSnake).style,
+            SpinnerStyle::PixelSnake
         );
     }
 
     #[test]
-    fn square_path_position_traces_square_edges() {
+    fn pixel_snake_cells_trace_square_perimeter() {
         let rect = egui::Rect::from_min_max(egui::pos2(2.0, 4.0), egui::pos2(12.0, 14.0));
+        let cells = pixel_snake_cells(rect, 3);
 
-        assert_eq!(square_path_position(rect, 0.0), egui::pos2(2.0, 4.0));
-        assert_eq!(square_path_position(rect, 0.25), egui::pos2(12.0, 4.0));
-        assert_eq!(square_path_position(rect, 0.50), egui::pos2(12.0, 14.0));
-        assert_eq!(square_path_position(rect, 0.75), egui::pos2(2.0, 14.0));
+        assert_eq!(cells.len(), 8);
+        assert_eq!(cells[0].min, egui::pos2(2.0, 4.0));
+        assert_eq!(cells[2].min.x, cells[3].min.x);
+        assert_eq!(cells[4].min.y, cells[5].min.y);
     }
 }

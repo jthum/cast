@@ -1981,13 +1981,13 @@ fn show_text_and_feedback(ui: &mut egui::Ui) {
             ui.add(
                 Spinner::new()
                     .intent(Intent::Primary)
-                    .style(SpinnerStyle::SquareSnake)
+                    .style(SpinnerStyle::PixelSnake)
                     .size(Size::Large),
             );
             ui.add(
                 Spinner::new()
                     .intent(Intent::Success)
-                    .style(SpinnerStyle::SquareSnake),
+                    .style(SpinnerStyle::PixelSnake),
             );
             ui.label("Async work can use spinner and progress primitives together.");
         });
