@@ -14,8 +14,8 @@ use patterns::shell::{
 use cast::{
     Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, Checkbox, Dialog, Dropdown,
     EmptyState, Intent, Label, Link, MenuItem, Notice, Panel as CastPanel, Popover, ProgressBar,
-    Radio, SearchInput, SegmentedControl, SemanticColorTokens, Separator, Size, Slider, Spinner,
-    Switch, Tabs, TextInput, ThemeMode, ThemeSeed, Tooltip, TypographyTokens, Variant,
+    Radio, SearchInput, SegmentedControl, SemanticColorTokens, Separator, Size, Skeleton, Slider,
+    Spinner, Switch, Tabs, TextInput, ThemeMode, ThemeSeed, Tooltip, TypographyTokens, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -1982,6 +1982,15 @@ fn show_text_and_feedback(ui: &mut egui::Ui) {
                 .intent(Intent::Warning)
                 .size(Size::Large),
         );
+        ui.add(Separator::new().spacing(10.0));
+        ui.heading("Skeleton");
+        ui.vertical(|ui| {
+            ui.add(Skeleton::new().width(220.0));
+            ui.add_space(6.0);
+            ui.add(Skeleton::new().width(320.0).size(Size::Small));
+            ui.add_space(6.0);
+            ui.add(Skeleton::new().width(180.0).size(Size::Small));
+        });
     });
 }
 

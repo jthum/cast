@@ -11,8 +11,8 @@ pub use components::{
     Accordion, AccordionItem, Alert, Avatar, Badge, Button, Card, Checkbox, Dialog,
     DialogController, Disclosure, DisclosureResponse, Dropdown, EmptyState, FilterBar, Label, Link,
     ListRow, MenuItem, NavList, Notice, Panel, Popover, ProgressBar, Radio, SearchInput,
-    SegmentedControl, Separator, Slider, Spinner, Switch, Table, TableDetailRow, TableRow, Tabs,
-    TextInput, TextTable, Tooltip,
+    SegmentedControl, Separator, Skeleton, Slider, Spinner, Switch, Table, TableDetailRow,
+    TableRow, Tabs, TextInput, TextTable, Tooltip,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};
