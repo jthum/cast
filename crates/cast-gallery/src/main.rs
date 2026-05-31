@@ -13,12 +13,14 @@ use patterns::shell::{
 };
 
 use cast::{
-    AgentComposer, Alert, Avatar, Badge, Button, Card, CastPaletteInput, CastTheme, ChatMessage,
-    Checkbox, Combobox, ConfirmDialog, ConfirmDialogResponse, Dialog, Dropdown, EmptyState,
-    FormActions, FormField, FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle, MenuItem,
-    Notice, Panel as CastPanel, Popover, ProgressBar, RadioGroup, SearchInput, SegmentedControl,
-    Select, SemanticColorTokens, Separator, Sheet, Size, Skeleton, Slider, Switch, Tabs, TextArea,
-    TextInput, ThemeMode, ThemeSeed, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallStatus,
+    AgentComposer, Alert, ApprovalPanel, ArtifactCard, Avatar, Badge, Button, Card,
+    CastPaletteInput, CastTheme, ChatMessage, Checkbox, CodeOutputPanel, Combobox, ConfirmDialog,
+    ConfirmDialogResponse, DateInput, Dialog, Dropdown, EmptyState, FormActions, FormField,
+    FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle, MenuItem, MessageThread, Notice,
+    NumberInput, Panel as CastPanel, Popover, ProgressBar, RadioGroup, RunPhase, RunTimeline,
+    RunTimelineItem, SearchInput, SegmentedControl, Select, SemanticColorTokens, Separator, Sheet,
+    Size, Skeleton, Slider, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed,
+    TimeInput, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus,
     ToolOutput, ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary,
     Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
@@ -79,6 +81,14 @@ struct CastGallery {
     foundation_tab: usize,
     workflow_segment: usize,
     component_tab: usize,
+    agent_model: usize,
+    agent_loading: bool,
+    agent_tool_open: bool,
+    agent_retry_budget: f64,
+    agent_due_date: String,
+    agent_due_time: String,
+    editable_task: String,
+    editable_status: usize,
     sidebar_section: usize,
     last_scroll_route: Option<(usize, usize)>,
 }
@@ -127,6 +137,14 @@ impl CastGallery {
             foundation_tab: 0,
             workflow_segment: 0,
             component_tab: 0,
+            agent_model: 1,
+            agent_loading: true,
+            agent_tool_open: true,
+            agent_retry_budget: 3.0,
+            agent_due_date: String::from("2026-06-01"),
+            agent_due_time: String::from("09:30"),
+            editable_task: String::from("Review agent output table"),
+            editable_status: 1,
             sidebar_section: 0,
             last_scroll_route: None,
         }
@@ -204,6 +222,7 @@ impl eframe::App for CastGallery {
             .frame(
                 egui::Frame::new()
                     .fill(self.theme.colors.surface)
+                    .stroke(egui::Stroke::NONE)
                     .inner_margin(egui::Margin::symmetric(28, 18)),
             )
             .show_inside(ui, |ui| {
@@ -215,6 +234,7 @@ impl eframe::App for CastGallery {
             .frame(
                 egui::Frame::new()
                     .fill(self.theme.colors.surface)
+                    .stroke(egui::Stroke::NONE)
                     .inner_margin(egui::Margin {
                         left: 28,
                         right: 28,
@@ -238,6 +258,7 @@ impl eframe::App for CastGallery {
                 }
 
                 scroll_area.auto_shrink([false, false]).show(ui, |ui| {
+                    ui.add_space(self.theme.spacing.lg);
                     theme_changed |= show_workspace_view(
                         ui,
                         self.sidebar_section,
@@ -279,7 +300,16 @@ impl eframe::App for CastGallery {
                         &mut self.foundation_tab,
                         &mut self.workflow_segment,
                         &mut self.component_tab,
+                        &mut self.agent_model,
+                        &mut self.agent_loading,
+                        &mut self.agent_tool_open,
+                        &mut self.agent_retry_budget,
+                        &mut self.agent_due_date,
+                        &mut self.agent_due_time,
+                        &mut self.editable_task,
+                        &mut self.editable_status,
                     );
+                    ui.add_space(self.theme.spacing.lg);
                 });
             });
 
@@ -352,6 +382,14 @@ fn show_workspace_view(
     foundation_tab: &mut usize,
     workflow_segment: &mut usize,
     component_tab: &mut usize,
+    agent_model: &mut usize,
+    agent_loading: &mut bool,
+    agent_tool_open: &mut bool,
+    agent_retry_budget: &mut f64,
+    agent_due_date: &mut String,
+    agent_due_time: &mut String,
+    editable_task: &mut String,
+    editable_status: &mut usize,
 ) -> bool {
     let mut theme_changed = false;
     match section {
@@ -450,7 +488,18 @@ fn show_workspace_view(
                 Intent::Primary,
             );
             ui.add_space(12.0);
-            show_agent_components(ui, command);
+            show_agent_components(
+                ui,
+                command,
+                agent_model,
+                agent_loading,
+                agent_tool_open,
+                agent_retry_budget,
+                agent_due_date,
+                agent_due_time,
+                editable_task,
+                editable_status,
+            );
         }
         _ => {
             workspace_header(
@@ -1575,7 +1624,19 @@ fn show_component_gallery(
     }
 }
 
-fn show_agent_components(ui: &mut egui::Ui, command: &mut String) {
+#[allow(clippy::too_many_arguments)]
+fn show_agent_components(
+    ui: &mut egui::Ui,
+    command: &mut String,
+    agent_model: &mut usize,
+    agent_loading: &mut bool,
+    agent_tool_open: &mut bool,
+    agent_retry_budget: &mut f64,
+    agent_due_date: &mut String,
+    agent_due_time: &mut String,
+    editable_task: &mut String,
+    editable_status: &mut usize,
+) {
     Card::new().show(ui, |ui| {
         ui.heading("Conversation primitives");
         ui.add_space(8.0);
@@ -1589,39 +1650,153 @@ fn show_agent_components(ui: &mut egui::Ui, command: &mut String) {
     ui.add_space(12.0);
     Card::new().show(ui, |ui| {
         ui.heading("Composer");
-        ui.label("A framed multiline prompt box with attached actions and submit state.");
+        ui.label("A framed multiline prompt box with attachments, tools, model choice, loading state, and Enter-to-send behavior.");
         ui.add_space(8.0);
-        AgentComposer::new(command)
+        let composer = AgentComposer::new(command)
             .placeholder("Ask the agent to inspect, patch, or explain...")
             .send_label("Run")
-            .secondary_label("Attach")
+            .stop_label("Stop")
+            .attachment_label("Attach")
+            .tool_label("Tools")
+            .model_selector(agent_model, ["Swift", "Balanced", "Deep review"])
+            .loading(*agent_loading)
             .rows(4)
             .width(ui.available_width())
             .show(ui);
+        if composer.inner.submitted {
+            *agent_loading = true;
+        }
+        if composer.inner.stopped {
+            *agent_loading = false;
+        }
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            NumberInput::new(agent_retry_budget)
+                .label("Retries")
+                .range(0.0, 12.0)
+                .width(92.0)
+                .size(Size::Small)
+                .show(ui);
+            ui.add(DateInput::new(agent_due_date).label("Due date"));
+            ui.add(TimeInput::new(agent_due_time).label("Due time"));
+        });
     });
 
     ui.add_space(12.0);
     Card::new().show(ui, |ui| {
-        ui.heading("Tool outputs");
-        ui.label("Outputs use compact mono-friendly frames without forcing app-specific parsing.");
+        ui.heading("Workflow blocks");
+        ui.label("Collapsible calls, timelines, and output regions for agent execution state.");
+        ui.add_space(8.0);
+        show_responsive_pair(
+            ui,
+            |ui| {
+                ui.add(
+                    ToolCallBlock::new("cargo test -p cast-ui", agent_tool_open)
+                        .status(ToolCallStatus::Running)
+                        .arguments("package: cast-ui, profile: test")
+                        .elapsed("14.2s")
+                        .preview("running 191 tests\ncomponents::agent::tests::workflow_components_store_state ... ok\ncomponents::text_input::tests::number_input_stores_typed_constraints ... ok")
+                        .width(ui.available_width()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    RunTimeline::new()
+                        .item(
+                            RunTimelineItem::new(RunPhase::Planning, "Plan component API")
+                                .detail("Map Turin agent states to Cast primitives")
+                                .metadata("done"),
+                        )
+                        .item(
+                            RunTimelineItem::new(RunPhase::ToolCall, "Inspect current widgets")
+                                .status(ToolCallStatus::Succeeded)
+                                .metadata("120ms"),
+                        )
+                        .item(
+                            RunTimelineItem::new(RunPhase::Patch, "Add workflow components")
+                                .status(ToolCallStatus::Succeeded)
+                                .metadata("done"),
+                        )
+                        .item(
+                            RunTimelineItem::new(RunPhase::Test, "Run focused tests")
+                                .status(ToolCallStatus::Running)
+                                .metadata("active"),
+                        )
+                        .width(ui.available_width()),
+                );
+            },
+            |ui| {
+                ui.add(
+                    CodeOutputPanel::new(
+                        "Shell output",
+                        "cargo test -p cast-ui\n\nrunning 191 tests\nagent workflow primitives ... ok\ntext input typed wrappers ... ok\n\nresult: ok",
+                    )
+                    .kind(ToolOutputKind::Log)
+                    .metadata("stdout")
+                    .height(172.0)
+                    .width(ui.available_width()),
+                );
+                ui.add_space(8.0);
+                ArtifactCard::new("agent-workflow-primitives.md")
+                    .kind("Report")
+                    .description("Generated review notes for composer, timeline, tool calls, output panels, and approvals.")
+                    .metadata("Markdown")
+                    .intent(Intent::Info)
+                    .width(ui.available_width())
+                    .show(ui);
+            },
+        );
+    });
+
+    ui.add_space(12.0);
+    Card::new().show(ui, |ui| {
+        ui.heading("Review and editable output");
+        ui.label("Approval surfaces and rich table cells for agent-produced settings or structured output.");
+        ui.add_space(8.0);
+        show_responsive_pair(
+            ui,
+            |ui| {
+                ApprovalPanel::new(
+                    "Approve patch",
+                    "Applies changes to Cast UI agent components and gallery examples.",
+                )
+                .risk("Touches reusable component APIs, so downstream callers should adopt the new names deliberately.")
+                .primary_label("Approve patch")
+                .secondary_label("Hold")
+                .intent(Intent::Warning)
+                .width(ui.available_width())
+                .show(ui);
+            },
+            |ui| {
+                Table::new(["Task", "Status", "Owner"])
+                    .column_weights([2.0, 1.0, 1.0])
+                    .min_column_width(96.0)
+                    .show(ui, 2, |row, index| {
+                        if index == 0 {
+                            row.editable_text(editable_task);
+                            row.select(editable_status, ["Queued", "In progress", "Done"]);
+                            row.text("Agent");
+                        } else {
+                            row.text("Contrast audit");
+                            row.text("Pending");
+                            row.text("Design");
+                        }
+                    });
+            },
+        );
+    });
+
+    ui.add_space(12.0);
+    Card::new().show(ui, |ui| {
+        ui.heading("Legacy output blocks");
+        ui.label("The lower-level ToolOutput widget is still useful for compact inline previews.");
         ui.add_space(8.0);
         show_responsive_pair(
             ui,
             |ui| {
                 ui.add(
                     ToolOutput::new(
-                        "Patch summary",
-                        "crates/cast-ui/src/components/agent.rs\n+ ToolOutput\n+ streaming message state\n+ wrapping fixes",
-                    )
-                    .kind(ToolOutputKind::Log)
-                    .metadata("stdout")
-                    .width(ui.available_width()),
-                );
-                ui.add_space(8.0);
-                ui.add(
-                    ToolOutput::new(
                         "Structured result",
-                        "{ \"tests\": \"passed\", \"components\": [\"ChatMessage\", \"ToolCall\", \"ToolOutput\"] }",
+                        "{ \"tests\": \"passed\", \"components\": [\"MessageThread\", \"ToolCallBlock\", \"CodeOutputPanel\"] }",
                     )
                     .kind(ToolOutputKind::Json)
                     .metadata("result.json")
@@ -1632,20 +1807,10 @@ fn show_agent_components(ui: &mut egui::Ui, command: &mut String) {
                 ui.add(
                     ToolOutput::new(
                         "Generated snippet",
-                        "AgentComposer::new(&mut prompt)\n    .send_label(\"Run\")\n    .secondary_label(\"Attach\")\n    .show(ui);",
+                        "AgentComposer::new(&mut prompt)\n    .attachment_label(\"Attach\")\n    .tool_label(\"Tools\")\n    .model_selector(&mut model, [\"Swift\", \"Deep review\"])\n    .show(ui);",
                     )
                     .kind(ToolOutputKind::Code)
                     .metadata("rust")
-                    .width(ui.available_width()),
-                );
-                ui.add_space(8.0);
-                ui.add(
-                    ToolOutput::new(
-                        "Command failure",
-                        "error: missing OPENAI_API_KEY in the current environment",
-                    )
-                    .kind(ToolOutputKind::Error)
-                    .metadata("stderr")
                     .width(ui.available_width()),
                 );
             },
@@ -1660,26 +1825,32 @@ fn show_agent_transcript_examples(ui: &mut egui::Ui) {
             ui.add(Badge::new("Streaming-ready").intent(Intent::Info));
         });
         ui.add_space(8.0);
-        ui.add(
-            ChatMessage::system("Use compact, theme-aware surfaces for agent state.")
-                .metadata("Policy")
-                .width(ui.available_width()),
-        );
-        ui.add_space(8.0);
-        ui.add(
-            ChatMessage::user("Compare the table states and propose the next polish pass.")
-                .metadata("You")
-                .width(ui.available_width()),
-        );
-        ui.add_space(8.0);
-        ui.add(
-            ChatMessage::assistant(
-                "I will review selection, hover, dark-mode contrast, and the expandable-row pattern before changing code.",
-            )
-            .metadata("Assistant")
-            .streaming(true)
-            .width(ui.available_width()),
-        );
+        MessageThread::new()
+            .width(ui.available_width())
+            .show(ui, |thread| {
+                thread.message(
+                    ChatMessage::system("Use compact, theme-aware surfaces for agent state.")
+                        .metadata("Policy"),
+                );
+                thread.message(
+                    ChatMessage::user("Compare the table states and propose the next polish pass.")
+                        .metadata("You"),
+                );
+                thread.rich_message(
+                    ChatMessage::assistant(
+                        "I will review selection, hover, dark-mode contrast, and the expandable-row pattern before changing code.",
+                    )
+                    .metadata("Assistant")
+                    .streaming(true),
+                    |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.add(Badge::new("Table").intent(Intent::Info).status_dot());
+                            ui.add(Badge::new("Dark mode").intent(Intent::Secondary).status_dot());
+                            ui.add(Badge::new("Selection").intent(Intent::Success).status_dot());
+                        });
+                    },
+                );
+            });
     });
 }
 
