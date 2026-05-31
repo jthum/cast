@@ -16,10 +16,11 @@ pub use components::{
     ListRow, Loader, LoaderStyle, MenuItem, MessageThread, MessageThreadUi, NavList, Notice,
     NumberInput, Panel, Popover, ProgressBar, Radio, RadioGroup, RunPhase, RunTimeline,
     RunTimelineItem, SearchInput, SegmentedControl, Select, Separator, Sheet, SheetController,
-    Skeleton, Slider, Spinner, SpinnerStyle, Switch, Table, TableDetailRow, TableRow, Tabs,
-    TextArea, TextInput, TextTable, TimeInput, Toast, ToastPlacement, ToastResponse, ToastStack,
-    ToastStackMode, ToastStackResponse, ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput,
-    ToolOutputKind, Tooltip, ValidationIssue, ValidationSummary,
+    Skeleton, Slider, Spinner, SpinnerStyle, SurfaceChrome, SurfaceSectionStyle, Switch, Table,
+    TableDetailRow, TableRow, Tabs, TextArea, TextInput, TextTable, TimeInput, Toast,
+    ToastPlacement, ToastResponse, ToastStack, ToastStackMode, ToastStackResponse, ToolCall,
+    ToolCallBlock, ToolCallStatus, ToolOutput, ToolOutputKind, Tooltip, ValidationIssue,
+    ValidationSummary,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};

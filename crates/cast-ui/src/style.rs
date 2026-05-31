@@ -160,16 +160,26 @@ fn button_metrics(tokens: ButtonTokens, theme: &CastTheme, size: Size) -> Contro
 
 pub(crate) fn card_frame(theme: &CastTheme) -> egui::Frame {
     let tokens = theme.components.card;
+    card_shell_frame(theme).inner_margin(Margin::same(tokens.padding as i8))
+}
+
+pub(crate) fn card_shell_frame(theme: &CastTheme) -> egui::Frame {
+    let tokens = theme.components.card;
     egui::Frame::new()
         .fill(tokens.fill)
         .stroke(Stroke::new(tokens.border_width, tokens.border))
         .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
         .shadow(surface_shadow(theme, 0.55, 10, 0, 2))
         .outer_margin(Margin::symmetric(1, 2))
-        .inner_margin(Margin::same(tokens.padding as i8))
+        .inner_margin(Margin::same(0))
 }
 
 pub(crate) fn panel_frame(theme: &CastTheme) -> egui::Frame {
+    let tokens = theme.components.panel;
+    panel_shell_frame(theme).inner_margin(Margin::same(tokens.padding as i8))
+}
+
+pub(crate) fn panel_shell_frame(theme: &CastTheme) -> egui::Frame {
     let tokens = theme.components.panel;
     egui::Frame::new()
         .fill(tokens.fill)
@@ -177,7 +187,7 @@ pub(crate) fn panel_frame(theme: &CastTheme) -> egui::Frame {
         .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
         .shadow(surface_shadow(theme, 0.28, 6, 0, 1))
         .outer_margin(Margin::symmetric(0, 1))
-        .inner_margin(Margin::same(tokens.padding as i8))
+        .inner_margin(Margin::same(0))
 }
 
 pub(crate) fn input_frame(theme: &CastTheme, variant: Variant) -> egui::Frame {
@@ -242,21 +252,29 @@ pub(crate) fn toast_frame(theme: &CastTheme, border: Color32) -> egui::Frame {
 }
 
 pub(crate) fn popover_frame(theme: &CastTheme) -> egui::Frame {
+    popover_shell_frame(theme).inner_margin(Margin::same(theme.spacing.md as i8))
+}
+
+pub(crate) fn popover_shell_frame(theme: &CastTheme) -> egui::Frame {
     egui::Frame::new()
         .fill(theme.colors.surface_overlay)
         .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
         .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
         .shadow(surface_shadow(theme, 0.68, 14, 0, 4))
-        .inner_margin(Margin::same(theme.spacing.md as i8))
+        .inner_margin(Margin::same(0))
 }
 
 pub(crate) fn dialog_frame(theme: &CastTheme) -> egui::Frame {
+    dialog_shell_frame(theme).inner_margin(Margin::same(theme.spacing.lg as i8))
+}
+
+pub(crate) fn dialog_shell_frame(theme: &CastTheme) -> egui::Frame {
     egui::Frame::new()
         .fill(theme.colors.surface_overlay)
         .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
         .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
         .shadow(surface_shadow(theme, 0.82, 22, 0, 8))
-        .inner_margin(Margin::same(theme.spacing.lg as i8))
+        .inner_margin(Margin::same(0))
 }
 
 pub(crate) fn dialog_backdrop(theme: &CastTheme) -> Color32 {

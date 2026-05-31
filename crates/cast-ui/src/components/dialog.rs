@@ -5,9 +5,12 @@ use egui::{
 
 use crate::{
     color::mix_with_transparent,
-    components::Button,
+    components::{
+        Button,
+        card::{SurfaceChrome, SurfaceSectionStyle, paint_section_divider, show_surface_section},
+    },
     foundation::{Intent, Placement, Size, Variant},
-    style::{dialog_backdrop, dialog_frame},
+    style::{dialog_backdrop, dialog_frame, dialog_shell_frame},
     theme::{CastTheme, current_theme},
 };
 
@@ -19,6 +22,7 @@ pub struct Dialog<'a> {
     description: Option<String>,
     width: Option<f32>,
     closable: bool,
+    sections: SurfaceSectionStyle,
 }
 
 impl<'a> Dialog<'a> {
@@ -31,6 +35,7 @@ impl<'a> Dialog<'a> {
             description: None,
             width: None,
             closable: true,
+            sections: SurfaceSectionStyle::flat(),
         }
     }
 
@@ -55,6 +60,18 @@ impl<'a> Dialog<'a> {
     #[must_use]
     pub fn closable(mut self, closable: bool) -> Self {
         self.closable = closable;
+        self
+    }
+
+    #[must_use]
+    pub fn section_style(mut self, sections: SurfaceSectionStyle) -> Self {
+        self.sections = sections;
+        self
+    }
+
+    #[must_use]
+    pub fn muted_sections(mut self) -> Self {
+        self.sections = SurfaceSectionStyle::muted();
         self
     }
 
@@ -87,6 +104,71 @@ impl<'a> Dialog<'a> {
                 );
 
                 add_contents(ui, &mut controller)
+            });
+
+        if response.should_close() || controller.close_requested {
+            *self.open = false;
+        }
+
+        Some(response)
+    }
+
+    pub fn show_with_footer<R>(
+        self,
+        ctx: &egui::Context,
+        add_contents: impl FnOnce(&mut Ui, &mut DialogController) -> R,
+        add_footer: impl FnOnce(&mut Ui, &mut DialogController),
+    ) -> Option<egui::ModalResponse<R>> {
+        let title = self.title.clone();
+        let description = self.description.clone();
+        let closable = self.closable;
+
+        self.show_sections(
+            ctx,
+            move |ui, dialog| {
+                paint_dialog_header(
+                    ui,
+                    &current_theme(ui.ctx()).unwrap_or_else(CastTheme::light),
+                    title.as_deref(),
+                    description.as_deref(),
+                    closable,
+                    dialog,
+                );
+            },
+            add_contents,
+            add_footer,
+        )
+    }
+
+    pub fn show_sections<R>(
+        self,
+        ctx: &egui::Context,
+        add_header: impl FnOnce(&mut Ui, &mut DialogController),
+        add_contents: impl FnOnce(&mut Ui, &mut DialogController) -> R,
+        add_footer: impl FnOnce(&mut Ui, &mut DialogController),
+    ) -> Option<egui::ModalResponse<R>> {
+        if !*self.open {
+            return None;
+        }
+
+        let theme = current_theme(ctx).unwrap_or_else(CastTheme::light);
+        let width = self.width.unwrap_or(420.0);
+        let mut controller = DialogController::default();
+        let response = egui::Modal::new(self.id)
+            .frame(dialog_shell_frame(&theme))
+            .backdrop_color(dialog_backdrop(&theme))
+            .show(ctx, |ui| {
+                ui.set_min_width(width);
+                ui.set_max_width(width);
+                show_dialog_sections(
+                    ui,
+                    &theme,
+                    self.sections,
+                    &mut controller,
+                    add_header,
+                    add_contents,
+                    add_footer,
+                )
             });
 
         if response.should_close() || controller.close_requested {
@@ -193,6 +275,7 @@ impl<'a> ConfirmDialog<'a> {
             description: Some(description),
             width,
             closable: true,
+            sections: SurfaceSectionStyle::flat(),
         }
         .show(ctx, |ui, dialog| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -238,6 +321,7 @@ pub struct Sheet<'a> {
     placement: Placement,
     extent: Option<f32>,
     closable: bool,
+    sections: SurfaceSectionStyle,
 }
 
 impl<'a> Sheet<'a> {
@@ -251,6 +335,7 @@ impl<'a> Sheet<'a> {
             placement: Placement::Right,
             extent: None,
             closable: true,
+            sections: SurfaceSectionStyle::flat(),
         }
     }
 
@@ -287,6 +372,18 @@ impl<'a> Sheet<'a> {
     #[must_use]
     pub fn closable(mut self, closable: bool) -> Self {
         self.closable = closable;
+        self
+    }
+
+    #[must_use]
+    pub fn section_style(mut self, sections: SurfaceSectionStyle) -> Self {
+        self.sections = sections;
+        self
+    }
+
+    #[must_use]
+    pub fn muted_sections(mut self) -> Self {
+        self.sections = SurfaceSectionStyle::muted();
         self
     }
 
@@ -334,9 +431,8 @@ impl<'a> Sheet<'a> {
             .fixed_pos(pos)
             .show(ctx, |ui| {
                 sheet_frame(&theme, self.placement).show(ui, |ui| {
-                    let content_size = sheet_content_size(size, &theme);
-                    ui.set_min_size(content_size);
-                    ui.set_max_size(content_size);
+                    ui.set_min_size(size);
+                    ui.set_max_size(size);
                     let mut header_controller = DialogController::default();
 
                     paint_dialog_header(
@@ -362,6 +458,104 @@ impl<'a> Sheet<'a> {
 
         Some(area_response.inner)
     }
+
+    pub fn show_sections<R>(
+        self,
+        ctx: &egui::Context,
+        add_header: impl FnOnce(&mut Ui, &mut SheetController),
+        add_contents: impl FnOnce(&mut Ui, &mut SheetController) -> R,
+        add_footer: impl FnOnce(&mut Ui, &mut SheetController),
+    ) -> Option<InnerResponse<R>> {
+        let theme = current_theme(ctx).unwrap_or_else(CastTheme::light);
+
+        if !*self.open {
+            ctx.animate_bool_with_time_and_easing(
+                self.id.with("slide"),
+                false,
+                theme.animation.normal_seconds(),
+                egui::emath::easing::cubic_out,
+            );
+            return None;
+        }
+
+        let screen_rect = ctx.content_rect();
+        let extent = self.extent.unwrap_or(420.0).max(sheet_extent_floor());
+        let (pos, size) = sheet_geometry(screen_rect, self.placement, extent);
+        let slide_progress = ctx.animate_bool_with_time_and_easing(
+            self.id.with("slide"),
+            true,
+            theme.animation.normal_seconds(),
+            egui::emath::easing::cubic_out,
+        );
+        let pos = sheet_slide_position(pos, size, self.placement, slide_progress);
+        let backdrop_response = egui::Area::new(self.id.with("backdrop"))
+            .order(egui::Order::Middle)
+            .fixed_pos(screen_rect.min)
+            .show(ctx, |ui| {
+                ui.painter()
+                    .rect_filled(screen_rect, 0.0, dialog_backdrop(&theme));
+                let (_, response) = ui.allocate_exact_size(screen_rect.size(), Sense::click());
+                response
+            });
+
+        let mut controller = SheetController::default();
+        let area_response = egui::Area::new(self.id)
+            .order(egui::Order::Foreground)
+            .fixed_pos(pos)
+            .show(ctx, |ui| {
+                sheet_shell_frame(&theme, self.placement).show(ui, |ui| {
+                    let content_size = sheet_content_size(size, &theme);
+                    ui.set_min_size(content_size);
+                    ui.set_max_size(content_size);
+                    show_sheet_sections(
+                        ui,
+                        &theme,
+                        self.sections,
+                        &mut controller,
+                        add_header,
+                        add_contents,
+                        add_footer,
+                    )
+                })
+            });
+
+        if (self.closable && backdrop_response.inner.clicked()) || controller.close_requested {
+            *self.open = false;
+        }
+
+        Some(area_response.inner)
+    }
+
+    pub fn show_with_footer<R>(
+        self,
+        ctx: &egui::Context,
+        add_contents: impl FnOnce(&mut Ui, &mut SheetController) -> R,
+        add_footer: impl FnOnce(&mut Ui, &mut SheetController),
+    ) -> Option<InnerResponse<R>> {
+        let title = self.title.clone();
+        let description = self.description.clone();
+        let closable = self.closable;
+
+        self.show_sections(
+            ctx,
+            move |ui, sheet| {
+                let mut dialog = DialogController::default();
+                paint_dialog_header(
+                    ui,
+                    &current_theme(ui.ctx()).unwrap_or_else(CastTheme::light),
+                    title.as_deref(),
+                    description.as_deref(),
+                    closable,
+                    &mut dialog,
+                );
+                if dialog.close_requested() {
+                    sheet.close();
+                }
+            },
+            add_contents,
+            add_footer,
+        )
+    }
 }
 
 #[derive(Default, Debug)]
@@ -380,7 +574,81 @@ impl SheetController {
     }
 }
 
+fn show_dialog_sections<R>(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    sections: SurfaceSectionStyle,
+    controller: &mut DialogController,
+    add_header: impl FnOnce(&mut Ui, &mut DialogController),
+    add_contents: impl FnOnce(&mut Ui, &mut DialogController) -> R,
+    add_footer: impl FnOnce(&mut Ui, &mut DialogController),
+) -> R {
+    let previous_spacing = ui.spacing().item_spacing;
+    ui.spacing_mut().item_spacing.y = 0.0;
+
+    let header = show_surface_section(ui, theme, sections.header, theme.spacing.lg, |ui| {
+        add_header(ui, controller);
+    });
+    if sections.dividers {
+        paint_section_divider(ui, theme, header.response.rect, header.response.rect.max.y);
+    }
+
+    let body = show_surface_section(ui, theme, SurfaceChrome::Flat, theme.spacing.lg, |ui| {
+        add_contents(ui, controller)
+    })
+    .inner;
+
+    let footer = show_surface_section(ui, theme, sections.footer, theme.spacing.lg, |ui| {
+        add_footer(ui, controller);
+    });
+    if sections.dividers {
+        paint_section_divider(ui, theme, footer.response.rect, footer.response.rect.min.y);
+    }
+
+    ui.spacing_mut().item_spacing = previous_spacing;
+    body
+}
+
+fn show_sheet_sections<R>(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    sections: SurfaceSectionStyle,
+    controller: &mut SheetController,
+    add_header: impl FnOnce(&mut Ui, &mut SheetController),
+    add_contents: impl FnOnce(&mut Ui, &mut SheetController) -> R,
+    add_footer: impl FnOnce(&mut Ui, &mut SheetController),
+) -> R {
+    let previous_spacing = ui.spacing().item_spacing;
+    ui.spacing_mut().item_spacing.y = 0.0;
+
+    let header = show_surface_section(ui, theme, sections.header, theme.spacing.lg, |ui| {
+        add_header(ui, controller);
+    });
+    if sections.dividers {
+        paint_section_divider(ui, theme, header.response.rect, header.response.rect.max.y);
+    }
+
+    let body = show_surface_section(ui, theme, SurfaceChrome::Flat, theme.spacing.lg, |ui| {
+        add_contents(ui, controller)
+    })
+    .inner;
+
+    let footer = show_surface_section(ui, theme, sections.footer, theme.spacing.lg, |ui| {
+        add_footer(ui, controller);
+    });
+    if sections.dividers {
+        paint_section_divider(ui, theme, footer.response.rect, footer.response.rect.min.y);
+    }
+
+    ui.spacing_mut().item_spacing = previous_spacing;
+    body
+}
+
 fn sheet_frame(theme: &CastTheme, placement: Placement) -> egui::Frame {
+    sheet_shell_frame(theme, placement).inner_margin(egui::Margin::same(theme.spacing.lg as i8))
+}
+
+fn sheet_shell_frame(theme: &CastTheme, placement: Placement) -> egui::Frame {
     egui::Frame::new()
         .fill(theme.colors.surface_overlay)
         .stroke(Stroke::new(theme.stroke.sm.max(1.0), theme.colors.border))
@@ -391,7 +659,7 @@ fn sheet_frame(theme: &CastTheme, placement: Placement) -> egui::Frame {
             spread: 0,
             color: mix_with_transparent(Color32::BLACK, 0.24),
         })
-        .inner_margin(egui::Margin::same(theme.spacing.lg as i8))
+        .inner_margin(egui::Margin::same(0))
 }
 
 fn sheet_corner_radius(theme: &CastTheme, placement: Placement) -> egui::CornerRadius {
@@ -579,6 +847,7 @@ mod tests {
         assert!(dialog.closable);
         assert!(dialog.title.is_none());
         assert!(dialog.description.is_none());
+        assert_eq!(dialog.sections, SurfaceSectionStyle::flat());
     }
 
     #[test]
@@ -587,6 +856,14 @@ mod tests {
         let dialog = Dialog::new(&mut open, "dialog").width(120.0);
 
         assert_eq!(dialog.width, Some(260.0));
+    }
+
+    #[test]
+    fn dialog_can_opt_into_muted_sections() {
+        let mut open = true;
+        let dialog = Dialog::new(&mut open, "dialog").muted_sections();
+
+        assert_eq!(dialog.sections, SurfaceSectionStyle::muted());
     }
 
     #[test]
@@ -624,6 +901,7 @@ mod tests {
         assert_eq!(sheet.placement, Placement::Right);
         assert!(sheet.closable);
         assert!(sheet.title.is_none());
+        assert_eq!(sheet.sections, SurfaceSectionStyle::flat());
     }
 
     #[test]
@@ -632,6 +910,14 @@ mod tests {
         let sheet = Sheet::new(&mut open, "sheet").width(120.0);
 
         assert_eq!(sheet.extent, Some(sheet_extent_floor()));
+    }
+
+    #[test]
+    fn sheet_can_opt_into_muted_sections() {
+        let mut open = true;
+        let sheet = Sheet::new(&mut open, "sheet").muted_sections();
+
+        assert_eq!(sheet.sections, SurfaceSectionStyle::muted());
     }
 
     #[test]

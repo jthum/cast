@@ -2006,6 +2006,39 @@ fn show_surfaces(ui: &mut egui::Ui) {
         ui.heading("Surfaces");
         ui.label("Card frames primary content. Panel frames secondary or raised content.");
         ui.add(Separator::new());
+        Card::new().muted_sections().show_sections(
+            ui,
+            |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.heading("Context");
+                    ui.add(Badge::new("860 / 200k").intent(Intent::Neutral));
+                });
+            },
+            |ui| {
+                CastPanel::new().show(ui, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.add(Badge::new("You").intent(Intent::Neutral));
+                        ui.label("Build is failing on main after the React 19 upgrade.");
+                    });
+                });
+                ui.add_space(8.0);
+                CastPanel::new().show(ui, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.add(Badge::new("Claude").intent(Intent::Warning));
+                        ui.label("Let me read the build log and trace the failing module.");
+                    });
+                });
+            },
+            |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("3 in window");
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label("Auto-compacts at 6");
+                    });
+                });
+            },
+        );
+        ui.add_space(8.0);
         CastPanel::new().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.add(Badge::new("Panel").intent(Intent::Neutral));
@@ -2070,7 +2103,8 @@ fn show_menus(
             .title("Popover")
             .body("A richer anchored overlay for compact settings and contextual actions.")
             .width(280.0)
-            .show(
+            .muted_sections()
+            .show_with_footer(
                 ui,
                 |ui| {
                     ui.add(
@@ -2086,6 +2120,12 @@ fn show_menus(
                     });
                     ui.add_space(6.0);
                     ui.add(Button::new("Apply").size(Size::Small));
+                },
+                |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label("Esc closes");
+                        ui.add(Badge::new("Local").intent(Intent::Neutral));
+                    });
                 },
             );
         ui.add_space(8.0);
@@ -2137,30 +2177,40 @@ fn show_menus(
         .title("Run settings")
         .description("A non-blocking side surface for secondary tasks and detailed controls.")
         .width(380.0)
-        .show(ui.ctx(), |ui, sheet| {
-            ui.label("Sheets keep the workspace visible while exposing a focused panel.");
-            ui.add_space(12.0);
-            ui.add(Badge::new("Right edge").intent(Intent::Info));
-            ui.add_space(12.0);
-            ui.add(Separator::new());
-            ui.add_space(12.0);
-            if ui.add(Button::new("Done").size(Size::Small)).clicked() {
-                sheet.close();
-            }
-        });
+        .muted_sections()
+        .show_with_footer(
+            ui.ctx(),
+            |ui, _sheet| {
+                ui.label("Sheets keep the workspace visible while exposing a focused panel.");
+                ui.add_space(12.0);
+                ui.add(Badge::new("Right edge").intent(Intent::Info));
+                ui.add_space(12.0);
+                ui.add(Separator::new());
+                ui.add_space(12.0);
+            },
+            |ui, sheet| {
+                if ui.add(Button::new("Done").size(Size::Small)).clicked() {
+                    sheet.close();
+                }
+            },
+        );
 
     Dialog::new(dialog_open, "gallery_dialog")
         .title("Dialog")
         .description("A blocking surface for focused decisions, confirmations, and short forms.")
         .width(440.0)
-        .show(ui.ctx(), |ui, dialog| {
+        .muted_sections()
+        .show_with_footer(
+            ui.ctx(),
+            |ui, _dialog| {
             ui.label("Use dialogs when the surrounding workspace should pause until the user makes a choice.");
             ui.add_space(12.0);
             ui.horizontal_wrapped(|ui| {
                 ui.add(Badge::new("Esc closes").intent(Intent::Neutral));
                 ui.add(Badge::new("Backdrop closes").intent(Intent::Info));
             });
-            ui.add_space(18.0);
+            },
+            |ui, dialog| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.add(Button::new("Confirm").size(Size::Small)).clicked() {
                     dialog.close();
@@ -2177,7 +2227,8 @@ fn show_menus(
                     dialog.close();
                 }
             });
-        });
+            },
+        );
 
     if let Some(result) = ConfirmDialog::new(confirm_dialog_open, "gallery_confirm_dialog")
         .title("Delete generated report?")

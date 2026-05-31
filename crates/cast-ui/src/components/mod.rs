@@ -37,7 +37,7 @@ pub use alert::{Alert, Notice};
 pub use avatar::Avatar;
 pub use badge::Badge;
 pub use button::Button;
-pub use card::Card;
+pub use card::{Card, SurfaceChrome, SurfaceSectionStyle};
 pub use checkbox::{Checkbox, Radio, RadioGroup};
 pub use dialog::{
     ConfirmDialog, ConfirmDialogResponse, Dialog, DialogController, Sheet, SheetController,
