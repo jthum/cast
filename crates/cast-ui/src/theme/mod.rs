@@ -929,6 +929,9 @@ pub struct ColorTokens {
     pub text: Color32,
     pub text_muted: Color32,
     pub text_subtle: Color32,
+    pub neutral_family: SemanticColorTokens,
+    pub neutral: Color32,
+    pub neutral_fg: Color32,
     pub primary_family: SemanticColorTokens,
     pub primary: Color32,
     pub primary_fg: Color32,
@@ -1001,6 +1004,7 @@ impl ColorTokens {
             mix_oklch(neutral, Color32::BLACK, 0.78),
             mix_oklch(neutral, Color32::BLACK, 0.35),
             neutral,
+            neutral,
             primary,
             secondary,
             success,
@@ -1035,6 +1039,7 @@ impl ColorTokens {
             mix_oklch(neutral, Color32::WHITE, 0.92),
             mix_oklch(neutral, Color32::WHITE, 0.62),
             mix_oklch(neutral, Color32::WHITE, 0.35),
+            neutral,
             primary,
             secondary,
             success,
@@ -1058,6 +1063,7 @@ impl ColorTokens {
         text: Color32,
         text_muted: Color32,
         text_subtle: Color32,
+        neutral: Color32,
         primary: Color32,
         secondary: Color32,
         success: Color32,
@@ -1066,6 +1072,7 @@ impl ColorTokens {
         info: Color32,
         selection_alpha: u8,
     ) -> Self {
+        let neutral_family = SemanticColorTokens::derive(neutral, mode, surface);
         let primary_family = SemanticColorTokens::derive(primary, mode, surface);
         let secondary_family = SemanticColorTokens::derive(secondary, mode, surface);
         let success_family = SemanticColorTokens::derive(success, mode, surface);
@@ -1084,6 +1091,9 @@ impl ColorTokens {
             text,
             text_muted,
             text_subtle,
+            neutral_family,
+            neutral,
+            neutral_fg: neutral_family.fg,
             primary_family,
             primary,
             primary_fg: primary_family.fg,
@@ -1882,6 +1892,65 @@ mod tests {
     }
 
     #[test]
+    fn palette_matrix_derives_readable_semantic_colors() {
+        let palettes = [
+            CastPaletteInput {
+                primary: Color32::from_rgb(37, 99, 235),
+                secondary: Some(Color32::from_rgb(124, 58, 237)),
+                neutral: Some(Color32::from_rgb(100, 116, 139)),
+                success: Some(Color32::from_rgb(22, 163, 74)),
+                warning: Some(Color32::from_rgb(217, 119, 6)),
+                danger: Some(Color32::from_rgb(220, 38, 38)),
+                info: Some(Color32::from_rgb(8, 145, 178)),
+            },
+            CastPaletteInput {
+                primary: Color32::from_rgb(147, 51, 234),
+                secondary: Some(Color32::from_rgb(236, 72, 153)),
+                neutral: Some(Color32::from_rgb(113, 113, 122)),
+                success: Some(Color32::from_rgb(22, 163, 74)),
+                warning: Some(Color32::from_rgb(234, 179, 8)),
+                danger: Some(Color32::from_rgb(239, 68, 68)),
+                info: Some(Color32::from_rgb(14, 165, 233)),
+            },
+            CastPaletteInput {
+                primary: Color32::from_rgb(5, 150, 105),
+                secondary: Some(Color32::from_rgb(14, 165, 233)),
+                neutral: Some(Color32::from_rgb(120, 113, 108)),
+                success: Some(Color32::from_rgb(34, 197, 94)),
+                warning: Some(Color32::from_rgb(245, 158, 11)),
+                danger: Some(Color32::from_rgb(225, 29, 72)),
+                info: Some(Color32::from_rgb(6, 182, 212)),
+            },
+            CastPaletteInput {
+                primary: Color32::from_rgb(217, 119, 6),
+                secondary: Some(Color32::from_rgb(79, 70, 229)),
+                neutral: Some(Color32::from_rgb(107, 114, 128)),
+                success: Some(Color32::from_rgb(21, 128, 61)),
+                warning: Some(Color32::from_rgb(202, 138, 4)),
+                danger: Some(Color32::from_rgb(185, 28, 28)),
+                info: Some(Color32::from_rgb(8, 145, 178)),
+            },
+        ];
+
+        for mode in [ThemeMode::Light, ThemeMode::Dark] {
+            for palette in palettes.clone() {
+                let theme = CastTheme::from_palette(mode, palette);
+
+                assert_semantic_family_contrast(&theme, theme.colors.neutral_family);
+                assert_semantic_family_contrast(&theme, theme.colors.primary_family);
+                assert_semantic_family_contrast(&theme, theme.colors.secondary_family);
+                assert_semantic_family_contrast(&theme, theme.colors.success_family);
+                assert_semantic_family_contrast(&theme, theme.colors.warning_family);
+                assert_semantic_family_contrast(&theme, theme.colors.danger_family);
+                assert_semantic_family_contrast(&theme, theme.colors.info_family);
+                assert!(contrast_ratio(theme.colors.surface, theme.colors.text) >= 4.5);
+                assert!(contrast_ratio(theme.colors.surface, theme.colors.text_muted) >= 3.0);
+                assert!(contrast_ratio(theme.colors.background, theme.colors.text) >= 4.5);
+            }
+        }
+    }
+
+    #[test]
     fn semantic_family_derives_variant_roles() {
         let theme = CastTheme::light();
         let family = theme.colors.primary_family;
@@ -1902,6 +1971,11 @@ mod tests {
         assert_eq!(theme.components.panel.fill, theme.colors.surface_raised);
         assert_eq!(theme.components.input.fg, theme.colors.text);
         assert_eq!(theme.components.input.focus_border, theme.colors.focus);
+    }
+
+    fn assert_semantic_family_contrast(theme: &CastTheme, family: SemanticColorTokens) {
+        assert!(contrast_ratio(family.base, family.fg) >= 4.5);
+        assert!(contrast_ratio(theme.colors.surface, family.emphasis) >= 4.5);
     }
 
     #[test]

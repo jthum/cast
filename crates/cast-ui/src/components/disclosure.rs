@@ -4,7 +4,7 @@ use egui::{
 };
 
 use crate::{
-    color::{contrast_ratio, mix_with_transparent},
+    color::{contrast_ratio, mix_oklch, mix_with_transparent},
     foundation::{Intent, Size, Variant},
     style::resolve_intent_colors,
     theme::{CastTheme, theme_for_ui},
@@ -631,11 +631,11 @@ fn disclosure_header_fill(
     pressed: bool,
 ) -> Color32 {
     if pressed {
-        mix_with_transparent(theme.colors.primary_family.base, 0.075)
+        mix_oklch(theme.colors.surface, theme.colors.surface_muted, 0.54)
     } else if hovered {
-        mix_with_transparent(theme.colors.primary_family.base, 0.06)
+        mix_oklch(theme.colors.surface, theme.colors.surface_muted, 0.38)
     } else if chrome == HeaderChrome::Filled {
-        mix_with_transparent(theme.colors.primary_family.base, 0.05)
+        theme.colors.surface_muted
     } else {
         Color32::TRANSPARENT
     }
@@ -665,9 +665,7 @@ fn disclosure_header_radius(
 
 fn disclosure_divider_color(theme: &CastTheme) -> Color32 {
     match theme.mode {
-        crate::theme::ThemeMode::Light => {
-            mix_with_transparent(theme.colors.primary_family.base, 0.14)
-        }
+        crate::theme::ThemeMode::Light => theme.colors.border,
         crate::theme::ThemeMode::Dark => mix_with_transparent(theme.colors.text_muted, 0.30),
     }
 }
@@ -824,11 +822,11 @@ mod tests {
 
         assert_eq!(
             disclosure_header_fill(&theme, HeaderChrome::Filled, true, false, false),
-            mix_with_transparent(theme.colors.primary_family.base, 0.05)
+            theme.colors.surface_muted
         );
         assert_eq!(
             disclosure_header_fill(&theme, HeaderChrome::Filled, false, false, false),
-            mix_with_transparent(theme.colors.primary_family.base, 0.05)
+            theme.colors.surface_muted
         );
     }
 
@@ -866,10 +864,7 @@ mod tests {
     fn disclosure_dividers_follow_table_rule_tint() {
         let theme = CastTheme::light();
 
-        assert_eq!(
-            disclosure_divider_color(&theme),
-            mix_with_transparent(theme.colors.primary_family.base, 0.14)
-        );
+        assert_eq!(disclosure_divider_color(&theme), theme.colors.border);
     }
 
     #[test]

@@ -1328,7 +1328,7 @@ fn paint_table_detail_row(ui: &Ui, theme: &CastTheme, rect: egui::Rect, last_row
     ui.painter().rect_filled(
         rect,
         radius,
-        mix_with_transparent(theme.colors.primary_family.base, 0.018),
+        mix_oklch(theme.colors.surface, theme.colors.surface_muted, 0.22),
     );
     if !last_row {
         paint_table_horizontal_rule(ui, theme, rect.max.y, rect);
@@ -1354,7 +1354,7 @@ fn paint_table_rule(ui: &Ui, x: f32, rect: egui::Rect, color: Color32) {
 }
 
 fn table_header_fill(theme: &CastTheme) -> Color32 {
-    mix_with_transparent(theme.colors.primary_family.base, 0.05)
+    theme.colors.surface_muted
 }
 
 fn table_header_text_color(theme: &CastTheme) -> Color32 {
@@ -1376,22 +1376,23 @@ fn table_outline_width(theme: &CastTheme) -> f32 {
 
 fn table_outline_color(theme: &CastTheme) -> Color32 {
     match theme.mode {
-        ThemeMode::Light => mix_with_transparent(theme.colors.primary_family.base, 0.16),
+        ThemeMode::Light => theme.colors.border_strong,
         ThemeMode::Dark => mix_with_transparent(theme.colors.text_muted, 0.34),
     }
 }
 
 fn table_internal_rule_color(theme: &CastTheme) -> Color32 {
     match theme.mode {
-        ThemeMode::Light => mix_with_transparent(theme.colors.primary_family.base, 0.10),
+        ThemeMode::Light => theme.colors.border,
         ThemeMode::Dark => mix_with_transparent(theme.colors.text_muted, 0.24),
     }
 }
 
 fn table_hover_fill(theme: &CastTheme, pressed: bool) -> Color32 {
-    mix_with_transparent(
-        theme.colors.primary_family.base,
-        if pressed { 0.035 } else { 0.025 },
+    mix_oklch(
+        theme.colors.surface,
+        theme.colors.surface_muted,
+        if pressed { 0.54 } else { 0.38 },
     )
 }
 
@@ -1724,28 +1725,18 @@ mod tests {
     }
 
     #[test]
-    fn table_chrome_uses_local_primary_subtle_treatment() {
+    fn table_chrome_uses_neutral_surfaces() {
         let theme = CastTheme::light();
 
-        assert_eq!(
-            table_header_fill(&theme),
-            mix_with_transparent(theme.colors.primary_family.base, 0.05)
-        );
+        assert_eq!(table_header_fill(&theme), theme.colors.surface_muted);
         assert_eq!(table_header_text_color(&theme), theme.colors.text);
-        assert_eq!(
-            table_outline_color(&theme),
-            mix_with_transparent(theme.colors.primary_family.base, 0.16)
-        );
-        assert_eq!(
-            table_internal_rule_color(&theme),
-            mix_with_transparent(theme.colors.primary_family.base, 0.10)
-        );
+        assert_eq!(table_outline_color(&theme), theme.colors.border_strong);
+        assert_eq!(table_internal_rule_color(&theme), theme.colors.border);
         assert_eq!(
             table_header_font(&theme).family,
             theme.typography.strong.family
         );
         assert_eq!(table_header_font(&theme).size, theme.typography.small.size);
-        assert_ne!(table_internal_rule_color(&theme), theme.colors.border);
         assert_ne!(
             table_outline_color(&theme),
             table_internal_rule_color(&theme)
@@ -1767,14 +1758,14 @@ mod tests {
     }
 
     #[test]
-    fn table_hover_uses_lighter_primary_subtle_fill() {
+    fn table_hover_uses_lighter_neutral_fill() {
         let theme = CastTheme::light();
         let colors = table_row_colors(&theme, false, true, false);
 
         assert_eq!(colors.fill, table_hover_fill(&theme, false));
         assert_eq!(
             colors.fill,
-            mix_with_transparent(theme.colors.primary_family.base, 0.025)
+            mix_oklch(theme.colors.surface, theme.colors.surface_muted, 0.38)
         );
         assert_ne!(colors.fill, table_header_fill(&theme));
         assert_eq!(colors.fg, theme.colors.text);

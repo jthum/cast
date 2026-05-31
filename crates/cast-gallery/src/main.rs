@@ -1238,6 +1238,7 @@ fn show_theme_foundation(ui: &mut egui::Ui) {
 fn show_palette_preview(ui: &mut egui::Ui, theme: &CastTheme) {
     Card::new().show(ui, |ui| {
         ui.heading("Derived palette");
+        palette_family_row(ui, "Neutral", theme.colors.neutral_family);
         palette_family_row(ui, "Primary", theme.colors.primary_family);
         palette_family_row(ui, "Secondary", theme.colors.secondary_family);
         palette_family_row(ui, "Success", theme.colors.success_family);
@@ -1463,8 +1464,10 @@ fn palette_family_row(ui: &mut egui::Ui, label: &str, family: SemanticColorToken
     ui.horizontal(|ui| {
         ui.label(label);
         color_swatch(ui, family.base, "base");
+        color_swatch(ui, family.fg, "foreground");
         color_swatch(ui, family.subtle, "subtle");
         color_swatch(ui, family.muted, "muted");
+        color_swatch(ui, family.emphasis, "emphasis");
         color_swatch(ui, family.border, "border");
         color_swatch(ui, family.hover, "hover");
         color_swatch(ui, family.active, "active");
