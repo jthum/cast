@@ -65,6 +65,12 @@ impl Default for AppShellMetrics {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SidebarChildRoute<'a> {
+    pub route: usize,
+    pub label: &'a str,
+}
+
 impl Default for AppShellConfig<'static> {
     fn default() -> Self {
         Self {
@@ -194,10 +200,29 @@ fn show_app_top_bar_inner(
     changed
 }
 
+#[allow(dead_code)]
 pub fn show_shell_sidebar(ui: &mut egui::Ui, theme: &CastTheme, selected: &mut usize) {
     show_app_sidebar(ui, theme, &AppShellConfig::default(), selected);
 }
 
+pub fn show_shell_sidebar_tree(
+    ui: &mut egui::Ui,
+    theme: &CastTheme,
+    selected: &mut usize,
+    components_open: &mut bool,
+    component_children: &[SidebarChildRoute<'_>],
+) {
+    show_app_sidebar_tree(
+        ui,
+        theme,
+        &AppShellConfig::default(),
+        selected,
+        components_open,
+        component_children,
+    );
+}
+
+#[allow(dead_code)]
 pub fn show_shell_sidebar_drawer(
     ctx: &egui::Context,
     theme: &CastTheme,
@@ -275,6 +300,91 @@ pub fn show_shell_sidebar_drawer(
     }
 }
 
+pub fn show_shell_sidebar_drawer_tree(
+    ctx: &egui::Context,
+    theme: &CastTheme,
+    open: &mut bool,
+    selected: &mut usize,
+    components_open: &mut bool,
+    component_children: &[SidebarChildRoute<'_>],
+    metrics: AppShellMetrics,
+) {
+    let id = egui::Id::new("cast_gallery_sidebar_drawer");
+    let slide_progress = drawer_animation_progress(ctx, id.with("slide"), *open, theme);
+
+    if !*open && slide_progress <= 0.001 {
+        return;
+    }
+
+    let screen_rect = ctx.content_rect();
+    let width = metrics
+        .compact_sidebar_width
+        .min((screen_rect.width() - theme.spacing.md).max(260.0));
+    let offset = -width * (1.0 - slide_progress.clamp(0.0, 1.0));
+    let mut close_requested = false;
+
+    let backdrop_response = egui::Area::new(id.with("backdrop"))
+        .order(egui::Order::Middle)
+        .fixed_pos(screen_rect.min)
+        .show(ctx, |ui| {
+            let alpha = match theme.mode {
+                ThemeMode::Light => 92,
+                ThemeMode::Dark => 148,
+            };
+            let backdrop_alpha = (alpha as f32 * slide_progress.clamp(0.0, 1.0)).round() as u8;
+            ui.painter()
+                .rect_filled(screen_rect, 0.0, Color32::from_black_alpha(backdrop_alpha));
+            let (_, response) = ui.allocate_exact_size(screen_rect.size(), egui::Sense::click());
+            response
+        });
+
+    if *open && backdrop_response.inner.clicked() {
+        close_requested = true;
+    }
+
+    egui::Area::new(id)
+        .order(egui::Order::Foreground)
+        .fixed_pos(screen_rect.min + egui::vec2(offset, 0.0))
+        .show(ctx, |ui| {
+            let margin = f32::from(metrics.sidebar_margin) * 2.0;
+            let inner_size = egui::vec2(
+                (width - margin).max(0.0),
+                (screen_rect.height() - margin).max(0.0),
+            );
+
+            egui::Frame::new()
+                .fill(shell_sidebar_fill(theme))
+                .stroke(egui::Stroke::NONE)
+                .inner_margin(egui::Margin::symmetric(
+                    metrics.sidebar_margin,
+                    metrics.sidebar_margin,
+                ))
+                .show(ui, |ui| {
+                    ui.set_min_size(inner_size);
+                    ui.set_max_size(inner_size);
+                    cast_scroll_area("compact_sidebar_scroll", theme)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            let previous_section = *selected;
+                            show_shell_sidebar_tree(
+                                ui,
+                                theme,
+                                selected,
+                                components_open,
+                                component_children,
+                            );
+                            if *selected != previous_section {
+                                close_requested = true;
+                            }
+                        });
+                });
+        });
+
+    if close_requested {
+        *open = false;
+    }
+}
+
 fn drawer_animation_seconds(theme: &CastTheme) -> f32 {
     if theme.animation.should_animate() {
         theme.animation.normal_seconds() * 1.5
@@ -315,6 +425,7 @@ fn move_toward(value: f32, target: f32, step: f32) -> f32 {
     }
 }
 
+#[allow(dead_code)]
 pub fn show_app_sidebar(
     ui: &mut egui::Ui,
     theme: &CastTheme,
@@ -341,6 +452,59 @@ pub fn show_app_sidebar(
     }
 
     ui.add_space(18.0);
+    sidebar_group_label(ui, config.status_group);
+    for (label, value) in config.status_items {
+        sidebar_status_row(ui, theme, label, value);
+    }
+}
+
+pub fn show_app_sidebar_tree(
+    ui: &mut egui::Ui,
+    theme: &CastTheme,
+    config: &AppShellConfig<'_>,
+    selected: &mut usize,
+    components_open: &mut bool,
+    component_children: &[SidebarChildRoute<'_>],
+) {
+    ui.add_space(4.0);
+    ui.label(
+        RichText::new(config.title)
+            .strong()
+            .size(theme.typography.heading.size + 2.0)
+            .color(Color32::WHITE),
+    );
+    ui.label(RichText::new(config.subtitle).color(sidebar_muted_text()));
+    ui.add_space(14.0);
+
+    sidebar_workspace_switcher(ui, theme, config.switcher_title, config.switcher_meta);
+    ui.add_space(14.0);
+    sidebar_group_label(ui, config.nav_group);
+    let component_child_selected = component_children
+        .iter()
+        .any(|child| child.route == *selected);
+    for (index, label) in config.nav_items.iter().enumerate() {
+        if index == 2 {
+            if sidebar_parent_nav_item(
+                ui,
+                theme,
+                label,
+                *selected == index || component_child_selected,
+                *components_open,
+            )
+            .clicked()
+            {
+                *components_open = !*components_open;
+                *selected = index;
+            }
+            if *components_open || component_child_selected {
+                show_sidebar_children(ui, theme, selected, component_children);
+            }
+        } else if sidebar_nav_item(ui, theme, label, *selected == index).clicked() {
+            *selected = index;
+        }
+    }
+
+    ui.add_space(14.0);
     sidebar_group_label(ui, config.status_group);
     for (label, value) in config.status_items {
         sidebar_status_row(ui, theme, label, value);
@@ -380,7 +544,7 @@ pub fn cast_page_scroll_area(id: impl Hash, theme: &CastTheme) -> ScrollArea {
 
 fn sidebar_workspace_switcher(ui: &mut egui::Ui, theme: &CastTheme, title: &str, meta: &str) {
     let width = ui.available_width();
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 44.0), egui::Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 40.0), egui::Sense::hover());
     if ui.is_rect_visible(rect) {
         ui.painter().rect(
             rect,
@@ -407,13 +571,13 @@ fn sidebar_workspace_switcher(ui: &mut egui::Ui, theme: &CastTheme, title: &str,
 }
 
 fn sidebar_group_label(ui: &mut egui::Ui, label: &str) {
-    ui.add_space(4.0);
+    ui.add_space(2.0);
     ui.label(
         RichText::new(label)
             .size(12.0)
             .color(Color32::from_rgba_unmultiplied(255, 255, 255, 128)),
     );
-    ui.add_space(4.0);
+    ui.add_space(2.0);
 }
 
 fn sidebar_nav_item(
@@ -423,7 +587,7 @@ fn sidebar_nav_item(
     selected: bool,
 ) -> egui::Response {
     let width = ui.available_width();
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 36.0), egui::Sense::click());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 32.0), egui::Sense::click());
     if ui.is_rect_visible(rect) {
         let fill = if selected {
             Color32::from_rgba_unmultiplied(255, 255, 255, 44)
@@ -443,10 +607,127 @@ fn sidebar_nav_item(
             fill,
         );
         ui.painter().text(
-            rect.left_center() + egui::vec2(14.0, 0.0),
+            rect.left_center() + egui::vec2(12.0, 0.0),
             egui::Align2::LEFT_CENTER,
             label,
             theme.typography.button.clone(),
+            fg,
+        );
+    }
+    response
+}
+
+fn sidebar_parent_nav_item(
+    ui: &mut egui::Ui,
+    theme: &CastTheme,
+    label: &str,
+    selected: bool,
+    open: bool,
+) -> egui::Response {
+    let response = sidebar_nav_item(ui, theme, label, selected);
+    if ui.is_rect_visible(response.rect) {
+        paint_sidebar_caret(
+            ui,
+            response.rect,
+            open,
+            Color32::from_rgba_unmultiplied(255, 255, 255, 170),
+        );
+    }
+    response
+}
+
+fn paint_sidebar_caret(ui: &egui::Ui, rect: egui::Rect, open: bool, color: Color32) {
+    let center = rect.right_center() - egui::vec2(14.0, 0.0);
+    let stroke = egui::Stroke::new(1.35, color);
+    if open {
+        ui.painter().line_segment(
+            [
+                center + egui::vec2(-4.0, -2.0),
+                center + egui::vec2(0.0, 2.0),
+            ],
+            stroke,
+        );
+        ui.painter().line_segment(
+            [
+                center + egui::vec2(0.0, 2.0),
+                center + egui::vec2(4.0, -2.0),
+            ],
+            stroke,
+        );
+    } else {
+        ui.painter().line_segment(
+            [
+                center + egui::vec2(-2.0, -4.0),
+                center + egui::vec2(2.0, 0.0),
+            ],
+            stroke,
+        );
+        ui.painter().line_segment(
+            [
+                center + egui::vec2(2.0, 0.0),
+                center + egui::vec2(-2.0, 4.0),
+            ],
+            stroke,
+        );
+    }
+}
+
+fn show_sidebar_children(
+    ui: &mut egui::Ui,
+    theme: &CastTheme,
+    selected: &mut usize,
+    children: &[SidebarChildRoute<'_>],
+) {
+    if children.is_empty() {
+        return;
+    }
+
+    let top = ui.cursor().min.y;
+    for child in children {
+        if sidebar_child_item(ui, theme, child.label, *selected == child.route).clicked() {
+            *selected = child.route;
+        }
+    }
+    let bottom = ui.cursor().min.y;
+    let line_x = ui.min_rect().min.x + 22.0;
+    ui.painter().vline(
+        line_x,
+        top + 4.0..=bottom - 4.0,
+        egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 42)),
+    );
+}
+
+fn sidebar_child_item(
+    ui: &mut egui::Ui,
+    theme: &CastTheme,
+    label: &str,
+    selected: bool,
+) -> egui::Response {
+    let width = ui.available_width();
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 28.0), egui::Sense::click());
+    if ui.is_rect_visible(rect) {
+        let fill = if selected {
+            Color32::from_rgba_unmultiplied(255, 255, 255, 34)
+        } else if response.hovered() {
+            Color32::from_rgba_unmultiplied(255, 255, 255, 18)
+        } else {
+            Color32::TRANSPARENT
+        };
+        let fg = if selected {
+            Color32::WHITE
+        } else {
+            Color32::from_rgba_unmultiplied(255, 255, 255, 174)
+        };
+        ui.painter().rect_filled(
+            rect.shrink2(egui::vec2(0.0, 2.0)),
+            egui::CornerRadius::same(theme.radius.sm.round() as u8),
+            fill,
+        );
+        ui.painter().text(
+            rect.left_center() + egui::vec2(38.0, 0.0),
+            egui::Align2::LEFT_CENTER,
+            label,
+            theme.typography.small.clone(),
             fg,
         );
     }

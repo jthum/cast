@@ -8,9 +8,9 @@ use patterns::entity_table_with_details::{
 };
 use patterns::related_activity::show_related_activity;
 use patterns::shell::{
-    AppShellMetrics, cast_page_scroll_area, cast_scroll_area, shell_sidebar_fill,
-    show_shell_sidebar, show_shell_sidebar_drawer, show_shell_top_bar,
-    show_shell_top_bar_with_sidebar_button,
+    AppShellMetrics, SidebarChildRoute, cast_page_scroll_area, cast_scroll_area,
+    shell_sidebar_fill, show_shell_sidebar_drawer_tree, show_shell_sidebar_tree,
+    show_shell_top_bar, show_shell_top_bar_with_sidebar_button,
 };
 
 use cast::{
@@ -19,18 +19,81 @@ use cast::{
     CastTheme, ChatMessage, Checkbox, CodeOutputPanel, Combobox, ConfirmDialog,
     ConfirmDialogResponse, ContextItem, ContextPanel, ControlGroup, DateInput, Dialog, Dropdown,
     EmptyState, FormActions, FormField, FormSection, HoverCard, Intent, Kbd, Label, Link, Loader,
-    LoaderStyle, Menu, MenuItem, MessageThread, MetricCard, Notice, NumberInput, Pagination,
-    Panel as CastPanel, PatchFile, PatchReviewPanel, PlanList, PlanStep, PlanStepStatus, Popover,
-    ProgressBar, ProgressMetric, RadioGroup, ReportSection, ResizablePanels, ResponsiveColumns,
-    RunPhase, RunTimeline, RunTimelineItem, SearchInput, SegmentedControl, Select,
-    SemanticColorTokens, Separator, Sheet, Sidebar, SidebarItem, Size, Skeleton, Slider, Sparkline,
-    Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, TimeInput, Toast,
-    ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput,
-    ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary, Variant,
+    LoaderStyle, Markdown, Menu, MenuItem, MessageThread, MetricCard, Notice, NumberInput,
+    Pagination, Panel as CastPanel, PatchFile, PatchReviewPanel, PlanList, PlanStep,
+    PlanStepStatus, Popover, ProgressBar, ProgressMetric, RadioGroup, ReportSection,
+    ResizablePanels, ResponsiveColumns, RunPhase, RunTimeline, RunTimelineItem, SearchInput,
+    SegmentedControl, Select, SemanticColorTokens, Separator, Sheet, Sidebar, SidebarItem, Size,
+    Skeleton, Slider, Sparkline, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed,
+    TimeInput, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus,
+    ToolOutput, ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary,
+    Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
 const LEAD_COUNT: usize = 24;
+const SECTION_WORKBENCH: usize = 0;
+const SECTION_FOUNDATIONS: usize = 1;
+const SECTION_COMPONENTS: usize = 2;
+const SECTION_AGENT_COMPONENTS: usize = 3;
+const SECTION_THEME_LAB: usize = 4;
+const SECTION_COMPONENT_BUTTONS: usize = 20;
+const SECTION_COMPONENT_INPUTS: usize = 21;
+const SECTION_COMPONENT_TABLES: usize = 22;
+const SECTION_COMPONENT_OVERLAYS: usize = 23;
+const SECTION_COMPONENT_FEEDBACK: usize = 24;
+const SECTION_COMPONENT_SURFACES: usize = 25;
+
+const COMPONENT_NAV_ITEMS: &[SidebarChildRoute<'_>] = &[
+    SidebarChildRoute {
+        route: SECTION_COMPONENT_BUTTONS,
+        label: "Buttons",
+    },
+    SidebarChildRoute {
+        route: SECTION_COMPONENT_INPUTS,
+        label: "Inputs",
+    },
+    SidebarChildRoute {
+        route: SECTION_COMPONENT_TABLES,
+        label: "Tables",
+    },
+    SidebarChildRoute {
+        route: SECTION_COMPONENT_OVERLAYS,
+        label: "Overlays",
+    },
+    SidebarChildRoute {
+        route: SECTION_COMPONENT_FEEDBACK,
+        label: "Feedback",
+    },
+    SidebarChildRoute {
+        route: SECTION_COMPONENT_SURFACES,
+        label: "Surfaces",
+    },
+];
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ComponentDocRoute {
+    Overview,
+    Buttons,
+    Inputs,
+    Tables,
+    Overlays,
+    Feedback,
+    Surfaces,
+}
+
+fn component_doc_route(section: usize) -> Option<ComponentDocRoute> {
+    match section {
+        SECTION_COMPONENTS => Some(ComponentDocRoute::Overview),
+        SECTION_COMPONENT_BUTTONS => Some(ComponentDocRoute::Buttons),
+        SECTION_COMPONENT_INPUTS => Some(ComponentDocRoute::Inputs),
+        SECTION_COMPONENT_TABLES => Some(ComponentDocRoute::Tables),
+        SECTION_COMPONENT_OVERLAYS => Some(ComponentDocRoute::Overlays),
+        SECTION_COMPONENT_FEEDBACK => Some(ComponentDocRoute::Feedback),
+        SECTION_COMPONENT_SURFACES => Some(ComponentDocRoute::Surfaces),
+        _ => None,
+    }
+}
 
 fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions::default();
@@ -94,6 +157,7 @@ struct CastGallery {
     editable_task: String,
     editable_status: usize,
     sidebar_section: usize,
+    components_nav_open: bool,
     compact_sidebar_open: bool,
     last_scroll_route: Option<(usize, usize)>,
 }
@@ -150,7 +214,8 @@ impl CastGallery {
             agent_due_time: String::from("09:30"),
             editable_task: String::from("Review agent output table"),
             editable_status: 1,
-            sidebar_section: 0,
+            sidebar_section: SECTION_WORKBENCH,
+            components_nav_open: true,
             compact_sidebar_open: false,
             last_scroll_route: None,
         }
@@ -163,10 +228,13 @@ impl CastGallery {
 
     fn apply_command_palette_action(&mut self, action: &str) -> bool {
         match action {
-            "open-workspace" => self.sidebar_section = 0,
-            "show-components" => self.sidebar_section = 2,
-            "agent-components" => self.sidebar_section = 3,
-            "theme-lab" => self.sidebar_section = 4,
+            "open-workspace" => self.sidebar_section = SECTION_WORKBENCH,
+            "show-components" => {
+                self.sidebar_section = SECTION_COMPONENTS;
+                self.components_nav_open = true;
+            }
+            "agent-components" => self.sidebar_section = SECTION_AGENT_COMPONENTS,
+            "theme-lab" => self.sidebar_section = SECTION_THEME_LAB,
             "export-table" => {
                 self.lead_exported_count = Some(
                     self.lead_selected
@@ -175,7 +243,7 @@ impl CastGallery {
                         .count(),
                 );
             }
-            "review-diagnostics" => self.sidebar_section = 1,
+            "review-diagnostics" => self.sidebar_section = SECTION_FOUNDATIONS,
             "toggle-mode" => {
                 let next = if self.seed.mode == ThemeMode::Light {
                     ThemeMode::Dark
@@ -226,7 +294,13 @@ impl eframe::App for CastGallery {
                     cast_scroll_area("sidebar_scroll", &self.theme)
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
-                            show_shell_sidebar(ui, &self.theme, &mut self.sidebar_section);
+                            show_shell_sidebar_tree(
+                                ui,
+                                &self.theme,
+                                &mut self.sidebar_section,
+                                &mut self.components_nav_open,
+                                COMPONENT_NAV_ITEMS,
+                            );
                         });
                 });
         }
@@ -263,11 +337,13 @@ impl eframe::App for CastGallery {
             });
 
         if compact_shell {
-            show_shell_sidebar_drawer(
+            show_shell_sidebar_drawer_tree(
                 &ctx,
                 &self.theme,
                 &mut self.compact_sidebar_open,
                 &mut self.sidebar_section,
+                &mut self.components_nav_open,
+                COMPONENT_NAV_ITEMS,
                 shell_metrics,
             );
         }
@@ -285,7 +361,7 @@ impl eframe::App for CastGallery {
                     }),
             )
             .show_inside(ui, |ui| {
-                let scroll_tab = if self.sidebar_section == 2 {
+                let scroll_tab = if self.sidebar_section == SECTION_COMPONENTS {
                     self.component_tab
                 } else {
                     0
@@ -434,8 +510,48 @@ fn show_workspace_view(
     editable_status: &mut usize,
 ) -> bool {
     let mut theme_changed = false;
+    if let Some(route) = component_doc_route(section) {
+        show_component_documentation_route(
+            ui,
+            route,
+            component_tab,
+            search,
+            name,
+            command,
+            handle,
+            preset_query,
+            preset_choice,
+            form_validation_attention,
+            enabled,
+            notifications,
+            indeterminate,
+            form_density,
+            menu_choice,
+            dialog_open,
+            sheet_open,
+            confirm_dialog_open,
+            confirm_result,
+            command_palette,
+            lead_search,
+            related_activity_open,
+            related_activity_group,
+            lead_selected,
+            lead_expanded,
+            lead_date_filter,
+            lead_user_filter,
+            lead_status_filter,
+            lead_payment_filter,
+            lead_rows_per_page,
+            lead_page,
+            lead_exported_count,
+            toast_preview_open,
+            toast_preview_toasts,
+        );
+        return theme_changed;
+    }
+
     match section {
-        0 => {
+        SECTION_WORKBENCH => {
             workspace_header(
                 ui,
                 "Agent workspace",
@@ -462,7 +578,7 @@ fn show_workspace_view(
                 form_density,
             );
         }
-        1 => {
+        SECTION_FOUNDATIONS => {
             workspace_header(
                 ui,
                 "Foundations",
@@ -478,7 +594,91 @@ fn show_workspace_view(
             ui.add_space(12.0);
             show_typography_diagnostics(ui, theme, pixels_per_point, zoom);
         }
-        2 => {
+        SECTION_AGENT_COMPONENTS => {
+            workspace_header(
+                ui,
+                "Agent components",
+                "Composer, transcript, tool-call, and workflow primitives for agentic desktop surfaces.",
+                Intent::Primary,
+            );
+            ui.add_space(12.0);
+            show_agent_components(
+                ui,
+                command,
+                agent_model,
+                agent_loading,
+                agent_tool_open,
+                agent_retry_budget,
+                agent_due_date,
+                agent_due_time,
+                editable_task,
+                editable_status,
+            );
+        }
+        SECTION_THEME_LAB => {
+            workspace_header(
+                ui,
+                "Theme lab",
+                "A focused view for token derivation, live overrides, type diagnostics, and palette checks.",
+                Intent::Success,
+            );
+            ui.add_space(12.0);
+            Card::new().show(ui, |ui| {
+                if show_theme_editor(ui, seed) {
+                    theme_changed = true;
+                }
+            });
+            ui.add_space(12.0);
+            show_palette_preview(ui, theme);
+            ui.add_space(12.0);
+            show_typography_diagnostics(ui, theme, pixels_per_point, zoom);
+            ui.add_space(12.0);
+            show_override_preview(ui);
+        }
+        _ => {}
+    };
+    theme_changed
+}
+
+#[allow(clippy::too_many_arguments)]
+fn show_component_documentation_route(
+    ui: &mut egui::Ui,
+    route: ComponentDocRoute,
+    component_tab: &mut usize,
+    search: &mut String,
+    name: &mut String,
+    command: &mut String,
+    handle: &mut String,
+    preset_query: &mut String,
+    preset_choice: &mut usize,
+    form_validation_attention: &mut bool,
+    enabled: &mut bool,
+    notifications: &mut bool,
+    indeterminate: &mut bool,
+    form_density: &mut usize,
+    menu_choice: &mut usize,
+    dialog_open: &mut bool,
+    sheet_open: &mut bool,
+    confirm_dialog_open: &mut bool,
+    confirm_result: &mut Option<ConfirmDialogResponse>,
+    command_palette: &mut CommandPaletteState,
+    lead_search: &mut String,
+    related_activity_open: &mut bool,
+    related_activity_group: &mut Option<usize>,
+    lead_selected: &mut [bool; LEAD_COUNT],
+    lead_expanded: &mut [bool; LEAD_COUNT],
+    lead_date_filter: &mut usize,
+    lead_user_filter: &mut usize,
+    lead_status_filter: &mut usize,
+    lead_payment_filter: &mut usize,
+    lead_rows_per_page: &mut usize,
+    lead_page: &mut usize,
+    lead_exported_count: &mut Option<usize>,
+    toast_preview_open: &mut bool,
+    toast_preview_toasts: &mut Vec<Toast>,
+) {
+    match route {
+        ComponentDocRoute::Overview => {
             workspace_header(
                 ui,
                 "Components",
@@ -522,49 +722,430 @@ fn show_workspace_view(
                 toast_preview_toasts,
             );
         }
-        3 => {
-            workspace_header(
+        ComponentDocRoute::Buttons => show_button_docs(ui),
+        ComponentDocRoute::Inputs => {
+            show_input_docs(
                 ui,
-                "Agent components",
-                "Composer, transcript, tool-call, and workflow primitives for agentic desktop surfaces.",
-                Intent::Primary,
-            );
-            ui.add_space(12.0);
-            show_agent_components(
-                ui,
+                search,
+                name,
                 command,
-                agent_model,
-                agent_loading,
-                agent_tool_open,
-                agent_retry_budget,
-                agent_due_date,
-                agent_due_time,
-                editable_task,
-                editable_status,
+                handle,
+                form_density,
+                enabled,
+                notifications,
+                indeterminate,
             );
         }
-        _ => {
-            workspace_header(
+        ComponentDocRoute::Tables => {
+            show_table_docs(
                 ui,
-                "Theme lab",
-                "A focused view for token derivation, live overrides, type diagnostics, and palette checks.",
-                Intent::Success,
+                lead_selected,
+                lead_expanded,
+                lead_rows_per_page,
+                lead_page,
+                lead_exported_count,
             );
-            ui.add_space(12.0);
-            Card::new().show(ui, |ui| {
-                if show_theme_editor(ui, seed) {
-                    theme_changed = true;
+        }
+        ComponentDocRoute::Overlays => {
+            show_overlay_docs(ui, menu_choice, dialog_open, sheet_open);
+        }
+        ComponentDocRoute::Feedback => {
+            show_feedback_docs(ui, toast_preview_open, toast_preview_toasts);
+        }
+        ComponentDocRoute::Surfaces => show_surface_docs(ui),
+    }
+}
+
+fn show_component_doc_header(ui: &mut egui::Ui, title: &str, subtitle: &str) {
+    workspace_header(ui, title, subtitle, Intent::Secondary);
+    ui.add_space(12.0);
+}
+
+fn show_usage_code(ui: &mut egui::Ui, title: &str, code: &str) {
+    ui.add(
+        CodeOutputPanel::new(title, code)
+            .kind(ToolOutputKind::Code)
+            .metadata("Rust")
+            .height(154.0)
+            .width(ui.available_width()),
+    );
+}
+
+fn show_doc_notes(ui: &mut egui::Ui, notes: &str) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Implementation notes");
+        ui.add(Markdown::new(notes).width(ui.available_width()));
+    });
+}
+
+fn show_button_docs(ui: &mut egui::Ui) {
+    show_component_doc_header(
+        ui,
+        "Button",
+        "Action controls with semantic intents, variants, loading and disabled states.",
+    );
+    Card::new().show(ui, |ui| {
+        ui.heading("Variants");
+        ui.horizontal_wrapped(|ui| {
+            for variant in [
+                Variant::Solid,
+                Variant::Subtle,
+                Variant::Outline,
+                Variant::Ghost,
+            ] {
+                ui.add(Button::new(format!("{variant:?}")).variant(variant));
+            }
+        });
+        ui.add_space(8.0);
+        ui.heading("Intents");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Button::new("Primary"));
+            ui.add(Button::new("Secondary").intent(Intent::Secondary));
+            ui.add(Button::new("Success").intent(Intent::Success));
+            ui.add(Button::new("Warning").intent(Intent::Warning));
+            ui.add(Button::new("Danger").intent(Intent::Danger));
+        });
+        ui.add_space(8.0);
+        ui.heading("States");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Button::new("Small").size(Size::Small));
+            ui.add(Button::new("Loading").loading(true));
+            ui.add(Button::new("Disabled").disabled());
+            ui.add(Button::new("With icon").leading_icon("[+]"));
+        });
+    });
+    ui.add_space(12.0);
+    show_usage_code(
+        ui,
+        "Button usage",
+        "ui.add(\n    Button::new(\"Run\")\n        .leading_icon(\"[>]\")\n        .intent(Intent::Primary)\n        .variant(Variant::Solid)\n        .size(Size::Medium),\n);",
+    );
+    ui.add_space(12.0);
+    show_doc_notes(
+        ui,
+        "- Solid buttons are borderless and use semantic foregrounds derived for contrast.\n- Subtle and outline variants use transparent OKLCH-style tints from the active intent.\n- Disabled and loading states keep the same layout footprint.",
+    );
+}
+
+fn show_input_docs(
+    ui: &mut egui::Ui,
+    search: &mut String,
+    name: &mut String,
+    command: &mut String,
+    handle: &mut String,
+    form_density: &mut usize,
+    enabled: &mut bool,
+    notifications: &mut bool,
+    indeterminate: &mut bool,
+) {
+    show_component_doc_header(
+        ui,
+        "Inputs",
+        "Text, search, multiline, select and choice controls with shared sizing and focus chrome.",
+    );
+    Card::new().show(ui, |ui| {
+        ui.heading("Text controls");
+        ui.horizontal_wrapped(|ui| {
+            ui.add(TextInput::new(name).label("Name").width(220.0));
+            ui.add(
+                SearchInput::new(search)
+                    .hint_text("Search components")
+                    .width(240.0),
+            );
+            ui.add(
+                TextInput::new(handle)
+                    .label("Handle")
+                    .success_text("Available")
+                    .width(220.0),
+            );
+        });
+        ui.add_space(8.0);
+        ui.add(TextArea::new(command).rows(4).width(ui.available_width()));
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Select::new(form_density, ["Compact", "Comfortable", "Spacious"]).width(180.0));
+            ui.add(Checkbox::new(enabled, "Enabled"));
+            ui.add(Checkbox::new(notifications, "Notifications"));
+            ui.add(Checkbox::new(indeterminate, "Partial").indeterminate(true));
+        });
+    });
+    ui.add_space(12.0);
+    show_usage_code(
+        ui,
+        "Input usage",
+        "ui.add(TextInput::new(&mut name).label(\"Name\").width(220.0));\nui.add(SearchInput::new(&mut query).placeholder(\"Search\"));\nui.add(Select::new(&mut density, [\"Compact\", \"Comfortable\"]));",
+    );
+    ui.add_space(12.0);
+    show_doc_notes(
+        ui,
+        "- Inputs reuse the same focus halo, border width and typography tokens.\n- Specialized wrappers keep typed ergonomics while preserving the TextInput visual language.\n- Choice controls use selected, hover and pressed states from the same semantic token family.",
+    );
+}
+
+fn show_table_docs(
+    ui: &mut egui::Ui,
+    lead_selected: &mut [bool; LEAD_COUNT],
+    lead_expanded: &mut [bool; LEAD_COUNT],
+    rows_per_page: &mut usize,
+    page: &mut usize,
+    exported_count: &mut Option<usize>,
+) {
+    show_component_doc_header(
+        ui,
+        "Table",
+        "Rich widget-capable rows for structured data, editable cells, selection and expandable details.",
+    );
+    Card::new().show(ui, |ui| {
+        Table::new(["Task", "Status", "Owner", "Action"])
+            .column_weights([2.0, 1.0, 1.0, 1.0])
+            .min_column_width(96.0)
+            .show(ui, 3, |row, index| match index {
+                0 => {
+                    row.text("Review token contrast");
+                    row.cell(|ui| {
+                        ui.add(Badge::new("Active").intent(Intent::Info).status_dot());
+                    });
+                    row.text("Design");
+                    row.cell(|ui| {
+                        ui.add(
+                            Button::new("Open")
+                                .size(Size::Small)
+                                .variant(Variant::Ghost),
+                        );
+                    });
+                }
+                1 => {
+                    row.text("Document buttons");
+                    row.cell(|ui| {
+                        ui.add(Badge::new("Done").intent(Intent::Success).status_dot());
+                    });
+                    row.text("Cast");
+                    row.cell(|ui| {
+                        ui.add(
+                            Button::new("Copy")
+                                .size(Size::Small)
+                                .variant(Variant::Ghost),
+                        );
+                    });
+                }
+                _ => {
+                    row.text("Audit tables");
+                    row.cell(|ui| {
+                        ui.add(Badge::new("Queued").intent(Intent::Neutral).status_dot());
+                    });
+                    row.text("Agent");
+                    row.cell(|ui| {
+                        ui.add(
+                            Button::new("Run")
+                                .size(Size::Small)
+                                .variant(Variant::Outline),
+                        );
+                    });
                 }
             });
-            ui.add_space(12.0);
-            show_palette_preview(ui, theme);
-            ui.add_space(12.0);
-            show_typography_diagnostics(ui, theme, pixels_per_point, zoom);
-            ui.add_space(12.0);
-            show_override_preview(ui);
-        }
-    };
-    theme_changed
+    });
+    ui.add_space(12.0);
+    show_usage_code(
+        ui,
+        "Table usage",
+        "Table::new([\"Task\", \"Status\", \"Owner\"])\n    .column_weights([2.0, 1.0, 1.0])\n    .show(ui, rows.len(), |row, index| {\n        row.text(&rows[index].task);\n        row.cell(|ui| { ui.add(Badge::new(\"Active\").status_dot()); });\n        row.text(&rows[index].owner);\n    });",
+    );
+    ui.add_space(12.0);
+    show_doc_notes(
+        ui,
+        "- `Table` accepts arbitrary widgets inside cells; use `TextTable` for string-only output.\n- Row selection is host-owned, so apps can select via a checkbox column instead of row clicks.\n- Expandable detail rows are useful for related data, agent traces and generated artifacts.",
+    );
+    ui.add_space(12.0);
+    Card::new().show(ui, |ui| {
+        ui.heading("Pattern reference");
+        show_entity_table_with_details(
+            ui,
+            &LEADS,
+            EntityTableState {
+                selected: lead_selected,
+                expanded: lead_expanded,
+                rows_per_page,
+                page,
+                exported_count,
+            },
+        );
+    });
+}
+
+fn show_overlay_docs(
+    ui: &mut egui::Ui,
+    menu_choice: &mut usize,
+    dialog_open: &mut bool,
+    sheet_open: &mut bool,
+) {
+    show_component_doc_header(
+        ui,
+        "Overlays",
+        "Menus, popovers, hover cards, dialogs and sheets for temporary interaction surfaces.",
+    );
+    Card::new().show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Dropdown::new(menu_choice, ["Overview", "Theme", "Diagnostics"]).width(190.0));
+            Popover::new()
+                .title("Popover")
+                .body("Click-triggered contextual content.")
+                .width(260.0)
+                .show(
+                    ui,
+                    |ui| ui.add(Button::new("Open popover")),
+                    |ui| {
+                        ui.add(Badge::new("Anchored").intent(Intent::Info));
+                    },
+                );
+            HoverCard::new()
+                .title("Hover card")
+                .body("Non-modal preview content.")
+                .show(
+                    ui,
+                    |ui| ui.add(Button::new("Hover details").variant(Variant::Outline)),
+                    |ui| {
+                        ui.label("Good for previews, people, files and metadata.");
+                    },
+                );
+        });
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .add(Button::new("Open dialog").variant(Variant::Outline))
+                .clicked()
+            {
+                *dialog_open = true;
+            }
+            if ui
+                .add(Button::new("Open sheet").variant(Variant::Outline))
+                .clicked()
+            {
+                *sheet_open = true;
+            }
+        });
+    });
+    ui.add_space(12.0);
+    show_usage_code(
+        ui,
+        "Overlay usage",
+        "Popover::new()\n    .title(\"Run settings\")\n    .show(ui, |ui| ui.add(Button::new(\"Open\")), |ui| {\n        ui.add(Badge::new(\"Anchored\"));\n    });",
+    );
+    Sheet::new(sheet_open, "component_docs_sheet")
+        .title("Component sheet")
+        .description("A side surface for secondary setup or details.")
+        .width(360.0)
+        .muted_sections()
+        .show_with_footer(
+            ui.ctx(),
+            |ui, _sheet| {
+                ui.label("Sheets preserve the surrounding workspace while focusing a task.");
+            },
+            |ui, sheet| {
+                if ui.add(Button::new("Close").size(Size::Small)).clicked() {
+                    sheet.close();
+                }
+            },
+        );
+    Dialog::new(dialog_open, "component_docs_dialog")
+        .title("Component dialog")
+        .description("A focused blocking surface with explicit actions.")
+        .width(420.0)
+        .muted_sections()
+        .show_with_footer(
+            ui.ctx(),
+            |ui, _dialog| {
+                ui.label("Dialogs are best for bounded decisions and short forms.");
+            },
+            |ui, dialog| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.add(Button::new("Done").size(Size::Small)).clicked() {
+                        dialog.close();
+                    }
+                });
+            },
+        );
+    ui.add_space(12.0);
+    show_doc_notes(
+        ui,
+        "- Popovers and hover cards are anchored to a trigger response.\n- Dialogs and sheets can opt into sectioned headers and footers.\n- Menus keep selected item color readable against custom primary palettes.",
+    );
+}
+
+fn show_feedback_docs(
+    ui: &mut egui::Ui,
+    toast_preview_open: &mut bool,
+    toast_preview_toasts: &mut Vec<Toast>,
+) {
+    show_component_doc_header(
+        ui,
+        "Feedback",
+        "Badges, alerts, loaders, progress, skeletons and toasts for system state.",
+    );
+    Card::new().show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Badge::new("Success").intent(Intent::Success).status_dot());
+            ui.add(Badge::new("Warning").intent(Intent::Warning));
+            ui.add(Badge::new("Danger").intent(Intent::Danger));
+            ui.add(Loader::new().style(LoaderStyle::PixelEqualizer));
+            ui.add(Loader::new().style(LoaderStyle::PulseGrid));
+        });
+        ui.add_space(8.0);
+        ui.add(Alert::new("Build finished").body("All checks passed and the report is ready."));
+        ui.add_space(8.0);
+        ui.add(ProgressBar::new(0.68).width(ui.available_width()));
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            ui.add(Skeleton::new().width(180.0).height(18.0));
+            if ui
+                .add(Button::new("Preview toasts").variant(Variant::Outline))
+                .clicked()
+            {
+                *toast_preview_open = true;
+                toast_preview_toasts.clear();
+                toast_preview_toasts.push(
+                    Toast::new("Report ready")
+                        .body("The generated artifact can be reviewed.")
+                        .intent(Intent::Success),
+                );
+                toast_preview_toasts.push(
+                    Toast::new("Background sync")
+                        .body("Two files are still being indexed.")
+                        .intent(Intent::Info),
+                );
+            }
+        });
+    });
+    ui.add_space(12.0);
+    show_usage_code(
+        ui,
+        "Feedback usage",
+        "ui.add(Badge::new(\"Ready\").intent(Intent::Success).status_dot());\nui.add(Alert::new(\"Build finished\").body(\"All checks passed.\"));\nToastStack::new(\"toasts\", &toasts).show(ctx);",
+    );
+    ui.add_space(12.0);
+    show_doc_notes(
+        ui,
+        "- Feedback components share semantic color derivation and accessible foreground selection.\n- Toasts can stack and unstack on hover.\n- Skeleton shimmer and loader animation respect reduced-motion theme settings where applicable.",
+    );
+}
+
+fn show_surface_docs(ui: &mut egui::Ui) {
+    show_component_doc_header(
+        ui,
+        "Surfaces",
+        "Cards, panels, sections and empty states for composing app-level layouts.",
+    );
+    show_surfaces(ui);
+    ui.add_space(12.0);
+    show_usage_code(
+        ui,
+        "Surface usage",
+        "Card::new().muted_sections().show_sections(\n    ui,\n    |ui| ui.heading(\"Context\"),\n    |ui| ui.label(\"Body content\"),\n    |ui| ui.label(\"Footer metadata\"),\n);",
+    );
+    ui.add_space(12.0);
+    show_doc_notes(
+        ui,
+        "- Cards and overlays support optional header/footer sections.\n- Section chrome is token-driven, so global surface style can move between flat and framed treatments.\n- Panels are best for dense secondary UI inside a larger page.",
+    );
 }
 
 fn workspace_header(ui: &mut egui::Ui, title: &str, subtitle: &str, intent: Intent) {
