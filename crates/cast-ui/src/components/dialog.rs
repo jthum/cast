@@ -7,7 +7,10 @@ use crate::{
     color::mix_with_transparent,
     components::{
         Button,
-        card::{SurfaceChrome, SurfaceSectionStyle, paint_section_divider, show_surface_section},
+        card::{
+            SurfaceChrome, SurfaceSectionStyle, paint_section_divider, show_surface_section,
+            show_surface_section_with_radius, surface_section_radius,
+        },
     },
     foundation::{Intent, Placement, Size, Variant},
     style::{dialog_backdrop, dialog_frame, dialog_shell_frame, surface_shadow},
@@ -431,8 +434,9 @@ impl<'a> Sheet<'a> {
             .fixed_pos(pos)
             .show(ctx, |ui| {
                 sheet_frame(&theme, self.placement).show(ui, |ui| {
-                    ui.set_min_size(size);
-                    ui.set_max_size(size);
+                    let content_size = sheet_content_size(size, &theme);
+                    ui.set_min_size(content_size);
+                    ui.set_max_size(content_size);
                     let mut header_controller = DialogController::default();
 
                     paint_dialog_header(
@@ -504,13 +508,13 @@ impl<'a> Sheet<'a> {
             .fixed_pos(pos)
             .show(ctx, |ui| {
                 sheet_shell_frame(&theme, self.placement).show(ui, |ui| {
-                    let content_size = sheet_content_size(size, &theme);
-                    ui.set_min_size(content_size);
-                    ui.set_max_size(content_size);
+                    ui.set_min_size(size);
+                    ui.set_max_size(size);
                     show_sheet_sections(
                         ui,
                         &theme,
                         self.sections,
+                        self.placement,
                         &mut controller,
                         add_header,
                         add_contents,
@@ -587,9 +591,16 @@ fn show_dialog_sections<R>(
     ui.spacing_mut().item_spacing.y = 0.0;
 
     let section_padding = theme.components.section.padding;
-    let header = show_surface_section(ui, theme, sections.header, section_padding, |ui| {
-        add_header(ui, controller);
-    });
+    let header = show_surface_section_with_radius(
+        ui,
+        theme,
+        sections.header,
+        section_padding,
+        surface_section_radius(theme.radius.lg, true, false),
+        |ui| {
+            add_header(ui, controller);
+        },
+    );
     if sections.dividers {
         paint_section_divider(ui, theme, header.response.rect, header.response.rect.max.y);
     }
@@ -599,9 +610,16 @@ fn show_dialog_sections<R>(
     })
     .inner;
 
-    let footer = show_surface_section(ui, theme, sections.footer, section_padding, |ui| {
-        add_footer(ui, controller);
-    });
+    let footer = show_surface_section_with_radius(
+        ui,
+        theme,
+        sections.footer,
+        section_padding,
+        surface_section_radius(theme.radius.lg, false, true),
+        |ui| {
+            add_footer(ui, controller);
+        },
+    );
     if sections.dividers {
         paint_section_divider(ui, theme, footer.response.rect, footer.response.rect.min.y);
     }
@@ -614,6 +632,7 @@ fn show_sheet_sections<R>(
     ui: &mut Ui,
     theme: &CastTheme,
     sections: SurfaceSectionStyle,
+    placement: Placement,
     controller: &mut SheetController,
     add_header: impl FnOnce(&mut Ui, &mut SheetController),
     add_contents: impl FnOnce(&mut Ui, &mut SheetController) -> R,
@@ -623,9 +642,16 @@ fn show_sheet_sections<R>(
     ui.spacing_mut().item_spacing.y = 0.0;
 
     let section_padding = theme.components.section.padding;
-    let header = show_surface_section(ui, theme, sections.header, section_padding, |ui| {
-        add_header(ui, controller);
-    });
+    let header = show_surface_section_with_radius(
+        ui,
+        theme,
+        sections.header,
+        section_padding,
+        sheet_section_radius(theme, placement, SheetSection::Header),
+        |ui| {
+            add_header(ui, controller);
+        },
+    );
     if sections.dividers {
         paint_section_divider(ui, theme, header.response.rect, header.response.rect.max.y);
     }
@@ -635,9 +661,16 @@ fn show_sheet_sections<R>(
     })
     .inner;
 
-    let footer = show_surface_section(ui, theme, sections.footer, section_padding, |ui| {
-        add_footer(ui, controller);
-    });
+    let footer = show_surface_section_with_radius(
+        ui,
+        theme,
+        sections.footer,
+        section_padding,
+        sheet_section_radius(theme, placement, SheetSection::Footer),
+        |ui| {
+            add_footer(ui, controller);
+        },
+    );
     if sections.dividers {
         paint_section_divider(ui, theme, footer.response.rect, footer.response.rect.min.y);
     }
@@ -687,6 +720,61 @@ fn sheet_corner_radius(theme: &CastTheme, placement: Placement) -> egui::CornerR
             sw: 0,
             se: 0,
         },
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SheetSection {
+    Header,
+    Footer,
+}
+
+fn sheet_section_radius(
+    theme: &CastTheme,
+    placement: Placement,
+    section: SheetSection,
+) -> egui::CornerRadius {
+    let radius = theme.radius.lg as u8;
+
+    match (placement, section) {
+        (Placement::Left, SheetSection::Header) => egui::CornerRadius {
+            nw: 0,
+            ne: radius,
+            sw: 0,
+            se: 0,
+        },
+        (Placement::Left, SheetSection::Footer) => egui::CornerRadius {
+            nw: 0,
+            ne: 0,
+            sw: 0,
+            se: radius,
+        },
+        (Placement::Right, SheetSection::Header) => egui::CornerRadius {
+            nw: radius,
+            ne: 0,
+            sw: 0,
+            se: 0,
+        },
+        (Placement::Right, SheetSection::Footer) => egui::CornerRadius {
+            nw: 0,
+            ne: 0,
+            sw: radius,
+            se: 0,
+        },
+        (Placement::Top, SheetSection::Header) => egui::CornerRadius::ZERO,
+        (Placement::Top, SheetSection::Footer) => egui::CornerRadius {
+            nw: 0,
+            ne: 0,
+            sw: radius,
+            se: radius,
+        },
+        (Placement::Bottom, SheetSection::Header) => egui::CornerRadius {
+            nw: radius,
+            ne: radius,
+            sw: 0,
+            se: 0,
+        },
+        (Placement::Bottom, SheetSection::Footer) => egui::CornerRadius::ZERO,
     }
 }
 

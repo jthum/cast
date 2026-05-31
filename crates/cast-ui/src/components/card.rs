@@ -1,4 +1,4 @@
-use egui::{Color32, InnerResponse, Margin, Ui};
+use egui::{Color32, CornerRadius, InnerResponse, Margin, Ui};
 
 use crate::{
     style::{card_frame, card_shell_frame},
@@ -172,20 +172,94 @@ where
     B: FnOnce(&mut Ui) -> R,
     F: FnOnce(&mut Ui),
 {
+    show_surface_sections_optional_with_radius(
+        ui,
+        theme,
+        sections,
+        padding,
+        theme.components.card.radius,
+        add_header,
+        add_contents,
+        add_footer,
+    )
+}
+
+pub(crate) fn show_surface_sections_inside_with_radius<R>(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    sections: SurfaceSectionStyle,
+    padding: f32,
+    radius: f32,
+    add_header: impl FnOnce(&mut Ui),
+    add_contents: impl FnOnce(&mut Ui) -> R,
+    add_footer: impl FnOnce(&mut Ui),
+) -> R {
+    show_surface_sections_optional_with_radius(
+        ui,
+        theme,
+        sections,
+        padding,
+        radius,
+        Some(add_header),
+        add_contents,
+        Some(add_footer),
+    )
+}
+
+pub(crate) fn show_surface_sections_optional_with_radius<R, H, B, F>(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    sections: SurfaceSectionStyle,
+    padding: f32,
+    radius: f32,
+    add_header: Option<H>,
+    add_contents: B,
+    add_footer: Option<F>,
+) -> R
+where
+    H: FnOnce(&mut Ui),
+    B: FnOnce(&mut Ui) -> R,
+    F: FnOnce(&mut Ui),
+{
     let previous_spacing = ui.spacing().item_spacing;
     ui.spacing_mut().item_spacing.y = 0.0;
 
+    let has_header = add_header.is_some();
+    let has_footer = add_footer.is_some();
+
     if let Some(add_header) = add_header {
-        let header = show_surface_section(ui, theme, sections.header, padding, add_header);
+        let header = show_surface_section_with_radius(
+            ui,
+            theme,
+            sections.header,
+            padding,
+            surface_section_radius(radius, true, !has_footer),
+            add_header,
+        );
         if sections.dividers {
             paint_section_divider(ui, theme, header.response.rect, header.response.rect.max.y);
         }
     }
 
-    let body = show_surface_section(ui, theme, SurfaceChrome::Flat, padding, add_contents).inner;
+    let body = show_surface_section_with_radius(
+        ui,
+        theme,
+        SurfaceChrome::Flat,
+        padding,
+        surface_section_radius(radius, !has_header, !has_footer),
+        add_contents,
+    )
+    .inner;
 
     if let Some(add_footer) = add_footer {
-        let footer = show_surface_section(ui, theme, sections.footer, padding, add_footer);
+        let footer = show_surface_section_with_radius(
+            ui,
+            theme,
+            sections.footer,
+            padding,
+            surface_section_radius(radius, !has_header, true),
+            add_footer,
+        );
         if sections.dividers {
             paint_section_divider(ui, theme, footer.response.rect, footer.response.rect.min.y);
         }
@@ -202,8 +276,20 @@ pub(crate) fn show_surface_section<R>(
     padding: f32,
     add_contents: impl FnOnce(&mut Ui) -> R,
 ) -> InnerResponse<R> {
+    show_surface_section_with_radius(ui, theme, chrome, padding, CornerRadius::ZERO, add_contents)
+}
+
+pub(crate) fn show_surface_section_with_radius<R>(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    chrome: SurfaceChrome,
+    padding: f32,
+    corner_radius: CornerRadius,
+    add_contents: impl FnOnce(&mut Ui) -> R,
+) -> InnerResponse<R> {
     egui::Frame::new()
         .fill(surface_chrome_fill(theme, chrome))
+        .corner_radius(corner_radius)
         .inner_margin(Margin::same(padding as i8))
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
@@ -215,6 +301,16 @@ fn surface_chrome_fill(theme: &CastTheme, chrome: SurfaceChrome) -> Color32 {
     match chrome {
         SurfaceChrome::Flat => Color32::TRANSPARENT,
         SurfaceChrome::Muted => theme.components.section.muted_fill,
+    }
+}
+
+pub(crate) fn surface_section_radius(radius: f32, top: bool, bottom: bool) -> CornerRadius {
+    let radius = radius.round() as u8;
+    CornerRadius {
+        nw: if top { radius } else { 0 },
+        ne: if top { radius } else { 0 },
+        sw: if bottom { radius } else { 0 },
+        se: if bottom { radius } else { 0 },
     }
 }
 

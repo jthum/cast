@@ -160,15 +160,16 @@ fn show_app_top_bar_inner(
             }
 
             ui.label(title);
-            ui.separator();
-            if theme_mode_toggle(ui, seed.mode, *follows_system_theme).clicked() {
-                seed.mode = match seed.mode {
-                    ThemeMode::Light => ThemeMode::Dark,
-                    ThemeMode::Dark => ThemeMode::Light,
-                };
-                *follows_system_theme = false;
-                changed = true;
-            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if theme_mode_toggle(ui, seed.mode, *follows_system_theme).clicked() {
+                    seed.mode = match seed.mode {
+                        ThemeMode::Light => ThemeMode::Dark,
+                        ThemeMode::Dark => ThemeMode::Light,
+                    };
+                    *follows_system_theme = false;
+                    changed = true;
+                }
+            });
         },
     );
     changed
@@ -612,6 +613,7 @@ fn sidebar_workspace_switcher(ui: &mut egui::Ui, theme: &CastTheme, title: &str,
 
 fn sidebar_group_label(ui: &mut egui::Ui, label: &str) {
     ui.add_space(2.0);
+    let label = label.to_ascii_uppercase();
     ui.label(
         RichText::new(label)
             .size(12.0)
@@ -629,6 +631,8 @@ fn sidebar_nav_item(
     let width = ui.available_width();
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 28.0), egui::Sense::click());
     if ui.is_rect_visible(rect) {
+        let text_inset = 10.0;
+        let paint_rect = rect.translate(egui::vec2(-text_inset, 0.0));
         let fill = if selected {
             Color32::from_rgba_unmultiplied(255, 255, 255, 44)
         } else if response.hovered() {
@@ -642,12 +646,12 @@ fn sidebar_nav_item(
             Color32::from_rgba_unmultiplied(255, 255, 255, 190)
         };
         ui.painter().rect_filled(
-            rect.shrink2(egui::vec2(0.0, 1.0)),
+            paint_rect.shrink2(egui::vec2(0.0, 1.0)),
             egui::CornerRadius::same(theme.radius.md.round() as u8),
             fill,
         );
         ui.painter().text(
-            rect.left_center(),
+            paint_rect.left_center() + egui::vec2(text_inset, 0.0),
             egui::Align2::LEFT_CENTER,
             label,
             theme.typography.button.clone(),

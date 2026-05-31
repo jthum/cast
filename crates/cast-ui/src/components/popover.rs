@@ -2,7 +2,8 @@ use egui::{InnerResponse, Response, RichText, Ui};
 
 use crate::{
     components::card::{
-        SurfaceSectionStyle, show_surface_sections_inside, show_surface_sections_optional,
+        SurfaceSectionStyle, show_surface_sections_inside_with_radius,
+        show_surface_sections_optional_with_radius,
     },
     foundation::Placement,
     style::{popover_frame, popover_shell_frame},
@@ -165,11 +166,12 @@ impl Popover {
             .show(|ui| {
                 ui.set_min_width(width);
                 ui.set_max_width(width);
-                show_surface_sections_inside(
+                show_surface_sections_inside_with_radius(
                     ui,
                     &theme,
                     self.sections,
                     theme.components.section.compact_padding,
+                    theme.radius.lg,
                     add_header,
                     add_contents,
                     add_footer,
@@ -278,11 +280,12 @@ impl HoverCard {
         tooltip.show(|ui| {
             ui.set_min_width(width);
             ui.set_max_width(width);
-            show_surface_sections_optional(
+            show_surface_sections_optional_with_radius(
                 ui,
                 &theme,
                 self.sections,
                 theme.components.section.compact_padding,
+                theme.radius.lg,
                 Some(|ui: &mut Ui| {
                     paint_popover_header(ui, &theme, self.title.as_deref(), self.body.as_deref());
                 }),
