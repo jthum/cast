@@ -14,17 +14,17 @@ use patterns::shell::{
 };
 
 use cast::{
-    AgentComposer, Alert, ApprovalPanel, ArtifactCard, Avatar, Badge, Button, Card,
-    CastPaletteInput, CastTheme, ChatMessage, Checkbox, CodeOutputPanel, Combobox, ConfirmDialog,
-    ConfirmDialogResponse, ContextItem, ContextPanel, DateInput, Dialog, Dropdown, EmptyState,
-    FormActions, FormField, FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle, MenuItem,
-    MessageThread, Notice, NumberInput, Panel as CastPanel, PatchFile, PatchReviewPanel, PlanList,
-    PlanStep, PlanStepStatus, Popover, ProgressBar, RadioGroup, RunPhase, RunTimeline,
-    RunTimelineItem, SearchInput, SegmentedControl, Select, SemanticColorTokens, Separator, Sheet,
-    Size, Skeleton, Slider, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed,
-    TimeInput, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus,
-    ToolOutput, ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary,
-    Variant,
+    AgentComposer, Alert, ApprovalPanel, ArtifactCard, Avatar, Badge, BarChart, BarDatum, Button,
+    Card, CastPaletteInput, CastTheme, ChatMessage, Checkbox, CodeOutputPanel, Combobox,
+    ConfirmDialog, ConfirmDialogResponse, ContextItem, ContextPanel, DateInput, Dialog, Dropdown,
+    EmptyState, FormActions, FormField, FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle,
+    MenuItem, MessageThread, MetricCard, Notice, NumberInput, Panel as CastPanel, PatchFile,
+    PatchReviewPanel, PlanList, PlanStep, PlanStepStatus, Popover, ProgressBar, ProgressMetric,
+    RadioGroup, ReportSection, RunPhase, RunTimeline, RunTimelineItem, SearchInput,
+    SegmentedControl, Select, SemanticColorTokens, Separator, Sheet, Size, Skeleton, Slider,
+    Sparkline, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, TimeInput, Toast,
+    ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput,
+    ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -1652,7 +1652,9 @@ fn show_component_gallery(
     Card::new().show(ui, |ui| {
         ui.add(Tabs::new(
             component_tab,
-            ["Core", "Inputs", "Menus", "Data", "Feedback", "Surfaces"],
+            [
+                "Core", "Inputs", "Menus", "Data", "Feedback", "Reports", "Surfaces",
+            ],
         ));
     });
     ui.add_space(12.0);
@@ -1706,6 +1708,7 @@ fn show_component_gallery(
             lead_exported_count,
         ),
         4 => show_text_and_feedback(ui, toast_preview_open, toast_preview_toasts),
+        5 => show_reports(ui),
         _ => {
             show_surfaces(ui);
             ui.add_space(12.0);
@@ -2781,6 +2784,75 @@ fn gallery_toasts() -> Vec<Toast> {
             .body("The host app owns timeout and dismissal behavior.")
             .intent(Intent::Neutral),
     ]
+}
+
+fn show_reports(ui: &mut egui::Ui) {
+    Card::new().show(ui, |ui| {
+        ui.heading("Reports and metrics");
+        ui.label(
+            "Compact reporting primitives for dashboards, run summaries, and generated reports.",
+        );
+        ui.add_space(8.0);
+
+        show_responsive_pair(
+            ui,
+            |ui| {
+                ui.add(
+                    MetricCard::new("Run success", "94.2%")
+                        .delta("+4.8%", Intent::Success)
+                        .detail("Last 24 hours")
+                        .width(ui.available_width()),
+                );
+                ui.add_space(8.0);
+                ui.add(
+                    MetricCard::new("Review debt", "17")
+                        .delta("-6", Intent::Info)
+                        .detail("Open items across workspaces")
+                        .width(ui.available_width()),
+                );
+            },
+            |ui| {
+                ReportSection::new("Activity trend")
+                    .description("Sparkline and progress metrics use semantic color roles.")
+                    .width(ui.available_width())
+                    .show(ui, |ui| {
+                        ui.add(
+                            Sparkline::new([12.0, 18.0, 16.0, 28.0, 26.0, 34.0, 42.0])
+                                .intent(Intent::Primary)
+                                .height(56.0)
+                                .width(ui.available_width()),
+                        );
+                        ui.add_space(10.0);
+                        ui.add(
+                            ProgressMetric::new("Context efficiency", 0.72)
+                                .detail("Tokens retained after compaction")
+                                .intent(Intent::Info)
+                                .width(ui.available_width()),
+                        );
+                    });
+            },
+        );
+
+        ui.add_space(12.0);
+        ReportSection::new("Outcome mix")
+            .description(
+                "Bar charts are intentionally lightweight; heavier plotting can be optional later.",
+            )
+            .width(ui.available_width())
+            .show(ui, |ui| {
+                ui.add(
+                    BarChart::new([
+                        BarDatum::new("Plan", 18.0).intent(Intent::Info),
+                        BarDatum::new("Patch", 28.0).intent(Intent::Primary),
+                        BarDatum::new("Test", 22.0).intent(Intent::Success),
+                        BarDatum::new("Review", 12.0).intent(Intent::Secondary),
+                        BarDatum::new("Fail", 4.0).intent(Intent::Danger),
+                    ])
+                    .height(180.0)
+                    .width(ui.available_width()),
+                );
+            });
+    });
 }
 
 fn show_text_and_feedback(
