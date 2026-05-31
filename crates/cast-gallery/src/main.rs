@@ -2006,38 +2006,7 @@ fn show_surfaces(ui: &mut egui::Ui) {
         ui.heading("Surfaces");
         ui.label("Card frames primary content. Panel frames secondary or raised content.");
         ui.add(Separator::new());
-        Card::new().muted_sections().show_sections(
-            ui,
-            |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.heading("Context");
-                    ui.add(Badge::new("860 / 200k").intent(Intent::Neutral));
-                });
-            },
-            |ui| {
-                CastPanel::new().show(ui, |ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        ui.add(Badge::new("You").intent(Intent::Neutral));
-                        ui.label("Build is failing on main after the React 19 upgrade.");
-                    });
-                });
-                ui.add_space(8.0);
-                CastPanel::new().show(ui, |ui| {
-                    ui.horizontal_wrapped(|ui| {
-                        ui.add(Badge::new("Claude").intent(Intent::Warning));
-                        ui.label("Let me read the build log and trace the failing module.");
-                    });
-                });
-            },
-            |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.label("3 in window");
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label("Auto-compacts at 6");
-                    });
-                });
-            },
-        );
+        show_context_card_example(ui);
         ui.add_space(8.0);
         CastPanel::new().show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
@@ -2056,6 +2025,261 @@ fn show_surfaces(ui: &mut egui::Ui) {
                 });
         });
     });
+}
+
+fn show_context_card_example(ui: &mut egui::Ui) {
+    let theme = cast::theme_for_ui(ui);
+    let outer_width = ui.available_width().min(620.0);
+    let outer_fill = theme.colors.surface_muted;
+    let inner_fill = theme.colors.surface;
+    let border = theme.colors.border;
+
+    ui.allocate_ui_with_layout(
+        egui::vec2(outer_width, 0.0),
+        egui::Layout::top_down(egui::Align::Center),
+        |ui| {
+            egui::Frame::new()
+                .fill(outer_fill)
+                .stroke(egui::Stroke::new(theme.stroke.sm, border))
+                .corner_radius(egui::CornerRadius::same((theme.radius.lg + 10.0) as u8))
+                .shadow(egui::epaint::Shadow {
+                    offset: [0, 8],
+                    blur: 20,
+                    spread: 0,
+                    color: Color32::from_black_alpha(26),
+                })
+                .inner_margin(egui::Margin::symmetric(18, 16))
+                .show(ui, |ui| {
+                    ui.set_width((outer_width - 2.0).max(280.0));
+                    ui.horizontal(|ui| {
+                        ui.heading(
+                            RichText::new("Context")
+                                .font(theme.typography.heading_sm.clone())
+                                .color(theme.colors.text)
+                                .extra_letter_spacing(theme.typography.letter_spacing),
+                        );
+                        ui.add(Badge::new("860 / 200k").intent(Intent::Neutral));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            context_header_meter(ui);
+                        });
+                    });
+
+                    ui.add_space(14.0);
+
+                    egui::Frame::new()
+                        .fill(inner_fill)
+                        .stroke(egui::Stroke::new(theme.stroke.sm, border))
+                        .corner_radius(egui::CornerRadius::same((theme.radius.lg + 4.0) as u8))
+                        .inner_margin(egui::Margin::same(10))
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            context_message_row(
+                                ui,
+                                "YOU",
+                                "Build is failing on main after the React 19 upgrade.",
+                                "318",
+                                Intent::Neutral,
+                            );
+                            ui.add_space(10.0);
+                            context_message_row(
+                                ui,
+                                "CLAUDE",
+                                "Let me read the build log and trace the failing module.",
+                                "542",
+                                Intent::Warning,
+                            );
+                        });
+
+                    ui.add_space(16.0);
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new("3 in window")
+                                .font(theme.typography.body_strong.clone())
+                                .color(theme.colors.text),
+                        );
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(
+                                RichText::new("Auto-compacts at 6")
+                                    .font(theme.typography.body_strong.clone())
+                                    .color(theme.colors.text_subtle),
+                            );
+                        });
+                    });
+                });
+        },
+    );
+}
+
+fn context_header_meter(ui: &mut egui::Ui) {
+    let theme = cast::theme_for_ui(ui);
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(120.0, 28.0), egui::Sense::hover());
+    let painter = ui.painter();
+    let line_y = rect.center().y;
+    let line_start = egui::pos2(rect.min.x + 4.0, line_y);
+    let line_end = egui::pos2(rect.min.x + 78.0, line_y);
+    let progress_end = egui::pos2(rect.min.x + 56.0, line_y);
+    let circle_center = egui::pos2(rect.max.x - 16.0, line_y);
+
+    painter.line_segment(
+        [line_start, line_end],
+        egui::Stroke::new(4.0, theme.colors.border),
+    );
+    painter.line_segment(
+        [line_start, progress_end],
+        egui::Stroke::new(4.0, theme.colors.border_strong),
+    );
+    painter.circle_stroke(
+        circle_center,
+        11.0,
+        egui::Stroke::new(2.0, theme.colors.border),
+    );
+    painter.circle_stroke(
+        circle_center,
+        11.0,
+        egui::Stroke::new(2.0, theme.colors.text_subtle),
+    );
+    painter.circle_filled(
+        egui::pos2(circle_center.x - 3.5, circle_center.y - 8.5),
+        2.0,
+        theme.colors.text_subtle,
+    );
+}
+
+fn context_message_row(
+    ui: &mut egui::Ui,
+    speaker: &str,
+    message: &str,
+    count: &str,
+    intent: Intent,
+) {
+    let theme = cast::theme_for_ui(ui);
+    let family = match intent {
+        Intent::Warning => theme.colors.warning_family,
+        Intent::Primary => theme.colors.primary_family,
+        Intent::Secondary => theme.colors.secondary_family,
+        Intent::Success => theme.colors.success_family,
+        Intent::Danger => theme.colors.danger_family,
+        Intent::Info => theme.colors.info_family,
+        Intent::Neutral => theme.colors.neutral_family,
+    };
+    let row_fill = if intent == Intent::Neutral {
+        theme.colors.surface
+    } else {
+        family.subtle
+    };
+    let row_border = if intent == Intent::Neutral {
+        theme.colors.border
+    } else {
+        family.border
+    };
+    let row_width = ui.available_width();
+
+    egui::Frame::new()
+        .fill(row_fill)
+        .stroke(egui::Stroke::new(theme.stroke.sm, row_border))
+        .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+        .inner_margin(egui::Margin::symmetric(14, 12))
+        .show(ui, |ui| {
+            ui.set_width(row_width);
+            ui.horizontal_top(|ui| {
+                context_message_icon(ui, intent);
+                ui.add_space(8.0);
+                ui.vertical(|ui| {
+                    ui.label(
+                        RichText::new(speaker)
+                            .font(theme.typography.body_strong.clone())
+                            .color(if intent == Intent::Neutral {
+                                theme.colors.text_muted
+                            } else {
+                                family.emphasis
+                            })
+                            .extra_letter_spacing(theme.typography.letter_spacing),
+                    );
+                    ui.label(
+                        RichText::new(message)
+                            .font(theme.typography.body.clone())
+                            .color(theme.colors.text)
+                            .extra_letter_spacing(theme.typography.letter_spacing),
+                    );
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                    ui.label(
+                        RichText::new(count)
+                            .font(theme.typography.small.clone())
+                            .color(theme.colors.text_subtle),
+                    );
+                });
+            });
+        });
+}
+
+fn context_message_icon(ui: &mut egui::Ui, intent: Intent) {
+    let theme = cast::theme_for_ui(ui);
+    let color = match intent {
+        Intent::Warning => theme.colors.warning_family.emphasis,
+        Intent::Primary => theme.colors.primary_family.emphasis,
+        Intent::Secondary => theme.colors.secondary_family.emphasis,
+        Intent::Success => theme.colors.success_family.emphasis,
+        Intent::Danger => theme.colors.danger_family.emphasis,
+        Intent::Info => theme.colors.info_family.emphasis,
+        Intent::Neutral => theme.colors.text_muted,
+    };
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(22.0, 22.0), egui::Sense::hover());
+    let painter = ui.painter();
+    let center = rect.center();
+    let stroke = egui::Stroke::new(1.5, color);
+
+    if intent == Intent::Warning {
+        let body = egui::Rect::from_center_size(center, egui::vec2(13.0, 9.0));
+        painter.rect_filled(body, 2.0, color);
+        painter.line_segment(
+            [
+                egui::pos2(body.min.x + 3.0, body.min.y),
+                egui::pos2(body.min.x + 3.0, body.min.y - 3.0),
+            ],
+            stroke,
+        );
+        painter.line_segment(
+            [
+                egui::pos2(body.max.x - 3.0, body.min.y),
+                egui::pos2(body.max.x - 3.0, body.min.y - 3.0),
+            ],
+            stroke,
+        );
+        painter.circle_filled(
+            egui::pos2(body.min.x + 4.0, body.center().y),
+            1.2,
+            theme.colors.surface,
+        );
+        painter.circle_filled(
+            egui::pos2(body.max.x - 4.0, body.center().y),
+            1.2,
+            theme.colors.surface,
+        );
+    } else {
+        painter.circle_stroke(egui::pos2(center.x, center.y - 4.0), 4.0, stroke);
+        painter.line_segment(
+            [
+                egui::pos2(center.x - 7.0, center.y + 7.0),
+                egui::pos2(center.x + 7.0, center.y + 7.0),
+            ],
+            stroke,
+        );
+        painter.line_segment(
+            [
+                egui::pos2(center.x - 7.0, center.y + 7.0),
+                egui::pos2(center.x - 4.0, center.y + 1.0),
+            ],
+            stroke,
+        );
+        painter.line_segment(
+            [
+                egui::pos2(center.x + 7.0, center.y + 7.0),
+                egui::pos2(center.x + 4.0, center.y + 1.0),
+            ],
+            stroke,
+        );
+    }
 }
 
 fn show_menus(
