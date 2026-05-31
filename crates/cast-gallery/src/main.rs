@@ -2106,7 +2106,7 @@ fn show_agent_transcript_examples(ui: &mut egui::Ui) {
                 );
                 thread.rich_message(
                     ChatMessage::assistant(
-                        "I will review selection, hover, dark-mode contrast, and the expandable-row pattern before changing code.",
+                        "I will review the interaction states before changing code.\n\n- Selection should preserve semantic badges.\n- Hover should stay quieter than selected state.\n- Dark-mode contrast needs a primary/neutral matrix.\n\n```rust\nTable::new([\"Task\", \"Status\"])\n    .show(ui, rows, |row, index| { /* cells */ });\n```",
                     )
                     .metadata("Assistant")
                     .streaming(true),

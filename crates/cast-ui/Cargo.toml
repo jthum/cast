@@ -17,4 +17,5 @@ experimental = []
 [dependencies]
 egui.workspace = true
 palette.workspace = true
+pulldown-cmark = "0.13.0"
 serde = { workspace = true, optional = true }

@@ -17,6 +17,7 @@ mod label;
 mod layout;
 mod link;
 mod list;
+mod markdown;
 mod menu;
 mod navigation;
 mod panel;
@@ -58,6 +59,7 @@ pub use label::Label;
 pub use layout::{ControlGroup, ResizablePanels, ResponsiveColumns};
 pub use link::Link;
 pub use list::{ActionRow, ListRow, Table, TableDetailRow, TableRow, TextTable};
+pub use markdown::Markdown;
 pub use menu::{Combobox, Dropdown, Menu, MenuItem, MenuResponse, Select};
 pub use navigation::{
     Breadcrumb, NavList, Pagination, SegmentedControl, Sidebar, SidebarItem, Tabs,

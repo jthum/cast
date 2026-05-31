@@ -2,7 +2,7 @@ use egui::{Color32, InnerResponse, Response, RichText, TextEdit, Ui, Widget};
 
 use crate::{
     color::mix_with_transparent,
-    components::{Badge, Button, Loader},
+    components::{Badge, Button, Loader, Markdown},
     foundation::{Intent, Size, Variant},
     theme::{CastTheme, ThemeMode, theme_for_ui},
 };
@@ -315,15 +315,20 @@ impl Widget for ToolOutput {
                     });
                 });
                 ui.add_space(theme.spacing.xs);
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(self.body)
-                            .font(tool_output_font(&theme, self.kind))
-                            .color(tool_output_text_color(&theme, self.kind))
-                            .extra_letter_spacing(theme.typography.letter_spacing),
-                    )
-                    .wrap(),
-                );
+                if self.kind == ToolOutputKind::Text {
+                    ui.add(Markdown::new(self.body).width(ui.available_width()));
+                } else {
+                    ui.add(
+                        egui::Label::new(
+                            RichText::new(self.body)
+                                .font(tool_output_font(&theme, self.kind))
+                                .color(tool_output_text_color(&theme, self.kind))
+                                .extra_letter_spacing(theme.typography.letter_spacing),
+                        )
+                        .wrap()
+                        .selectable(true),
+                    );
+                }
             })
             .response
     }
@@ -1950,6 +1955,7 @@ fn show_chat_message_content(
 ) -> Response {
     let theme = theme_for_ui(ui);
     let colors = chat_message_colors(&theme, message.role, message.intent);
+    let body = message.body;
 
     chat_message_frame(&theme, colors)
         .show(ui, |ui| {
@@ -1989,21 +1995,13 @@ fn show_chat_message_content(
                         )
                         .clicked()
                     {
-                        ui.ctx().copy_text(message.body.clone());
+                        ui.ctx().copy_text(body.clone());
                     }
                 });
             });
             ui.add_space(theme.spacing.xs);
-            if !message.body.is_empty() {
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(message.body)
-                            .font(theme.typography.body.clone())
-                            .color(theme.colors.text)
-                            .extra_letter_spacing(theme.typography.letter_spacing),
-                    )
-                    .wrap(),
-                );
+            if !body.is_empty() {
+                ui.add(Markdown::new(body).width(ui.available_width()));
             }
             if let Some(add_content) = add_content {
                 ui.add_space(theme.spacing.sm);
