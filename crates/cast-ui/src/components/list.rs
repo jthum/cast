@@ -5,7 +5,7 @@ use egui::{
 
 use crate::{
     color::{mix_oklch, mix_with_transparent, with_alpha},
-    components::Kbd,
+    components::{Kbd, Select, TextInput},
     foundation::{Intent, Size},
     style::IntentColors,
     theme::{CastTheme, ThemeMode, theme_for_ui},
@@ -475,6 +475,34 @@ impl TableRow<'_> {
                     .size(font.size)
                     .color(with_alpha(theme.colors.text, 230))
                     .extra_letter_spacing(theme.typography.letter_spacing),
+            );
+        });
+    }
+
+    pub fn editable_text(&mut self, text: &mut String) {
+        self.cell(|ui| {
+            let width = ui.available_width().max(48.0);
+            ui.add(
+                TextInput::new(text)
+                    .size(Size::Small)
+                    .width(width)
+                    .variant(crate::Variant::Ghost),
+            );
+        });
+    }
+
+    pub fn select(
+        &mut self,
+        selected: &mut usize,
+        options: impl IntoIterator<Item = impl Into<String>>,
+    ) {
+        let options: Vec<String> = options.into_iter().map(Into::into).collect();
+        self.cell(|ui| {
+            let width = ui.available_width().max(72.0);
+            ui.add(
+                Select::new(selected, options)
+                    .size(Size::Small)
+                    .width(width),
             );
         });
     }

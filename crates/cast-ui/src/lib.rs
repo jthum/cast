@@ -8,16 +8,18 @@ pub mod theme;
 
 pub use color::{contrast_ratio, mix_with_transparent};
 pub use components::{
-    Accordion, AccordionItem, ActionRow, AgentComposer, AgentComposerResponse, Alert, Avatar,
-    Badge, Button, Card, ChatMessage, ChatRole, Checkbox, Combobox, ConfirmDialog,
-    ConfirmDialogResponse, Dialog, DialogController, Disclosure, DisclosureResponse, Dropdown,
-    EmptyState, FilterBar, FormActions, FormField, FormSection, Kbd, Label, Link, ListRow, Loader,
-    LoaderStyle, MenuItem, NavList, Notice, Panel, Popover, ProgressBar, Radio, RadioGroup,
-    SearchInput, SegmentedControl, Select, Separator, Sheet, SheetController, Skeleton, Slider,
-    Spinner, SpinnerStyle, Switch, Table, TableDetailRow, TableRow, Tabs, TextArea, TextInput,
-    TextTable, Toast, ToastPlacement, ToastResponse, ToastStack, ToastStackMode,
-    ToastStackResponse, ToolCall, ToolCallStatus, ToolOutput, ToolOutputKind, Tooltip,
-    ValidationIssue, ValidationSummary,
+    Accordion, AccordionItem, ActionRow, AgentComposer, AgentComposerResponse, Alert,
+    ApprovalPanel, ApprovalPanelResponse, ArtifactCard, ArtifactCardResponse, Avatar, Badge,
+    Button, Card, ChatMessage, ChatRole, Checkbox, CodeOutputPanel, Combobox, ConfirmDialog,
+    ConfirmDialogResponse, DateInput, Dialog, DialogController, Disclosure, DisclosureResponse,
+    Dropdown, EmptyState, FilterBar, FormActions, FormField, FormSection, Kbd, Label, Link,
+    ListRow, Loader, LoaderStyle, MenuItem, MessageThread, MessageThreadUi, NavList, Notice,
+    NumberInput, Panel, Popover, ProgressBar, Radio, RadioGroup, RunPhase, RunTimeline,
+    RunTimelineItem, SearchInput, SegmentedControl, Select, Separator, Sheet, SheetController,
+    Skeleton, Slider, Spinner, SpinnerStyle, Switch, Table, TableDetailRow, TableRow, Tabs,
+    TextArea, TextInput, TextTable, TimeInput, Toast, ToastPlacement, ToastResponse, ToastStack,
+    ToastStackMode, ToastStackResponse, ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput,
+    ToolOutputKind, Tooltip, ValidationIssue, ValidationSummary,
 };
 pub use egui;
 pub use foundation::{Intent, Orientation, Placement, Size, Variant};

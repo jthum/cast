@@ -28,8 +28,10 @@ mod toast;
 mod tooltip;
 
 pub use agent::{
-    AgentComposer, AgentComposerResponse, ChatMessage, ChatRole, ToolCall, ToolCallStatus,
-    ToolOutput, ToolOutputKind,
+    AgentComposer, AgentComposerResponse, ApprovalPanel, ApprovalPanelResponse, ArtifactCard,
+    ArtifactCardResponse, ChatMessage, ChatRole, CodeOutputPanel, MessageThread, MessageThreadUi,
+    RunPhase, RunTimeline, RunTimelineItem, ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput,
+    ToolOutputKind,
 };
 pub use alert::{Alert, Notice};
 pub use avatar::Avatar;
@@ -57,7 +59,7 @@ pub use separator::Separator;
 pub use skeleton::Skeleton;
 pub use slider::Slider;
 pub use switch::Switch;
-pub use text_input::{SearchInput, TextArea, TextInput};
+pub use text_input::{DateInput, NumberInput, SearchInput, TextArea, TextInput, TimeInput};
 pub use toast::{
     Toast, ToastPlacement, ToastResponse, ToastStack, ToastStackMode, ToastStackResponse,
 };

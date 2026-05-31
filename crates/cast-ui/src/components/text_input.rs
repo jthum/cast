@@ -496,6 +496,207 @@ impl Widget for SearchInput<'_> {
     }
 }
 
+#[derive(Debug)]
+pub struct NumberInput<'a> {
+    value: &'a mut f64,
+    label: Option<String>,
+    hint_text: Option<String>,
+    width: Option<f32>,
+    size: Option<Size>,
+    enabled: bool,
+    min: Option<f64>,
+    max: Option<f64>,
+}
+
+impl<'a> NumberInput<'a> {
+    #[must_use]
+    pub fn new(value: &'a mut f64) -> Self {
+        Self {
+            value,
+            label: None,
+            hint_text: None,
+            width: None,
+            size: None,
+            enabled: true,
+            min: None,
+            max: None,
+        }
+    }
+
+    #[must_use]
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    #[must_use]
+    pub fn hint_text(mut self, hint_text: impl Into<String>) -> Self {
+        self.hint_text = Some(hint_text.into());
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = Some(size);
+        self
+    }
+
+    #[must_use]
+    pub fn range(mut self, min: f64, max: f64) -> Self {
+        self.min = Some(min);
+        self.max = Some(max);
+        self
+    }
+
+    #[must_use]
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    pub fn show(self, ui: &mut Ui) -> TypedInputResponse {
+        let mut text = compact_number(*self.value);
+        let mut input = TextInput::new(&mut text)
+            .width(self.width.unwrap_or(96.0))
+            .size(self.size.unwrap_or(Size::Medium))
+            .enabled(self.enabled);
+        if let Some(label) = self.label {
+            input = input.label(label);
+        }
+        if let Some(hint_text) = self.hint_text {
+            input = input.hint_text(hint_text);
+        }
+        let response = ui.add(input);
+        let mut valid = true;
+        let mut changed = false;
+        if response.changed() {
+            match text.trim().parse::<f64>() {
+                Ok(mut parsed) => {
+                    if let Some(min) = self.min {
+                        parsed = parsed.max(min);
+                    }
+                    if let Some(max) = self.max {
+                        parsed = parsed.min(max);
+                    }
+                    changed = (*self.value - parsed).abs() > f64::EPSILON;
+                    *self.value = parsed;
+                }
+                Err(_) => valid = false,
+            }
+        }
+        TypedInputResponse {
+            response,
+            changed,
+            valid,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct DateInput<'a> {
+    value: &'a mut String,
+    label: Option<String>,
+    width: f32,
+}
+
+impl<'a> DateInput<'a> {
+    #[must_use]
+    pub fn new(value: &'a mut String) -> Self {
+        Self {
+            value,
+            label: None,
+            width: 140.0,
+        }
+    }
+
+    #[must_use]
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = width;
+        self
+    }
+}
+
+impl Widget for DateInput<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let mut input = TextInput::new(self.value)
+            .hint_text("YYYY-MM-DD")
+            .width(self.width);
+        if let Some(label) = self.label {
+            input = input.label(label);
+        }
+        input.ui(ui)
+    }
+}
+
+#[derive(Debug)]
+pub struct TimeInput<'a> {
+    value: &'a mut String,
+    label: Option<String>,
+    width: f32,
+}
+
+impl<'a> TimeInput<'a> {
+    #[must_use]
+    pub fn new(value: &'a mut String) -> Self {
+        Self {
+            value,
+            label: None,
+            width: 112.0,
+        }
+    }
+
+    #[must_use]
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = width;
+        self
+    }
+}
+
+impl Widget for TimeInput<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let mut input = TextInput::new(self.value)
+            .hint_text("HH:MM")
+            .width(self.width);
+        if let Some(label) = self.label {
+            input = input.label(label);
+        }
+        input.ui(ui)
+    }
+}
+
+#[derive(Debug)]
+pub struct TypedInputResponse {
+    pub response: Response,
+    pub changed: bool,
+    pub valid: bool,
+}
+
+fn compact_number(value: f64) -> String {
+    if value.fract().abs() <= f64::EPSILON {
+        format!("{value:.0}")
+    } else {
+        format!("{value:.2}")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -537,6 +738,37 @@ mod tests {
         let area = TextArea::new(&mut value).rows(1);
 
         assert_eq!(area.rows, 2);
+    }
+
+    #[test]
+    fn number_input_stores_typed_constraints() {
+        let mut value = 12.0;
+        let input = NumberInput::new(&mut value)
+            .label("Retries")
+            .hint_text("0")
+            .range(0.0, 20.0)
+            .width(88.0)
+            .size(Size::Small);
+
+        assert_eq!(input.label.as_deref(), Some("Retries"));
+        assert_eq!(input.hint_text.as_deref(), Some("0"));
+        assert_eq!(input.min, Some(0.0));
+        assert_eq!(input.max, Some(20.0));
+        assert_eq!(input.width, Some(88.0));
+        assert_eq!(compact_number(*input.value), "12");
+    }
+
+    #[test]
+    fn date_and_time_inputs_have_useful_defaults() {
+        let mut date = String::new();
+        let mut time = String::new();
+        let date_input = DateInput::new(&mut date).label("Date");
+        let time_input = TimeInput::new(&mut time).label("Time");
+
+        assert_eq!(date_input.width, 140.0);
+        assert_eq!(date_input.label.as_deref(), Some("Date"));
+        assert_eq!(time_input.width, 112.0);
+        assert_eq!(time_input.label.as_deref(), Some("Time"));
     }
 
     #[test]

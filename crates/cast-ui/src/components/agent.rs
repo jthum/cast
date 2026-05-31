@@ -1,8 +1,8 @@
-use egui::{Color32, InnerResponse, Response, RichText, Ui, Widget};
+use egui::{Color32, InnerResponse, Response, RichText, TextEdit, Ui, Widget};
 
 use crate::{
     color::mix_with_transparent,
-    components::{Badge, Button, Loader, TextArea},
+    components::{Badge, Button, Loader},
     foundation::{Intent, Size, Variant},
     theme::{CastTheme, ThemeMode, theme_for_ui},
 };
@@ -90,55 +90,15 @@ impl ChatMessage {
         self.width = Some(width);
         self
     }
+
+    pub fn show_with_content(self, ui: &mut Ui, add_content: impl FnOnce(&mut Ui)) -> Response {
+        show_chat_message_content(self, ui, Some(add_content))
+    }
 }
 
 impl Widget for ChatMessage {
     fn ui(self, ui: &mut Ui) -> Response {
-        let theme = theme_for_ui(ui);
-        let colors = chat_message_colors(&theme, self.role, self.intent);
-
-        chat_message_frame(&theme, colors)
-            .show(ui, |ui| {
-                if let Some(width) = self.width {
-                    let inner_width = frame_inner_width(width, theme.spacing.md);
-                    ui.set_width(inner_width);
-                    ui.set_max_width(inner_width);
-                }
-
-                ui.horizontal(|ui| {
-                    paint_role_dot(ui, &theme, self.intent);
-                    ui.label(
-                        RichText::new(self.title)
-                            .font(theme.typography.strong.clone())
-                            .color(theme.colors.text)
-                            .extra_letter_spacing(theme.typography.letter_spacing),
-                    );
-                    ui.add_space(theme.spacing.xs);
-                    if let Some(metadata) = self.metadata {
-                        ui.label(
-                            RichText::new(metadata)
-                                .font(theme.typography.caption.clone())
-                                .color(theme.colors.text_subtle)
-                                .extra_letter_spacing(theme.typography.letter_spacing),
-                        );
-                    }
-                    if self.streaming {
-                        ui.add_space(theme.spacing.xs);
-                        ui.add(Loader::new().intent(Intent::Info).size(Size::Small));
-                    }
-                });
-                ui.add_space(theme.spacing.xs);
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(self.body)
-                            .font(theme.typography.body.clone())
-                            .color(theme.colors.text)
-                            .extra_letter_spacing(theme.typography.letter_spacing),
-                    )
-                    .wrap(),
-                );
-            })
-            .response
+        show_chat_message_content(self, ui, None::<fn(&mut Ui)>)
     }
 }
 
@@ -374,9 +334,15 @@ pub struct AgentComposer<'a> {
     text: &'a mut String,
     placeholder: String,
     send_label: String,
+    stop_label: String,
     secondary_label: Option<String>,
+    tool_label: Option<String>,
+    model_label: Option<String>,
+    model_options: Vec<String>,
+    selected_model: Option<&'a mut usize>,
     rows: usize,
     enabled: bool,
+    loading: bool,
     width: Option<f32>,
 }
 
@@ -387,9 +353,15 @@ impl<'a> AgentComposer<'a> {
             text,
             placeholder: "Ask the agent to do something...".to_owned(),
             send_label: "Send".to_owned(),
+            stop_label: "Stop".to_owned(),
             secondary_label: None,
+            tool_label: None,
+            model_label: None,
+            model_options: Vec::new(),
+            selected_model: None,
             rows: 3,
             enabled: true,
+            loading: false,
             width: None,
         }
     }
@@ -407,8 +379,42 @@ impl<'a> AgentComposer<'a> {
     }
 
     #[must_use]
+    pub fn stop_label(mut self, label: impl Into<String>) -> Self {
+        self.stop_label = label.into();
+        self
+    }
+
+    #[must_use]
     pub fn secondary_label(mut self, label: impl Into<String>) -> Self {
         self.secondary_label = Some(label.into());
+        self
+    }
+
+    #[must_use]
+    pub fn attachment_label(self, label: impl Into<String>) -> Self {
+        self.secondary_label(label)
+    }
+
+    #[must_use]
+    pub fn tool_label(mut self, label: impl Into<String>) -> Self {
+        self.tool_label = Some(label.into());
+        self
+    }
+
+    #[must_use]
+    pub fn model_selector<I, O>(mut self, selected_model: &'a mut usize, options: I) -> Self
+    where
+        I: IntoIterator<Item = O>,
+        O: Into<String>,
+    {
+        self.selected_model = Some(selected_model);
+        self.model_options = options.into_iter().map(Into::into).collect();
+        self
+    }
+
+    #[must_use]
+    pub fn model_label(mut self, label: impl Into<String>) -> Self {
+        self.model_label = Some(label.into());
         self
     }
 
@@ -431,6 +437,12 @@ impl<'a> AgentComposer<'a> {
     }
 
     #[must_use]
+    pub fn loading(mut self, loading: bool) -> Self {
+        self.loading = loading;
+        self
+    }
+
+    #[must_use]
     pub fn width(mut self, width: f32) -> Self {
         self.width = Some(width);
         self
@@ -442,6 +454,14 @@ impl<'a> AgentComposer<'a> {
             .width
             .unwrap_or_else(|| ui.available_width().max(260.0));
         let enabled = self.enabled;
+        let loading = self.loading;
+        let send_label = self.send_label;
+        let stop_label = self.stop_label;
+        let secondary_label = self.secondary_label;
+        let tool_label = self.tool_label;
+        let model_label = self.model_label.unwrap_or_else(|| "Model".to_owned());
+        let model_options = self.model_options;
+        let selected_model = self.selected_model;
 
         egui::Frame::new()
             .fill(theme.components.input.fill)
@@ -457,54 +477,1016 @@ impl<'a> AgentComposer<'a> {
                 let inner_width = frame_inner_width(width, theme.spacing.sm);
                 ui.set_width(inner_width);
                 ui.set_max_width(inner_width);
-                let edit = ui.add_enabled(
-                    enabled,
-                    TextArea::new(self.text)
-                        .hint_text(self.placeholder)
-                        .variant(Variant::Ghost)
-                        .rows(self.rows)
-                        .width(inner_width),
-                );
+                let edit_widget = TextEdit::multiline(self.text)
+                    .frame(crate::style::input_frame(&theme, Variant::Ghost))
+                    .font(theme.typography.body.clone())
+                    .desired_rows(self.rows)
+                    .desired_width(inner_width)
+                    .lock_focus(true)
+                    .hint_text(
+                        RichText::new(self.placeholder)
+                            .font(theme.typography.body.clone())
+                            .color(theme.components.input.placeholder)
+                            .extra_letter_spacing(theme.typography.letter_spacing),
+                    );
+                let edit = ui.add_enabled(enabled, edit_widget);
                 let has_text = !self.text.trim().is_empty();
                 let submit_shortcut = enabled
                     && has_text
+                    && !loading
                     && edit.has_focus()
                     && ui.input(|input| {
                         input.key_pressed(egui::Key::Enter)
-                            && (input.modifiers.command || input.modifiers.ctrl)
+                            && !input.modifiers.shift
+                            && !input.modifiers.command
+                            && !input.modifiers.ctrl
                     });
+                if submit_shortcut {
+                    trim_submitted_newline(self.text);
+                }
 
                 ui.add_space(theme.spacing.xs);
                 let buttons = ui.horizontal(|ui| {
-                    if let Some(label) = self.secondary_label {
-                        ui.add(Button::new(label).variant(Variant::Ghost).size(Size::Small));
+                    let mut attachment_clicked = false;
+                    let mut tool_clicked = false;
+                    let mut stopped = false;
+                    let mut model_changed = false;
+
+                    if let Some(label) = secondary_label {
+                        attachment_clicked = ui
+                            .add(Button::new(label).variant(Variant::Ghost).size(Size::Small))
+                            .clicked();
                     }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.add(
-                            Button::new(self.send_label)
-                                .leading_icon("[>]")
-                                .enabled(enabled && has_text)
-                                .size(Size::Small),
-                        )
-                    })
-                    .inner
+                    if let Some(label) = tool_label {
+                        tool_clicked = ui
+                            .add(Button::new(label).variant(Variant::Ghost).size(Size::Small))
+                            .clicked();
+                    }
+                    if let Some(selected) = selected_model {
+                        if !model_options.is_empty() {
+                            let selected_text = model_options
+                                .get(*selected)
+                                .or_else(|| model_options.first())
+                                .cloned()
+                                .unwrap_or_default();
+                            egui::ComboBox::from_id_salt(ui.next_auto_id())
+                                .selected_text(format!("{model_label}: {selected_text}"))
+                                .show_ui(ui, |ui| {
+                                    for (index, option) in model_options.iter().enumerate() {
+                                        if ui.selectable_value(selected, index, option).changed() {
+                                            model_changed = true;
+                                        }
+                                    }
+                                });
+                        }
+                    }
+                    let response = ui
+                        .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if loading {
+                                let response = ui.add(
+                                    Button::new(stop_label)
+                                        .leading_icon("[]")
+                                        .intent(Intent::Danger)
+                                        .variant(Variant::Outline)
+                                        .size(Size::Small),
+                                );
+                                stopped = response.clicked();
+                                response
+                            } else {
+                                ui.add(
+                                    Button::new(send_label)
+                                        .leading_icon("[>]")
+                                        .enabled(enabled && has_text)
+                                        .size(Size::Small),
+                                )
+                            }
+                        })
+                        .inner;
+
+                    AgentComposerActionState {
+                        response,
+                        attachment_clicked,
+                        tool_clicked,
+                        stopped,
+                        model_changed,
+                    }
                 });
 
-                let button_response = buttons.inner;
-                let submitted = submit_shortcut || button_response.clicked();
+                let actions = buttons.inner;
+                let submitted = submit_shortcut || actions.response.clicked();
 
                 AgentComposerResponse {
-                    response: edit.union(button_response),
+                    response: edit.union(actions.response),
                     submitted,
+                    stopped: actions.stopped,
+                    attachment_clicked: actions.attachment_clicked,
+                    tool_clicked: actions.tool_clicked,
+                    model_changed: actions.model_changed,
                 }
             })
     }
 }
 
 #[derive(Debug)]
+struct AgentComposerActionState {
+    response: Response,
+    attachment_clicked: bool,
+    tool_clicked: bool,
+    stopped: bool,
+    model_changed: bool,
+}
+
+#[derive(Debug)]
 pub struct AgentComposerResponse {
     pub response: Response,
     pub submitted: bool,
+    pub stopped: bool,
+    pub attachment_clicked: bool,
+    pub tool_clicked: bool,
+    pub model_changed: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct MessageThread {
+    width: Option<f32>,
+    compact: bool,
+}
+
+impl MessageThread {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            width: None,
+            compact: false,
+        }
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    #[must_use]
+    pub fn compact(mut self, compact: bool) -> Self {
+        self.compact = compact;
+        self
+    }
+
+    pub fn show<R>(
+        self,
+        ui: &mut Ui,
+        add_messages: impl FnOnce(&mut MessageThreadUi<'_>) -> R,
+    ) -> InnerResponse<R> {
+        let theme = theme_for_ui(ui);
+        let width = self
+            .width
+            .unwrap_or_else(|| ui.available_width().max(260.0));
+        egui::Frame::new()
+            .fill(theme.colors.surface)
+            .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+            .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.md as i8))
+            .show(ui, |ui| {
+                ui.set_width(frame_inner_width(width, theme.spacing.md));
+                let mut thread = MessageThreadUi {
+                    ui,
+                    spacing: if self.compact {
+                        theme.spacing.sm
+                    } else {
+                        theme.spacing.md
+                    },
+                    count: 0,
+                };
+                add_messages(&mut thread)
+            })
+    }
+}
+
+impl Default for MessageThread {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct MessageThreadUi<'a> {
+    ui: &'a mut Ui,
+    spacing: f32,
+    count: usize,
+}
+
+impl MessageThreadUi<'_> {
+    pub fn message(&mut self, message: ChatMessage) -> Response {
+        self.add_gap();
+        let width = self.ui.available_width();
+        let response = self.ui.add(message.width(width));
+        self.count += 1;
+        response
+    }
+
+    pub fn rich_message(
+        &mut self,
+        message: ChatMessage,
+        add_content: impl FnOnce(&mut Ui),
+    ) -> Response {
+        self.add_gap();
+        let width = self.ui.available_width();
+        let response = message.width(width).show_with_content(self.ui, add_content);
+        self.count += 1;
+        response
+    }
+
+    fn add_gap(&mut self) {
+        if self.count > 0 {
+            self.ui.add_space(self.spacing);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ToolCallBlock<'a> {
+    name: String,
+    status: ToolCallStatus,
+    arguments: Option<String>,
+    elapsed: Option<String>,
+    preview: Option<String>,
+    open: &'a mut bool,
+    width: Option<f32>,
+}
+
+impl<'a> ToolCallBlock<'a> {
+    #[must_use]
+    pub fn new(name: impl Into<String>, open: &'a mut bool) -> Self {
+        Self {
+            name: name.into(),
+            status: ToolCallStatus::Queued,
+            arguments: None,
+            elapsed: None,
+            preview: None,
+            open,
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn status(mut self, status: ToolCallStatus) -> Self {
+        self.status = status;
+        self
+    }
+
+    #[must_use]
+    pub fn arguments(mut self, arguments: impl Into<String>) -> Self {
+        self.arguments = Some(arguments.into());
+        self
+    }
+
+    #[must_use]
+    pub fn elapsed(mut self, elapsed: impl Into<String>) -> Self {
+        self.elapsed = Some(elapsed.into());
+        self
+    }
+
+    #[must_use]
+    pub fn preview(mut self, preview: impl Into<String>) -> Self {
+        self.preview = Some(preview.into());
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+}
+
+impl Widget for ToolCallBlock<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let intent = tool_call_intent(self.status);
+        let width = self
+            .width
+            .unwrap_or_else(|| ui.available_width().max(260.0));
+
+        egui::Frame::new()
+            .fill(tool_call_fill(&theme))
+            .stroke(egui::Stroke::new(
+                theme.stroke.sm,
+                tool_call_border(&theme, intent),
+            ))
+            .corner_radius(egui::CornerRadius::same(theme.radius.md as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.sm as i8))
+            .show(ui, |ui| {
+                ui.set_width(frame_inner_width(width, theme.spacing.sm));
+                let header = ui
+                    .horizontal(|ui| {
+                        let caret = if *self.open { "v" } else { ">" };
+                        ui.label(
+                            RichText::new(caret)
+                                .font(theme.typography.button.clone())
+                                .color(theme.colors.text_muted),
+                        );
+                        ui.label(
+                            RichText::new(self.name.clone())
+                                .font(theme.typography.button.clone())
+                                .color(theme.colors.text)
+                                .extra_letter_spacing(theme.typography.letter_spacing),
+                        );
+                        if let Some(elapsed) = &self.elapsed {
+                            ui.label(
+                                RichText::new(elapsed)
+                                    .font(theme.typography.caption.clone())
+                                    .color(theme.colors.text_subtle),
+                            );
+                        }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.add(
+                                Badge::new(tool_call_status_label(self.status))
+                                    .intent(intent)
+                                    .status_dot(),
+                            );
+                        });
+                    })
+                    .response
+                    .interact(egui::Sense::click());
+                if header.clicked() {
+                    *self.open = !*self.open;
+                }
+                if let Some(arguments) = &self.arguments {
+                    ui.add_space(theme.spacing.xs);
+                    ui.label(
+                        RichText::new(arguments)
+                            .font(theme.typography.small.clone())
+                            .color(theme.colors.text_muted),
+                    );
+                }
+                if *self.open {
+                    if let Some(preview) = &self.preview {
+                        ui.add_space(theme.spacing.sm);
+                        paint_code_region(ui, &theme, preview, ToolOutputKind::Log, true, 128.0);
+                    }
+                }
+                header
+            })
+            .inner
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct RunTimeline {
+    items: Vec<RunTimelineItem>,
+    width: Option<f32>,
+}
+
+impl RunTimeline {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn item(mut self, item: RunTimelineItem) -> Self {
+        self.items.push(item);
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+}
+
+impl Default for RunTimeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Widget for RunTimeline {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let width = self
+            .width
+            .unwrap_or_else(|| ui.available_width().max(260.0));
+        egui::Frame::new()
+            .fill(theme.colors.surface)
+            .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+            .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.md as i8))
+            .show(ui, |ui| {
+                ui.set_width(frame_inner_width(width, theme.spacing.md));
+                let mut combined: Option<Response> = None;
+                for (index, item) in self.items.iter().enumerate() {
+                    let response = timeline_item_ui(ui, &theme, item, index + 1 < self.items.len());
+                    combined = Some(match combined {
+                        Some(existing) => existing.union(response),
+                        None => response,
+                    });
+                }
+                combined
+                    .unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, egui::Sense::hover()))
+            })
+            .inner
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct RunTimelineItem {
+    title: String,
+    detail: Option<String>,
+    phase: RunPhase,
+    status: ToolCallStatus,
+    metadata: Option<String>,
+}
+
+impl RunTimelineItem {
+    #[must_use]
+    pub fn new(phase: RunPhase, title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            detail: None,
+            phase,
+            status: ToolCallStatus::Succeeded,
+            metadata: None,
+        }
+    }
+
+    #[must_use]
+    pub fn detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    #[must_use]
+    pub fn status(mut self, status: ToolCallStatus) -> Self {
+        self.status = status;
+        self
+    }
+
+    #[must_use]
+    pub fn metadata(mut self, metadata: impl Into<String>) -> Self {
+        self.metadata = Some(metadata.into());
+        self
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum RunPhase {
+    #[default]
+    Planning,
+    ToolCall,
+    Patch,
+    Test,
+    Review,
+    FinalResponse,
+}
+
+#[derive(Clone, Debug)]
+pub struct CodeOutputPanel {
+    title: String,
+    body: String,
+    kind: ToolOutputKind,
+    metadata: Option<String>,
+    wrap: bool,
+    copy: bool,
+    width: Option<f32>,
+    height: f32,
+}
+
+impl CodeOutputPanel {
+    #[must_use]
+    pub fn new(title: impl Into<String>, body: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            body: body.into(),
+            kind: ToolOutputKind::Log,
+            metadata: None,
+            wrap: true,
+            copy: true,
+            width: None,
+            height: 180.0,
+        }
+    }
+
+    #[must_use]
+    pub fn kind(mut self, kind: ToolOutputKind) -> Self {
+        self.kind = kind;
+        self
+    }
+
+    #[must_use]
+    pub fn metadata(mut self, metadata: impl Into<String>) -> Self {
+        self.metadata = Some(metadata.into());
+        self
+    }
+
+    #[must_use]
+    pub fn wrap(mut self, wrap: bool) -> Self {
+        self.wrap = wrap;
+        self
+    }
+
+    #[must_use]
+    pub fn copy(mut self, copy: bool) -> Self {
+        self.copy = copy;
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    #[must_use]
+    pub fn height(mut self, height: f32) -> Self {
+        self.height = height.max(64.0);
+        self
+    }
+}
+
+impl Widget for CodeOutputPanel {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let width = self
+            .width
+            .unwrap_or_else(|| ui.available_width().max(260.0));
+        egui::Frame::new()
+            .fill(tool_output_fill(&theme, self.kind))
+            .stroke(egui::Stroke::new(
+                theme.stroke.sm,
+                mix_with_transparent(intent_color(&theme, tool_output_intent(self.kind)), 0.24),
+            ))
+            .corner_radius(egui::CornerRadius::same(theme.radius.md as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.md as i8))
+            .show(ui, |ui| {
+                ui.set_width(frame_inner_width(width, theme.spacing.md));
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(self.title.clone())
+                            .font(theme.typography.button.clone())
+                            .color(theme.colors.text),
+                    );
+                    if let Some(metadata) = &self.metadata {
+                        ui.label(
+                            RichText::new(metadata)
+                                .font(theme.typography.caption.clone())
+                                .color(theme.colors.text_subtle),
+                        );
+                    }
+                    if self.copy {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .add(
+                                    Button::new("Copy")
+                                        .variant(Variant::Ghost)
+                                        .size(Size::Small),
+                                )
+                                .clicked()
+                            {
+                                ui.ctx().copy_text(self.body.clone());
+                            }
+                        });
+                    }
+                });
+                ui.add_space(theme.spacing.xs);
+                paint_code_region(ui, &theme, &self.body, self.kind, self.wrap, self.height)
+            })
+            .inner
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ArtifactCard {
+    title: String,
+    description: Option<String>,
+    kind: String,
+    metadata: Option<String>,
+    intent: Intent,
+    width: Option<f32>,
+}
+
+impl ArtifactCard {
+    #[must_use]
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            description: None,
+            kind: "Artifact".to_owned(),
+            metadata: None,
+            intent: Intent::Neutral,
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    #[must_use]
+    pub fn kind(mut self, kind: impl Into<String>) -> Self {
+        self.kind = kind.into();
+        self
+    }
+
+    #[must_use]
+    pub fn metadata(mut self, metadata: impl Into<String>) -> Self {
+        self.metadata = Some(metadata.into());
+        self
+    }
+
+    #[must_use]
+    pub fn intent(mut self, intent: Intent) -> Self {
+        self.intent = intent;
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    pub fn show(self, ui: &mut Ui) -> InnerResponse<ArtifactCardResponse> {
+        let theme = theme_for_ui(ui);
+        let width = self
+            .width
+            .unwrap_or_else(|| ui.available_width().max(260.0));
+        egui::Frame::new()
+            .fill(theme.colors.surface)
+            .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+            .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.md as i8))
+            .show(ui, |ui| {
+                ui.set_width(frame_inner_width(width, theme.spacing.md));
+                ui.horizontal(|ui| {
+                    ui.add(Badge::new(self.kind).intent(self.intent).status_dot());
+                    if let Some(metadata) = &self.metadata {
+                        ui.label(
+                            RichText::new(metadata)
+                                .font(theme.typography.caption.clone())
+                                .color(theme.colors.text_subtle),
+                        );
+                    }
+                });
+                ui.add_space(theme.spacing.xs);
+                ui.label(
+                    RichText::new(self.title)
+                        .font(theme.typography.body_strong.clone())
+                        .color(theme.colors.text),
+                );
+                if let Some(description) = self.description {
+                    ui.label(
+                        RichText::new(description)
+                            .font(theme.typography.small.clone())
+                            .color(theme.colors.text_muted),
+                    );
+                }
+                ui.add_space(theme.spacing.sm);
+                let mut result = ArtifactCardResponse::default();
+                ui.horizontal_wrapped(|ui| {
+                    result.opened = ui.add(Button::new("Open").size(Size::Small)).clicked();
+                    result.copied = ui
+                        .add(
+                            Button::new("Copy")
+                                .variant(Variant::Outline)
+                                .size(Size::Small),
+                        )
+                        .clicked();
+                    result.approved = ui
+                        .add(
+                            Button::new("Approve")
+                                .intent(Intent::Success)
+                                .size(Size::Small),
+                        )
+                        .clicked();
+                    result.rejected = ui
+                        .add(
+                            Button::new("Reject")
+                                .intent(Intent::Danger)
+                                .variant(Variant::Outline)
+                                .size(Size::Small),
+                        )
+                        .clicked();
+                });
+                result
+            })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ArtifactCardResponse {
+    pub opened: bool,
+    pub copied: bool,
+    pub approved: bool,
+    pub rejected: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct ApprovalPanel {
+    title: String,
+    impact: String,
+    risk: Option<String>,
+    primary_label: String,
+    secondary_label: String,
+    intent: Intent,
+    width: Option<f32>,
+}
+
+impl ApprovalPanel {
+    #[must_use]
+    pub fn new(title: impl Into<String>, impact: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            impact: impact.into(),
+            risk: None,
+            primary_label: "Approve".to_owned(),
+            secondary_label: "Cancel".to_owned(),
+            intent: Intent::Primary,
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn risk(mut self, risk: impl Into<String>) -> Self {
+        self.risk = Some(risk.into());
+        self
+    }
+
+    #[must_use]
+    pub fn primary_label(mut self, label: impl Into<String>) -> Self {
+        self.primary_label = label.into();
+        self
+    }
+
+    #[must_use]
+    pub fn secondary_label(mut self, label: impl Into<String>) -> Self {
+        self.secondary_label = label.into();
+        self
+    }
+
+    #[must_use]
+    pub fn intent(mut self, intent: Intent) -> Self {
+        self.intent = intent;
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    pub fn show(self, ui: &mut Ui) -> InnerResponse<ApprovalPanelResponse> {
+        let theme = theme_for_ui(ui);
+        let width = self
+            .width
+            .unwrap_or_else(|| ui.available_width().max(260.0));
+        egui::Frame::new()
+            .fill(mix_with_transparent(
+                intent_color(&theme, self.intent),
+                0.04,
+            ))
+            .stroke(egui::Stroke::new(
+                theme.stroke.sm,
+                mix_with_transparent(intent_color(&theme, self.intent), 0.25),
+            ))
+            .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.md as i8))
+            .show(ui, |ui| {
+                ui.set_width(frame_inner_width(width, theme.spacing.md));
+                ui.add(
+                    Badge::new("Approval required")
+                        .intent(self.intent)
+                        .status_dot(),
+                );
+                ui.add_space(theme.spacing.xs);
+                ui.label(
+                    RichText::new(self.title)
+                        .font(theme.typography.body_strong.clone())
+                        .color(theme.colors.text),
+                );
+                ui.label(
+                    RichText::new(self.impact)
+                        .font(theme.typography.small.clone())
+                        .color(theme.colors.text_muted),
+                );
+                if let Some(risk) = self.risk {
+                    ui.add_space(theme.spacing.xs);
+                    ui.label(
+                        RichText::new(risk)
+                            .font(theme.typography.small.clone())
+                            .color(intent_color(&theme, Intent::Warning)),
+                    );
+                }
+                ui.add_space(theme.spacing.sm);
+                let mut result = ApprovalPanelResponse::default();
+                ui.horizontal_wrapped(|ui| {
+                    result.approved = ui
+                        .add(
+                            Button::new(self.primary_label)
+                                .intent(self.intent)
+                                .size(Size::Small),
+                        )
+                        .clicked();
+                    result.cancelled = ui
+                        .add(
+                            Button::new(self.secondary_label)
+                                .variant(Variant::Outline)
+                                .size(Size::Small),
+                        )
+                        .clicked();
+                });
+                result
+            })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ApprovalPanelResponse {
+    pub approved: bool,
+    pub cancelled: bool,
+}
+
+fn show_chat_message_content(
+    message: ChatMessage,
+    ui: &mut Ui,
+    add_content: Option<impl FnOnce(&mut Ui)>,
+) -> Response {
+    let theme = theme_for_ui(ui);
+    let colors = chat_message_colors(&theme, message.role, message.intent);
+
+    chat_message_frame(&theme, colors)
+        .show(ui, |ui| {
+            if let Some(width) = message.width {
+                let inner_width = frame_inner_width(width, theme.spacing.md);
+                ui.set_width(inner_width);
+                ui.set_max_width(inner_width);
+            }
+
+            ui.horizontal(|ui| {
+                paint_role_dot(ui, &theme, message.intent);
+                ui.label(
+                    RichText::new(message.title)
+                        .font(theme.typography.strong.clone())
+                        .color(theme.colors.text)
+                        .extra_letter_spacing(theme.typography.letter_spacing),
+                );
+                ui.add_space(theme.spacing.xs);
+                if let Some(metadata) = message.metadata {
+                    ui.label(
+                        RichText::new(metadata)
+                            .font(theme.typography.caption.clone())
+                            .color(theme.colors.text_subtle)
+                            .extra_letter_spacing(theme.typography.letter_spacing),
+                    );
+                }
+                if message.streaming {
+                    ui.add_space(theme.spacing.xs);
+                    ui.add(Loader::new().intent(Intent::Info).size(Size::Small));
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add(
+                            Button::new("Copy")
+                                .variant(Variant::Ghost)
+                                .size(Size::Small),
+                        )
+                        .clicked()
+                    {
+                        ui.ctx().copy_text(message.body.clone());
+                    }
+                });
+            });
+            ui.add_space(theme.spacing.xs);
+            if !message.body.is_empty() {
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(message.body)
+                            .font(theme.typography.body.clone())
+                            .color(theme.colors.text)
+                            .extra_letter_spacing(theme.typography.letter_spacing),
+                    )
+                    .wrap(),
+                );
+            }
+            if let Some(add_content) = add_content {
+                ui.add_space(theme.spacing.sm);
+                add_content(ui);
+            }
+        })
+        .response
+}
+
+fn trim_submitted_newline(text: &mut String) {
+    if text.ends_with('\n') {
+        text.pop();
+        if text.ends_with('\r') {
+            text.pop();
+        }
+    }
+}
+
+fn timeline_item_ui(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    item: &RunTimelineItem,
+    has_next: bool,
+) -> Response {
+    let height = if item.detail.is_some() { 58.0 } else { 42.0 };
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), height),
+        egui::Sense::hover(),
+    );
+    if ui.is_rect_visible(rect) {
+        let x = rect.min.x + 10.0;
+        let dot_center = egui::pos2(x, rect.min.y + 14.0);
+        if has_next {
+            ui.painter().vline(
+                x,
+                (dot_center.y + 7.0)..=(rect.max.y + theme.spacing.xs),
+                egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+            );
+        }
+        ui.painter().circle_filled(
+            dot_center,
+            5.0,
+            intent_color(theme, tool_call_intent(item.status)),
+        );
+        let content_x = x + 18.0;
+        ui.painter().text(
+            egui::pos2(content_x, rect.min.y + 5.0),
+            egui::Align2::LEFT_TOP,
+            format!("{} · {}", run_phase_label(item.phase), item.title),
+            theme.typography.button.clone(),
+            theme.colors.text,
+        );
+        if let Some(metadata) = &item.metadata {
+            ui.painter().text(
+                egui::pos2(rect.max.x, rect.min.y + 5.0),
+                egui::Align2::RIGHT_TOP,
+                metadata,
+                theme.typography.caption.clone(),
+                theme.colors.text_subtle,
+            );
+        }
+        if let Some(detail) = &item.detail {
+            ui.painter().text(
+                egui::pos2(content_x, rect.min.y + 28.0),
+                egui::Align2::LEFT_TOP,
+                detail,
+                theme.typography.small.clone(),
+                theme.colors.text_muted,
+            );
+        }
+    }
+    response
+}
+
+fn run_phase_label(phase: RunPhase) -> &'static str {
+    match phase {
+        RunPhase::Planning => "Plan",
+        RunPhase::ToolCall => "Tool",
+        RunPhase::Patch => "Patch",
+        RunPhase::Test => "Test",
+        RunPhase::Review => "Review",
+        RunPhase::FinalResponse => "Final",
+    }
+}
+
+fn paint_code_region(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    body: &str,
+    kind: ToolOutputKind,
+    wrap: bool,
+    height: f32,
+) -> Response {
+    let output = egui::ScrollArea::vertical()
+        .max_height(height)
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            if !wrap {
+                ui.set_min_width(
+                    (body.lines().map(str::len).max().unwrap_or(0) as f32 * 7.0)
+                        .max(ui.available_width()),
+                );
+            }
+            let label = egui::Label::new(
+                RichText::new(body)
+                    .font(tool_output_font(theme, kind))
+                    .color(tool_output_text_color(theme, kind))
+                    .extra_letter_spacing(theme.typography.letter_spacing),
+            )
+            .selectable(true);
+            ui.add(if wrap { label.wrap() } else { label.extend() })
+        });
+    output.inner
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -683,9 +1665,21 @@ mod tests {
     #[test]
     fn composer_requires_text_to_submit() {
         let mut text = String::from("  ");
-        let composer = AgentComposer::new(&mut text).send_label("Run").rows(1);
+        let mut selected_model = 0;
+        let composer = AgentComposer::new(&mut text)
+            .send_label("Run")
+            .stop_label("Cancel")
+            .attachment_label("Attach")
+            .tool_label("Tools")
+            .model_selector(&mut selected_model, ["Small", "Large"])
+            .loading(true)
+            .rows(1);
 
         assert_eq!(composer.send_label, "Run");
+        assert_eq!(composer.stop_label, "Cancel");
+        assert_eq!(composer.tool_label.as_deref(), Some("Tools"));
+        assert_eq!(composer.model_options, ["Small", "Large"]);
+        assert!(composer.loading);
         assert_eq!(composer.rows, 2);
         assert!(composer.text.trim().is_empty());
     }
@@ -723,5 +1717,53 @@ mod tests {
     fn framed_width_accounts_for_inner_padding() {
         assert_eq!(frame_inner_width(320.0, 12.0), 296.0);
         assert_eq!(frame_inner_width(64.0, 12.0), 80.0);
+    }
+
+    #[test]
+    fn submitted_newline_is_trimmed_for_enter_send() {
+        let mut text = String::from("Run tests\n");
+
+        trim_submitted_newline(&mut text);
+
+        assert_eq!(text, "Run tests");
+    }
+
+    #[test]
+    fn workflow_components_store_state() {
+        let mut open = false;
+        let block = ToolCallBlock::new("cargo test", &mut open)
+            .status(ToolCallStatus::Running)
+            .arguments("package: cast-ui")
+            .elapsed("1.2s")
+            .preview("running 189 tests");
+        let timeline = RunTimeline::new()
+            .item(RunTimelineItem::new(RunPhase::Planning, "Plan").metadata("now"))
+            .item(
+                RunTimelineItem::new(RunPhase::ToolCall, "Run tests")
+                    .status(ToolCallStatus::Running),
+            );
+        let output = CodeOutputPanel::new("stdout", "ok")
+            .height(24.0)
+            .wrap(false);
+
+        assert_eq!(block.status, ToolCallStatus::Running);
+        assert_eq!(block.arguments.as_deref(), Some("package: cast-ui"));
+        assert_eq!(timeline.items.len(), 2);
+        assert_eq!(timeline.items[0].phase, RunPhase::Planning);
+        assert_eq!(output.height, 64.0);
+        assert!(!output.wrap);
+    }
+
+    #[test]
+    fn artifact_and_approval_defaults_are_workflow_oriented() {
+        let artifact = ArtifactCard::new("Report").kind("Markdown");
+        let approval = ApprovalPanel::new("Run command", "Executes cargo test")
+            .risk("May take a few seconds")
+            .intent(Intent::Warning);
+
+        assert_eq!(artifact.kind, "Markdown");
+        assert_eq!(approval.primary_label, "Approve");
+        assert_eq!(approval.intent, Intent::Warning);
+        assert!(approval.risk.is_some());
     }
 }
