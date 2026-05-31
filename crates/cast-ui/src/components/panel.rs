@@ -49,7 +49,7 @@ impl Panel {
                 ui,
                 &theme,
                 self.sections,
-                theme.components.panel.padding,
+                theme.components.section.padding,
                 add_header,
                 add_contents,
                 add_footer,

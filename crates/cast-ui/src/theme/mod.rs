@@ -1166,6 +1166,9 @@ pub struct ComponentTokens {
     pub badge: BadgeTokens,
     pub card: SurfaceTokens,
     pub panel: SurfaceTokens,
+    pub inset: SurfaceTokens,
+    pub row: SurfaceTokens,
+    pub section: SurfaceSectionTokens,
     pub input: InputTokens,
     pub alert: FeedbackTokens,
 }
@@ -1178,6 +1181,9 @@ pub struct ComponentTokenOverrides {
     pub input: InputTokenOverrides,
     pub card: SurfaceTokenOverrides,
     pub panel: SurfaceTokenOverrides,
+    pub inset: SurfaceTokenOverrides,
+    pub row: SurfaceTokenOverrides,
+    pub section: SurfaceSectionTokenOverrides,
     pub alert: FeedbackTokenOverrides,
 }
 
@@ -1188,6 +1194,9 @@ impl ComponentTokenOverrides {
         self.input.apply_to(&mut components.input);
         self.card.apply_to(&mut components.card);
         self.panel.apply_to(&mut components.panel);
+        self.inset.apply_to(&mut components.inset);
+        self.row.apply_to(&mut components.row);
+        self.section.apply_to(&mut components.section);
         self.alert.apply_to(&mut components.alert);
     }
 
@@ -1283,6 +1292,36 @@ impl SurfaceTokenOverrides {
         }
         if let Some(value) = self.padding {
             tokens.padding = value;
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SurfaceSectionTokenOverrides {
+    pub muted_fill: Option<Color32>,
+    pub divider: Option<Color32>,
+    pub divider_width: Option<f32>,
+    pub padding: Option<f32>,
+    pub compact_padding: Option<f32>,
+}
+
+impl SurfaceSectionTokenOverrides {
+    fn apply_to(&self, tokens: &mut SurfaceSectionTokens) {
+        if let Some(value) = self.muted_fill {
+            tokens.muted_fill = value;
+        }
+        if let Some(value) = self.divider {
+            tokens.divider = value;
+        }
+        if let Some(value) = self.divider_width {
+            tokens.divider_width = value;
+        }
+        if let Some(value) = self.padding {
+            tokens.padding = value;
+        }
+        if let Some(value) = self.compact_padding {
+            tokens.compact_padding = value;
         }
     }
 }
@@ -1397,6 +1436,27 @@ impl ComponentTokens {
                 radius: radius.lg,
                 padding: spacing.lg,
             },
+            inset: SurfaceTokens {
+                fill: colors.surface,
+                border: colors.border,
+                border_width: stroke.sm,
+                radius: radius.lg + 4.0,
+                padding: spacing.md,
+            },
+            row: SurfaceTokens {
+                fill: colors.surface,
+                border: colors.border,
+                border_width: stroke.sm,
+                radius: radius.lg,
+                padding: spacing.md,
+            },
+            section: SurfaceSectionTokens {
+                muted_fill: colors.surface_muted,
+                divider: colors.border,
+                divider_width: stroke.sm,
+                padding: spacing.lg,
+                compact_padding: spacing.md,
+            },
             input: InputTokens {
                 fill: colors.surface,
                 fg: colors.text,
@@ -1446,6 +1506,16 @@ pub struct SurfaceTokens {
     pub border_width: f32,
     pub radius: f32,
     pub padding: f32,
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SurfaceSectionTokens {
+    pub muted_fill: Color32,
+    pub divider: Color32,
+    pub divider_width: f32,
+    pub padding: f32,
+    pub compact_padding: f32,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -1740,12 +1810,79 @@ impl FocusTokens {
 #[derive(Clone, Debug)]
 pub struct ElevationTokens {
     pub shadow_alpha: u8,
+    pub card: ShadowTokens,
+    pub panel: ShadowTokens,
+    pub menu: ShadowTokens,
+    pub tooltip: ShadowTokens,
+    pub toast: ShadowTokens,
+    pub popover: ShadowTokens,
+    pub dialog: ShadowTokens,
+    pub sheet: ShadowTokens,
 }
 
 impl Default for ElevationTokens {
     fn default() -> Self {
-        Self { shadow_alpha: 24 }
+        Self {
+            shadow_alpha: 24,
+            card: ShadowTokens {
+                alpha_scale: 0.55,
+                blur: 10,
+                spread: 0,
+                offset_y: 2,
+            },
+            panel: ShadowTokens {
+                alpha_scale: 0.28,
+                blur: 6,
+                spread: 0,
+                offset_y: 1,
+            },
+            menu: ShadowTokens {
+                alpha_scale: 0.70,
+                blur: 12,
+                spread: 0,
+                offset_y: 3,
+            },
+            tooltip: ShadowTokens {
+                alpha_scale: 0.62,
+                blur: 10,
+                spread: 0,
+                offset_y: 2,
+            },
+            toast: ShadowTokens {
+                alpha_scale: 0.58,
+                blur: 14,
+                spread: 0,
+                offset_y: 4,
+            },
+            popover: ShadowTokens {
+                alpha_scale: 0.68,
+                blur: 14,
+                spread: 0,
+                offset_y: 4,
+            },
+            dialog: ShadowTokens {
+                alpha_scale: 0.82,
+                blur: 22,
+                spread: 0,
+                offset_y: 8,
+            },
+            sheet: ShadowTokens {
+                alpha_scale: 2.55,
+                blur: 28,
+                spread: 0,
+                offset_y: 10,
+            },
+        }
     }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ShadowTokens {
+    pub alpha_scale: f32,
+    pub blur: u8,
+    pub spread: u8,
+    pub offset_y: i8,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -1969,6 +2106,13 @@ mod tests {
         assert_eq!(theme.components.card.fill, theme.colors.surface);
         assert_eq!(theme.components.card.border, theme.colors.border);
         assert_eq!(theme.components.panel.fill, theme.colors.surface_raised);
+        assert_eq!(theme.components.inset.fill, theme.colors.surface);
+        assert_eq!(theme.components.row.border, theme.colors.border);
+        assert_eq!(
+            theme.components.section.muted_fill,
+            theme.colors.surface_muted
+        );
+        assert_eq!(theme.components.section.divider, theme.colors.border);
         assert_eq!(theme.components.input.fg, theme.colors.text);
         assert_eq!(theme.components.input.focus_border, theme.colors.focus);
     }
@@ -2006,6 +2150,10 @@ mod tests {
         seed.component_overrides.input.min_height = Some(42.0);
         seed.component_overrides.card.padding = Some(22.0);
         seed.component_overrides.panel.radius = Some(16.0);
+        seed.component_overrides.inset.radius = Some(18.0);
+        seed.component_overrides.row.padding = Some(10.0);
+        seed.component_overrides.section.padding = Some(24.0);
+        seed.component_overrides.section.divider_width = Some(2.0);
         seed.component_overrides.alert.padding = Some(20.0);
 
         let theme = seed.resolve();
@@ -2015,6 +2163,10 @@ mod tests {
         assert_eq!(theme.components.input.min_height, 42.0);
         assert_eq!(theme.components.card.padding, 22.0);
         assert_eq!(theme.components.panel.radius, 16.0);
+        assert_eq!(theme.components.inset.radius, 18.0);
+        assert_eq!(theme.components.row.padding, 10.0);
+        assert_eq!(theme.components.section.padding, 24.0);
+        assert_eq!(theme.components.section.divider_width, 2.0);
         assert_eq!(theme.components.alert.padding, 20.0);
         assert_eq!(theme.radius.md, 10.0);
     }

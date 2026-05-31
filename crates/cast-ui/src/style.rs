@@ -3,7 +3,7 @@ use egui::{Color32, Margin, Stroke, Ui, Vec2};
 use crate::{
     color::{mix_with_transparent, with_alpha},
     foundation::{Intent, Size, Variant},
-    theme::{ButtonTokens, CastTheme, SemanticColorTokens},
+    theme::{ButtonTokens, CastTheme, SemanticColorTokens, ShadowTokens},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -169,7 +169,7 @@ pub(crate) fn card_shell_frame(theme: &CastTheme) -> egui::Frame {
         .fill(tokens.fill)
         .stroke(Stroke::new(tokens.border_width, tokens.border))
         .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
-        .shadow(surface_shadow(theme, 0.55, 10, 0, 2))
+        .shadow(surface_shadow(theme, theme.elevation.card))
         .outer_margin(Margin::symmetric(1, 2))
         .inner_margin(Margin::same(0))
 }
@@ -185,7 +185,7 @@ pub(crate) fn panel_shell_frame(theme: &CastTheme) -> egui::Frame {
         .fill(tokens.fill)
         .stroke(Stroke::new(tokens.border_width, tokens.border))
         .corner_radius(egui::CornerRadius::same(tokens.radius as u8))
-        .shadow(surface_shadow(theme, 0.28, 6, 0, 1))
+        .shadow(surface_shadow(theme, theme.elevation.panel))
         .outer_margin(Margin::symmetric(0, 1))
         .inner_margin(Margin::same(0))
 }
@@ -222,7 +222,7 @@ pub(crate) fn menu_frame(theme: &CastTheme) -> egui::Frame {
         .fill(theme.colors.surface_overlay)
         .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
         .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
-        .shadow(surface_shadow(theme, 0.70, 12, 0, 3))
+        .shadow(surface_shadow(theme, theme.elevation.menu))
         .outer_margin(Margin::same(4))
         .inner_margin(Margin::same(theme.spacing.xs as i8))
 }
@@ -232,7 +232,7 @@ pub(crate) fn tooltip_frame(theme: &CastTheme) -> egui::Frame {
         .fill(theme.colors.surface_overlay)
         .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
         .corner_radius(egui::CornerRadius::same(theme.radius.md as u8))
-        .shadow(surface_shadow(theme, 0.62, 10, 0, 2))
+        .shadow(surface_shadow(theme, theme.elevation.tooltip))
         .inner_margin(Margin::symmetric(
             theme.spacing.sm as i8,
             theme.spacing.xs as i8,
@@ -244,7 +244,7 @@ pub(crate) fn toast_frame(theme: &CastTheme, border: Color32) -> egui::Frame {
         .fill(theme.colors.surface_overlay)
         .stroke(Stroke::new(theme.stroke.sm, border))
         .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
-        .shadow(surface_shadow(theme, 0.58, 14, 0, 4))
+        .shadow(surface_shadow(theme, theme.elevation.toast))
         .inner_margin(Margin::symmetric(
             theme.spacing.md as i8,
             theme.spacing.sm as i8,
@@ -260,7 +260,7 @@ pub(crate) fn popover_shell_frame(theme: &CastTheme) -> egui::Frame {
         .fill(theme.colors.surface_overlay)
         .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
         .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
-        .shadow(surface_shadow(theme, 0.68, 14, 0, 4))
+        .shadow(surface_shadow(theme, theme.elevation.popover))
         .inner_margin(Margin::same(0))
 }
 
@@ -273,7 +273,7 @@ pub(crate) fn dialog_shell_frame(theme: &CastTheme) -> egui::Frame {
         .fill(theme.colors.surface_overlay)
         .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
         .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
-        .shadow(surface_shadow(theme, 0.82, 22, 0, 8))
+        .shadow(surface_shadow(theme, theme.elevation.dialog))
         .inner_margin(Margin::same(0))
 }
 
@@ -303,20 +303,16 @@ pub(crate) fn alert_intent_colors(theme: &CastTheme, intent: Intent) -> IntentCo
     }
 }
 
-fn surface_shadow(
-    theme: &CastTheme,
-    opacity: f32,
-    blur: u8,
-    spread: u8,
-    offset_y: i8,
-) -> egui::epaint::Shadow {
+pub(crate) fn surface_shadow(theme: &CastTheme, tokens: ShadowTokens) -> egui::epaint::Shadow {
     egui::epaint::Shadow {
-        offset: [0, offset_y],
-        blur,
-        spread,
+        offset: [0, tokens.offset_y],
+        blur: tokens.blur,
+        spread: tokens.spread,
         color: with_alpha(
             Color32::BLACK,
-            (f32::from(theme.elevation.shadow_alpha) * opacity).round() as u8,
+            (f32::from(theme.elevation.shadow_alpha) * tokens.alpha_scale)
+                .round()
+                .clamp(0.0, 255.0) as u8,
         ),
     }
 }

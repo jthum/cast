@@ -167,7 +167,7 @@ impl Popover {
                     ui,
                     &theme,
                     self.sections,
-                    theme.spacing.md,
+                    theme.components.section.compact_padding,
                     add_header,
                     add_contents,
                     add_footer,

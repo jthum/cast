@@ -86,7 +86,7 @@ impl Card {
                 ui,
                 &theme,
                 self.sections,
-                theme.components.card.padding,
+                theme.components.section.padding,
                 Some(add_header),
                 add_contents,
                 None::<fn(&mut Ui)>,
@@ -107,7 +107,7 @@ impl Card {
                 ui,
                 &theme,
                 self.sections,
-                theme.components.card.padding,
+                theme.components.section.padding,
                 None::<fn(&mut Ui)>,
                 add_contents,
                 Some(add_footer),
@@ -129,7 +129,7 @@ impl Card {
                 ui,
                 &theme,
                 self.sections,
-                theme.components.card.padding,
+                theme.components.section.padding,
                 add_header,
                 add_contents,
                 add_footer,
@@ -214,14 +214,17 @@ pub(crate) fn show_surface_section<R>(
 fn surface_chrome_fill(theme: &CastTheme, chrome: SurfaceChrome) -> Color32 {
     match chrome {
         SurfaceChrome::Flat => Color32::TRANSPARENT,
-        SurfaceChrome::Muted => theme.colors.surface_muted,
+        SurfaceChrome::Muted => theme.components.section.muted_fill,
     }
 }
 
 pub(crate) fn paint_section_divider(ui: &Ui, theme: &CastTheme, rect: egui::Rect, y: f32) {
     ui.painter().line_segment(
         [egui::pos2(rect.min.x, y), egui::pos2(rect.max.x, y)],
-        egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+        egui::Stroke::new(
+            theme.components.section.divider_width,
+            theme.components.section.divider,
+        ),
     );
 }
 

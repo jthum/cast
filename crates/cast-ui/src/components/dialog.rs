@@ -10,7 +10,7 @@ use crate::{
         card::{SurfaceChrome, SurfaceSectionStyle, paint_section_divider, show_surface_section},
     },
     foundation::{Intent, Placement, Size, Variant},
-    style::{dialog_backdrop, dialog_frame, dialog_shell_frame},
+    style::{dialog_backdrop, dialog_frame, dialog_shell_frame, surface_shadow},
     theme::{CastTheme, current_theme},
 };
 
@@ -586,19 +586,20 @@ fn show_dialog_sections<R>(
     let previous_spacing = ui.spacing().item_spacing;
     ui.spacing_mut().item_spacing.y = 0.0;
 
-    let header = show_surface_section(ui, theme, sections.header, theme.spacing.lg, |ui| {
+    let section_padding = theme.components.section.padding;
+    let header = show_surface_section(ui, theme, sections.header, section_padding, |ui| {
         add_header(ui, controller);
     });
     if sections.dividers {
         paint_section_divider(ui, theme, header.response.rect, header.response.rect.max.y);
     }
 
-    let body = show_surface_section(ui, theme, SurfaceChrome::Flat, theme.spacing.lg, |ui| {
+    let body = show_surface_section(ui, theme, SurfaceChrome::Flat, section_padding, |ui| {
         add_contents(ui, controller)
     })
     .inner;
 
-    let footer = show_surface_section(ui, theme, sections.footer, theme.spacing.lg, |ui| {
+    let footer = show_surface_section(ui, theme, sections.footer, section_padding, |ui| {
         add_footer(ui, controller);
     });
     if sections.dividers {
@@ -621,19 +622,20 @@ fn show_sheet_sections<R>(
     let previous_spacing = ui.spacing().item_spacing;
     ui.spacing_mut().item_spacing.y = 0.0;
 
-    let header = show_surface_section(ui, theme, sections.header, theme.spacing.lg, |ui| {
+    let section_padding = theme.components.section.padding;
+    let header = show_surface_section(ui, theme, sections.header, section_padding, |ui| {
         add_header(ui, controller);
     });
     if sections.dividers {
         paint_section_divider(ui, theme, header.response.rect, header.response.rect.max.y);
     }
 
-    let body = show_surface_section(ui, theme, SurfaceChrome::Flat, theme.spacing.lg, |ui| {
+    let body = show_surface_section(ui, theme, SurfaceChrome::Flat, section_padding, |ui| {
         add_contents(ui, controller)
     })
     .inner;
 
-    let footer = show_surface_section(ui, theme, sections.footer, theme.spacing.lg, |ui| {
+    let footer = show_surface_section(ui, theme, sections.footer, section_padding, |ui| {
         add_footer(ui, controller);
     });
     if sections.dividers {
@@ -653,12 +655,7 @@ fn sheet_shell_frame(theme: &CastTheme, placement: Placement) -> egui::Frame {
         .fill(theme.colors.surface_overlay)
         .stroke(Stroke::new(theme.stroke.sm.max(1.0), theme.colors.border))
         .corner_radius(sheet_corner_radius(theme, placement))
-        .shadow(egui::epaint::Shadow {
-            offset: [0, 10],
-            blur: 28,
-            spread: 0,
-            color: mix_with_transparent(Color32::BLACK, 0.24),
-        })
+        .shadow(surface_shadow(theme, theme.elevation.sheet))
         .inner_margin(egui::Margin::same(0))
 }
 
