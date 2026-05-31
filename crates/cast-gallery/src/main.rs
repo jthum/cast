@@ -198,89 +198,89 @@ impl eframe::App for CastGallery {
             });
 
         let mut theme_changed = false;
-        CentralPanel::default()
+        EguiPanel::top("topbar")
+            .exact_size(68.0)
+            .show_separator_line(false)
             .frame(
                 egui::Frame::new()
-                    .fill(self.theme.colors.background)
-                    .inner_margin(egui::Margin::same(0)),
+                    .fill(self.theme.colors.surface)
+                    .inner_margin(egui::Margin::symmetric(28, 18)),
             )
             .show_inside(ui, |ui| {
-                egui::Frame::new()
-                    .fill(self.theme.colors.surface)
-                    .inner_margin(egui::Margin::symmetric(28, 18))
-                    .show(ui, |ui| {
-                        ui.set_min_width(ui.available_width());
-                        theme_changed |=
-                            show_shell_top_bar(ui, &ctx, &mut self.seed, &mut self.zoom);
-                    });
+                ui.set_min_width(ui.available_width());
+                theme_changed |= show_shell_top_bar(ui, &ctx, &mut self.seed, &mut self.zoom);
+            });
+
+        CentralPanel::default()
+            .frame(
                 egui::Frame::new()
                     .fill(self.theme.colors.surface)
                     .inner_margin(egui::Margin {
                         left: 28,
                         right: 28,
-                        top: 8,
-                        bottom: 24,
-                    })
-                    .show(ui, |ui| {
-                        let scroll_tab = if self.sidebar_section == 2 {
-                            self.component_tab
-                        } else {
-                            0
-                        };
-                        let scroll_route = (self.sidebar_section, scroll_tab);
-                        let reset_scroll = self.last_scroll_route != Some(scroll_route);
-                        self.last_scroll_route = Some(scroll_route);
-                        let mut scroll_area =
-                            cast_page_scroll_area(("main_scroll", scroll_route), &self.theme);
-                        if reset_scroll {
-                            scroll_area = scroll_area.vertical_scroll_offset(0.0);
-                        }
+                        top: 0,
+                        bottom: 0,
+                    }),
+            )
+            .show_inside(ui, |ui| {
+                let scroll_tab = if self.sidebar_section == 2 {
+                    self.component_tab
+                } else {
+                    0
+                };
+                let scroll_route = (self.sidebar_section, scroll_tab);
+                let reset_scroll = self.last_scroll_route != Some(scroll_route);
+                self.last_scroll_route = Some(scroll_route);
+                let mut scroll_area =
+                    cast_page_scroll_area(("main_scroll", scroll_route), &self.theme);
+                if reset_scroll {
+                    scroll_area = scroll_area.vertical_scroll_offset(0.0);
+                }
 
-                        scroll_area.auto_shrink([false, false]).show(ui, |ui| {
-                            theme_changed |= show_workspace_view(
-                                ui,
-                                self.sidebar_section,
-                                &self.theme,
-                                &mut self.seed,
-                                ctx.pixels_per_point(),
-                                self.zoom,
-                                &mut self.command,
-                                &mut self.search,
-                                &mut self.name,
-                                &mut self.handle,
-                                &mut self.preset_query,
-                                &mut self.preset_choice,
-                                &mut self.form_validation_attention,
-                                &mut self.enabled,
-                                &mut self.notifications,
-                                &mut self.indeterminate,
-                                &mut self.form_density,
-                                &mut self.menu_choice,
-                                &mut self.dialog_open,
-                                &mut self.sheet_open,
-                                &mut self.confirm_dialog_open,
-                                &mut self.confirm_result,
-                                &mut self.toast_preview_open,
-                                &mut self.toast_preview_toasts,
-                                &mut self.command_palette,
-                                &mut self.lead_search,
-                                &mut self.related_activity_open,
-                                &mut self.related_activity_group,
-                                &mut self.lead_selected,
-                                &mut self.lead_expanded,
-                                &mut self.lead_date_filter,
-                                &mut self.lead_user_filter,
-                                &mut self.lead_status_filter,
-                                &mut self.lead_payment_filter,
-                                &mut self.lead_rows_per_page,
-                                &mut self.lead_page,
-                                &mut self.lead_exported_count,
-                                &mut self.foundation_tab,
-                                &mut self.workflow_segment,
-                                &mut self.component_tab,
-                            );
-                        });
-                    });
+                scroll_area.auto_shrink([false, false]).show(ui, |ui| {
+                    theme_changed |= show_workspace_view(
+                        ui,
+                        self.sidebar_section,
+                        &self.theme,
+                        &mut self.seed,
+                        ctx.pixels_per_point(),
+                        self.zoom,
+                        &mut self.command,
+                        &mut self.search,
+                        &mut self.name,
+                        &mut self.handle,
+                        &mut self.preset_query,
+                        &mut self.preset_choice,
+                        &mut self.form_validation_attention,
+                        &mut self.enabled,
+                        &mut self.notifications,
+                        &mut self.indeterminate,
+                        &mut self.form_density,
+                        &mut self.menu_choice,
+                        &mut self.dialog_open,
+                        &mut self.sheet_open,
+                        &mut self.confirm_dialog_open,
+                        &mut self.confirm_result,
+                        &mut self.toast_preview_open,
+                        &mut self.toast_preview_toasts,
+                        &mut self.command_palette,
+                        &mut self.lead_search,
+                        &mut self.related_activity_open,
+                        &mut self.related_activity_group,
+                        &mut self.lead_selected,
+                        &mut self.lead_expanded,
+                        &mut self.lead_date_filter,
+                        &mut self.lead_user_filter,
+                        &mut self.lead_status_filter,
+                        &mut self.lead_payment_filter,
+                        &mut self.lead_rows_per_page,
+                        &mut self.lead_page,
+                        &mut self.lead_exported_count,
+                        &mut self.foundation_tab,
+                        &mut self.workflow_segment,
+                        &mut self.component_tab,
+                    );
+                });
             });
 
         if let Some(action) = show_command_palette(&ctx, &mut self.command_palette) {
