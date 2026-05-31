@@ -369,22 +369,22 @@ fn nav_fill(
 
 fn selected_fill(theme: &CastTheme, hovered: bool, pressed: bool) -> Color32 {
     let alpha = if pressed {
-        0.12
+        theme.tone.subtle_active_fill_alpha
     } else if hovered {
-        0.08
+        theme.tone.subtle_hover_fill_alpha
     } else {
-        0.05
+        theme.tone.subtle_fill_alpha
     };
     mix_with_transparent(theme.colors.primary_family.base, alpha)
 }
 
 fn selected_border(theme: &CastTheme, hovered: bool, pressed: bool) -> Color32 {
     let alpha = if pressed {
-        0.46
+        theme.tone.subtle_active_border_alpha
     } else if hovered {
-        0.38
+        theme.tone.subtle_hover_border_alpha
     } else {
-        0.30
+        theme.tone.subtle_border_alpha
     };
     mix_with_transparent(theme.colors.primary_family.base, alpha)
 }

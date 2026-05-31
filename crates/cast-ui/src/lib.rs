@@ -31,6 +31,6 @@ pub use theme::{
     FontPathStack, FontStack, FontStackBuilder, GoogleFontFamily, InputTokenOverrides, InputTokens,
     RadiusTokens, ScrollTokens, SemanticColorTokens, ShadowTokens, SpacingTokens, StrokeTokens,
     SurfaceSectionTokenOverrides, SurfaceSectionTokens, SurfaceTokenOverrides, SurfaceTokens,
-    ThemeMode, ThemeSeed, TypographyTokens, apply_theme, install_cast_fonts, install_font_stack,
-    install_inter_fonts, set_theme, theme_for_ui,
+    ThemeMode, ThemeSeed, ToneTokens, TypographyTokens, apply_theme, install_cast_fonts,
+    install_font_stack, install_inter_fonts, set_theme, theme_for_ui,
 };

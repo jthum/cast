@@ -186,7 +186,7 @@ fn resolve_badge_colors(
         return IntentColors {
             fill: egui::Color32::TRANSPARENT,
             fg: family.emphasis,
-            border: mix_with_transparent(family.base, 0.30),
+            border: mix_with_transparent(family.base, theme.tone.subtle_border_alpha),
         };
     }
 
@@ -196,9 +196,9 @@ fn resolve_badge_colors(
 
     let family = badge_semantic_family(theme, intent);
     IntentColors {
-        fill: mix_with_transparent(family.base, 0.05),
+        fill: mix_with_transparent(family.base, theme.tone.subtle_fill_alpha),
         fg: family.emphasis,
-        border: mix_with_transparent(family.base, 0.30),
+        border: mix_with_transparent(family.base, theme.tone.subtle_border_alpha),
     }
 }
 

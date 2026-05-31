@@ -1,5 +1,5 @@
 use cast::{
-    CastTheme, SegmentedControl, Size, Slider, ThemeMode,
+    Button, CastTheme, SegmentedControl, Size, Slider, ThemeMode, Variant,
     egui::{
         self, Color32, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -17,6 +17,52 @@ pub struct AppShellConfig<'a> {
     pub nav_items: &'a [&'a str],
     pub status_group: &'a str,
     pub status_items: &'a [(&'a str, &'a str)],
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct AppShellMetrics {
+    pub compact_breakpoint: f32,
+    pub sidebar_width: f32,
+    pub compact_sidebar_width: f32,
+    pub topbar_height: f32,
+    pub content_margin: f32,
+    pub compact_content_margin: f32,
+    pub sidebar_margin: i8,
+}
+
+impl AppShellMetrics {
+    #[must_use]
+    pub fn is_compact(&self, available_width: f32) -> bool {
+        available_width <= self.compact_breakpoint
+    }
+
+    #[must_use]
+    pub fn content_margin_for_width(&self, available_width: f32) -> i8 {
+        if self.is_compact(available_width) {
+            self.compact_content_margin.round() as i8
+        } else {
+            self.content_margin.round() as i8
+        }
+    }
+
+    #[must_use]
+    pub fn topbar_margin_for_width(&self, available_width: f32) -> i8 {
+        self.content_margin_for_width(available_width)
+    }
+}
+
+impl Default for AppShellMetrics {
+    fn default() -> Self {
+        Self {
+            compact_breakpoint: 900.0,
+            sidebar_width: 248.0,
+            compact_sidebar_width: 320.0,
+            topbar_height: 68.0,
+            content_margin: 28.0,
+            compact_content_margin: 16.0,
+            sidebar_margin: 18,
+        }
+    }
 }
 
 impl Default for AppShellConfig<'static> {
@@ -49,6 +95,15 @@ pub fn show_shell_top_bar(
     show_app_top_bar(ui, ctx, "Cast Gallery", seed, zoom)
 }
 
+pub fn show_shell_top_bar_with_sidebar_button(
+    ui: &mut egui::Ui,
+    ctx: &egui::Context,
+    seed: &mut cast::ThemeSeed,
+    zoom: &mut f32,
+) -> (bool, bool) {
+    show_app_top_bar_with_sidebar_button(ui, ctx, "Cast Gallery", seed, zoom)
+}
+
 pub fn show_app_top_bar(
     ui: &mut egui::Ui,
     ctx: &egui::Context,
@@ -56,11 +111,51 @@ pub fn show_app_top_bar(
     seed: &mut cast::ThemeSeed,
     zoom: &mut f32,
 ) -> bool {
+    show_app_top_bar_inner(ui, ctx, title, seed, zoom, None)
+}
+
+pub fn show_app_top_bar_with_sidebar_button(
+    ui: &mut egui::Ui,
+    ctx: &egui::Context,
+    title: &str,
+    seed: &mut cast::ThemeSeed,
+    zoom: &mut f32,
+) -> (bool, bool) {
+    let mut sidebar_requested = false;
+    let changed = show_app_top_bar_inner(ui, ctx, title, seed, zoom, Some(&mut sidebar_requested));
+    (changed, sidebar_requested)
+}
+
+fn show_app_top_bar_inner(
+    ui: &mut egui::Ui,
+    ctx: &egui::Context,
+    title: &str,
+    seed: &mut cast::ThemeSeed,
+    zoom: &mut f32,
+    mut sidebar_requested: Option<&mut bool>,
+) -> bool {
     let mut changed = false;
+    let compact = ui.available_width() < 560.0;
+    let title = if compact { "Cast" } else { title };
     ui.allocate_ui_with_layout(
         egui::vec2(ui.available_width(), 32.0),
         egui::Layout::left_to_right(egui::Align::Center),
         |ui| {
+            if let Some(requested) = sidebar_requested.as_deref_mut() {
+                if ui
+                    .add(
+                        Button::new("Menu")
+                            .leading_icon("☰")
+                            .variant(Variant::Outline)
+                            .size(Size::Small),
+                    )
+                    .clicked()
+                {
+                    *requested = true;
+                }
+                ui.separator();
+            }
+
             ui.label(title);
             ui.separator();
 
@@ -80,9 +175,16 @@ pub fn show_app_top_bar(
             }
 
             ui.separator();
-            ui.label("Zoom");
+            if !compact {
+                ui.label("Zoom");
+            }
+            let slider_width = if compact { 86.0 } else { 118.0 };
             if ui
-                .add(Slider::new(zoom, 0.9..=1.35).show_value(false).width(118.0))
+                .add(
+                    Slider::new(zoom, 0.9..=1.35)
+                        .show_value(false)
+                        .width(slider_width),
+                )
                 .changed()
             {
                 ctx.set_zoom_factor(*zoom);
@@ -297,5 +399,17 @@ mod tests {
         assert_eq!(config.title, "Cast");
         assert_eq!(config.nav_items[3], "Agent components");
         assert_eq!(config.status_items[0], ("Runtime theme", "Live"));
+    }
+
+    #[test]
+    fn app_shell_metrics_switch_to_compact_layout_at_breakpoint() {
+        let metrics = AppShellMetrics::default();
+
+        assert!(!metrics.is_compact(metrics.compact_breakpoint + 1.0));
+        assert!(metrics.is_compact(metrics.compact_breakpoint));
+        assert_eq!(
+            metrics.content_margin_for_width(metrics.compact_breakpoint - 1.0),
+            metrics.compact_content_margin as i8
+        );
     }
 }

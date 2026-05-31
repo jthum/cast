@@ -146,7 +146,7 @@ impl Widget for Button {
             } else {
                 disabled_button_fg(active_fill, &theme)
             };
-            let border = button_border(accent, self.variant, enabled, hovered, pressed);
+            let border = button_border(&theme, accent, self.variant, enabled, hovered, pressed);
 
             ui.painter().rect(
                 paint_rect,
@@ -181,14 +181,14 @@ fn button_colors(theme: &crate::CastTheme, intent: Intent, variant: Variant) -> 
             border: Color32::TRANSPARENT,
         },
         Variant::Subtle => IntentColors {
-            fill: mix_with_transparent(accent.base, 0.05),
+            fill: mix_with_transparent(accent.base, theme.tone.subtle_fill_alpha),
             fg: accent.text,
-            border: mix_with_transparent(accent.base, 0.30),
+            border: mix_with_transparent(accent.base, theme.tone.subtle_border_alpha),
         },
         Variant::Outline => IntentColors {
             fill: Color32::TRANSPARENT,
             fg: accent.text,
-            border: mix_with_transparent(accent.base, 0.30),
+            border: mix_with_transparent(accent.base, theme.tone.subtle_border_alpha),
         },
         Variant::Ghost => IntentColors {
             fill: Color32::TRANSPARENT,
@@ -278,9 +278,9 @@ fn button_fill(
 ) -> Color32 {
     if matches!(variant, Variant::Ghost | Variant::Outline) && fill == Color32::TRANSPARENT {
         return if pressed {
-            mix_with_transparent(accent, 0.12)
+            mix_with_transparent(accent, theme.tone.subtle_active_fill_alpha)
         } else if hovered {
-            mix_with_transparent(accent, 0.05)
+            mix_with_transparent(accent, theme.tone.subtle_fill_alpha)
         } else {
             Color32::TRANSPARENT
         };
@@ -288,9 +288,9 @@ fn button_fill(
 
     if matches!(variant, Variant::Subtle) {
         return if pressed {
-            mix_with_transparent(accent, 0.12)
+            mix_with_transparent(accent, theme.tone.subtle_active_fill_alpha)
         } else if hovered {
-            mix_with_transparent(accent, 0.08)
+            mix_with_transparent(accent, theme.tone.subtle_hover_fill_alpha)
         } else {
             fill
         };
@@ -311,6 +311,7 @@ fn button_fill(
 }
 
 fn button_border(
+    theme: &crate::CastTheme,
     accent: Color32,
     variant: Variant,
     enabled: bool,
@@ -319,10 +320,18 @@ fn button_border(
 ) -> Color32 {
     match variant {
         Variant::Solid | Variant::Ghost => Color32::TRANSPARENT,
-        Variant::Subtle | Variant::Outline if !enabled => mix_with_transparent(accent, 0.18),
-        Variant::Subtle | Variant::Outline if pressed => mix_with_transparent(accent, 0.46),
-        Variant::Subtle | Variant::Outline if hovered => mix_with_transparent(accent, 0.38),
-        Variant::Subtle | Variant::Outline => mix_with_transparent(accent, 0.30),
+        Variant::Subtle | Variant::Outline if !enabled => {
+            mix_with_transparent(accent, theme.tone.disabled_border_alpha)
+        }
+        Variant::Subtle | Variant::Outline if pressed => {
+            mix_with_transparent(accent, theme.tone.subtle_active_border_alpha)
+        }
+        Variant::Subtle | Variant::Outline if hovered => {
+            mix_with_transparent(accent, theme.tone.subtle_hover_border_alpha)
+        }
+        Variant::Subtle | Variant::Outline => {
+            mix_with_transparent(accent, theme.tone.subtle_border_alpha)
+        }
     }
 }
 
@@ -418,6 +427,7 @@ mod tests {
         assert_eq!(colors.border, Color32::TRANSPARENT);
         assert_eq!(
             button_border(
+                &theme,
                 theme.colors.primary_family.base,
                 Variant::Solid,
                 true,

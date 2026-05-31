@@ -8,8 +8,8 @@ use patterns::entity_table_with_details::{
 };
 use patterns::related_activity::show_related_activity;
 use patterns::shell::{
-    cast_page_scroll_area, cast_scroll_area, shell_sidebar_fill, show_shell_sidebar,
-    show_shell_top_bar,
+    AppShellMetrics, cast_page_scroll_area, cast_scroll_area, shell_sidebar_fill,
+    show_shell_sidebar, show_shell_top_bar, show_shell_top_bar_with_sidebar_button,
 };
 
 use cast::{
@@ -17,12 +17,12 @@ use cast::{
     CastPaletteInput, CastTheme, ChatMessage, Checkbox, CodeOutputPanel, Combobox, ConfirmDialog,
     ConfirmDialogResponse, DateInput, Dialog, Dropdown, EmptyState, FormActions, FormField,
     FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle, MenuItem, MessageThread, Notice,
-    NumberInput, Panel as CastPanel, Popover, ProgressBar, RadioGroup, RunPhase, RunTimeline,
-    RunTimelineItem, SearchInput, SegmentedControl, Select, SemanticColorTokens, Separator, Sheet,
-    Size, Skeleton, Slider, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed,
-    TimeInput, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus,
-    ToolOutput, ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary,
-    Variant,
+    NumberInput, Panel as CastPanel, Placement, Popover, ProgressBar, RadioGroup, RunPhase,
+    RunTimeline, RunTimelineItem, SearchInput, SegmentedControl, Select, SemanticColorTokens,
+    Separator, Sheet, Size, Skeleton, Slider, Switch, Table, Tabs, TextArea, TextInput, ThemeMode,
+    ThemeSeed, TimeInput, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallBlock,
+    ToolCallStatus, ToolOutput, ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue,
+    ValidationSummary, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -90,6 +90,7 @@ struct CastGallery {
     editable_task: String,
     editable_status: usize,
     sidebar_section: usize,
+    compact_sidebar_open: bool,
     last_scroll_route: Option<(usize, usize)>,
 }
 
@@ -146,6 +147,7 @@ impl CastGallery {
             editable_task: String::from("Review agent output table"),
             editable_status: 1,
             sidebar_section: 0,
+            compact_sidebar_open: false,
             last_scroll_route: None,
         }
     }
@@ -199,36 +201,94 @@ impl eframe::App for CastGallery {
             self.command_palette.open = true;
         }
 
-        EguiPanel::left("sidebar")
-            .resizable(false)
-            .default_size(248.0)
-            .frame(
-                egui::Frame::new()
-                    .fill(shell_sidebar_fill(&self.theme))
-                    .inner_margin(egui::Margin::symmetric(18, 18)),
-            )
-            .show_inside(ui, |ui| {
-                cast_scroll_area("sidebar_scroll", &self.theme)
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        show_shell_sidebar(ui, &self.theme, &mut self.sidebar_section);
-                    });
-            });
+        let shell_metrics = AppShellMetrics::default();
+        let available_width = ctx.content_rect().width();
+        let compact_shell = shell_metrics.is_compact(available_width);
+
+        if !compact_shell {
+            self.compact_sidebar_open = false;
+            EguiPanel::left("sidebar")
+                .resizable(false)
+                .default_size(shell_metrics.sidebar_width)
+                .frame(
+                    egui::Frame::new()
+                        .fill(shell_sidebar_fill(&self.theme))
+                        .inner_margin(egui::Margin::symmetric(
+                            shell_metrics.sidebar_margin,
+                            shell_metrics.sidebar_margin,
+                        )),
+                )
+                .show_inside(ui, |ui| {
+                    cast_scroll_area("sidebar_scroll", &self.theme)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            show_shell_sidebar(ui, &self.theme, &mut self.sidebar_section);
+                        });
+                });
+        }
 
         let mut theme_changed = false;
         EguiPanel::top("topbar")
-            .exact_size(68.0)
+            .exact_size(shell_metrics.topbar_height)
             .show_separator_line(false)
             .frame(
                 egui::Frame::new()
                     .fill(self.theme.colors.surface)
                     .stroke(egui::Stroke::NONE)
-                    .inner_margin(egui::Margin::symmetric(28, 18)),
+                    .inner_margin(egui::Margin::symmetric(
+                        shell_metrics.topbar_margin_for_width(available_width),
+                        shell_metrics.sidebar_margin,
+                    )),
             )
             .show_inside(ui, |ui| {
                 ui.set_min_width(ui.available_width());
-                theme_changed |= show_shell_top_bar(ui, &ctx, &mut self.seed, &mut self.zoom);
+                if compact_shell {
+                    let (changed, sidebar_requested) = show_shell_top_bar_with_sidebar_button(
+                        ui,
+                        &ctx,
+                        &mut self.seed,
+                        &mut self.zoom,
+                    );
+                    theme_changed |= changed;
+                    if sidebar_requested {
+                        self.compact_sidebar_open = true;
+                    }
+                } else {
+                    theme_changed |= show_shell_top_bar(ui, &ctx, &mut self.seed, &mut self.zoom);
+                }
             });
+
+        if compact_shell {
+            let sheet_width = shell_metrics
+                .compact_sidebar_width
+                .min((available_width - self.theme.spacing.md).max(260.0));
+            let theme = self.theme.clone();
+            let sidebar_section = &mut self.sidebar_section;
+            Sheet::new(&mut self.compact_sidebar_open, "gallery_compact_sidebar")
+                .placement(Placement::Left)
+                .width(sheet_width)
+                .closable(true)
+                .show(&ctx, move |ui, sheet| {
+                    egui::Frame::new()
+                        .fill(shell_sidebar_fill(&theme))
+                        .inner_margin(egui::Margin::symmetric(
+                            shell_metrics.sidebar_margin,
+                            shell_metrics.sidebar_margin,
+                        ))
+                        .show(ui, |ui| {
+                            ui.set_min_size(ui.available_size());
+                            cast_scroll_area("compact_sidebar_scroll", &theme)
+                                .auto_shrink([false, false])
+                                .show(ui, |ui| {
+                                    let previous_section = *sidebar_section;
+                                    show_shell_sidebar(ui, &theme, sidebar_section);
+                                    if *sidebar_section != previous_section {
+                                        sheet.close();
+                                    }
+                                });
+                        });
+                });
+        }
 
         CentralPanel::default()
             .frame(
@@ -236,8 +296,8 @@ impl eframe::App for CastGallery {
                     .fill(self.theme.colors.surface)
                     .stroke(egui::Stroke::NONE)
                     .inner_margin(egui::Margin {
-                        left: 28,
-                        right: 28,
+                        left: shell_metrics.content_margin_for_width(available_width),
+                        right: shell_metrics.content_margin_for_width(available_width),
                         top: 0,
                         bottom: 0,
                     }),

@@ -4,7 +4,7 @@ Cast themes are resolved at runtime from a small editable `ThemeSeed` into a com
 
 The current model separates seed input, global tokens, component tokens, and egui style integration:
 
-- `ThemeSeed`: user-editable source values such as mode, palette, spacing, radius, stroke, typography, controls, motion, scroll, elevation, and component overrides.
+- `ThemeSeed`: user-editable source values such as mode, palette, spacing, radius, stroke, typography, controls, tone, motion, scroll, elevation, and component overrides.
 - `CastTheme`: resolved runtime theme used by widgets.
 - `ColorTokens`: global semantic colors and derived color families.
 - `ComponentTokens`: component and surface role tokens derived from global tokens.
@@ -120,6 +120,20 @@ The font stack supports separate role families for body, controls, strong text, 
 - `padding_y`
 
 Buttons, inputs, and other controls derive their default sizing from these values.
+
+## Tone
+
+`ToneTokens` contains shared alpha stops for accent-tinted fills and borders:
+
+- `subtle_fill_alpha`
+- `subtle_hover_fill_alpha`
+- `subtle_active_fill_alpha`
+- `subtle_border_alpha`
+- `subtle_hover_border_alpha`
+- `subtle_active_border_alpha`
+- `disabled_border_alpha`
+
+These are the named version of the shadcn-like pattern we use for subtle semantic surfaces: a very light tinted fill paired with a stronger tinted border. Buttons, badges, alerts, tabs, and segmented controls should use these stops when they need an accent tint rather than choosing new local alpha values.
 
 ## Elevation
 

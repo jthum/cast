@@ -53,6 +53,7 @@ pub struct CastTheme {
     pub stroke: StrokeTokens,
     pub typography: TypographyTokens,
     pub controls: ControlTokens,
+    pub tone: ToneTokens,
     pub focus: FocusTokens,
     pub elevation: ElevationTokens,
     pub animation: AnimationTokens,
@@ -93,6 +94,7 @@ pub struct ThemeSeed {
     pub stroke: StrokeTokens,
     pub typography: TypographyTokens,
     pub controls: ControlTokens,
+    pub tone: ToneTokens,
     pub elevation: ElevationTokens,
     pub animation: AnimationTokens,
     pub scroll: ScrollTokens,
@@ -110,6 +112,7 @@ impl ThemeSeed {
             stroke: StrokeTokens::default(),
             typography: TypographyTokens::default(),
             controls: ControlTokens::default(),
+            tone: ToneTokens::default(),
             elevation: ElevationTokens::default(),
             animation: AnimationTokens::default(),
             scroll: ScrollTokens::default(),
@@ -231,6 +234,7 @@ impl ThemeSeed {
             stroke: self.stroke,
             typography: self.typography,
             controls: self.controls,
+            tone: self.tone,
             focus,
             elevation: self.elevation,
             animation: self.animation,
@@ -1777,6 +1781,32 @@ impl Default for ControlTokens {
             min_height: 32.0,
             padding_x: 12.0,
             padding_y: 7.0,
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[derive(Clone, Copy, Debug)]
+pub struct ToneTokens {
+    pub subtle_fill_alpha: f32,
+    pub subtle_hover_fill_alpha: f32,
+    pub subtle_active_fill_alpha: f32,
+    pub subtle_border_alpha: f32,
+    pub subtle_hover_border_alpha: f32,
+    pub subtle_active_border_alpha: f32,
+    pub disabled_border_alpha: f32,
+}
+
+impl Default for ToneTokens {
+    fn default() -> Self {
+        Self {
+            subtle_fill_alpha: 0.05,
+            subtle_hover_fill_alpha: 0.08,
+            subtle_active_fill_alpha: 0.12,
+            subtle_border_alpha: 0.30,
+            subtle_hover_border_alpha: 0.38,
+            subtle_active_border_alpha: 0.46,
+            disabled_border_alpha: 0.18,
         }
     }
 }
