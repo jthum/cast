@@ -2030,6 +2030,8 @@ fn show_surfaces(ui: &mut egui::Ui) {
 fn show_context_card_example(ui: &mut egui::Ui) {
     let theme = cast::theme_for_ui(ui);
     let outer_width = ui.available_width().min(620.0);
+    let outer_padding_x = 18.0;
+    let outer_content_width = (outer_width - outer_padding_x * 2.0).max(120.0);
     let outer_fill = theme.colors.surface_muted;
     let inner_fill = theme.colors.surface;
     let border = theme.colors.border;
@@ -2048,10 +2050,10 @@ fn show_context_card_example(ui: &mut egui::Ui) {
                     spread: 0,
                     color: Color32::from_black_alpha(26),
                 })
-                .inner_margin(egui::Margin::symmetric(18, 16))
+                .inner_margin(egui::Margin::symmetric(outer_padding_x as i8, 16))
                 .show(ui, |ui| {
-                    ui.set_width((outer_width - 2.0).max(280.0));
-                    ui.horizontal(|ui| {
+                    ui.set_width(outer_content_width);
+                    ui.horizontal_wrapped(|ui| {
                         ui.heading(
                             RichText::new("Context")
                                 .font(theme.typography.heading_sm.clone())
@@ -2059,9 +2061,14 @@ fn show_context_card_example(ui: &mut egui::Ui) {
                                 .extra_letter_spacing(theme.typography.letter_spacing),
                         );
                         ui.add(Badge::new("860 / 200k").intent(Intent::Neutral));
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            context_header_meter(ui);
-                        });
+                        if ui.available_width() >= 136.0 {
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    context_header_meter(ui);
+                                },
+                            );
+                        }
                     });
 
                     ui.add_space(14.0);
@@ -2173,14 +2180,16 @@ fn context_message_row(
         family.border
     };
     let row_width = ui.available_width();
+    let row_padding_x = 14.0;
+    let row_content_width = (row_width - row_padding_x * 2.0).max(80.0);
 
     egui::Frame::new()
         .fill(row_fill)
         .stroke(egui::Stroke::new(theme.stroke.sm, row_border))
         .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
-        .inner_margin(egui::Margin::symmetric(14, 12))
+        .inner_margin(egui::Margin::symmetric(row_padding_x as i8, 12))
         .show(ui, |ui| {
-            ui.set_width(row_width);
+            ui.set_width(row_content_width);
             ui.horizontal_top(|ui| {
                 context_message_icon(ui, intent);
                 ui.add_space(8.0);
