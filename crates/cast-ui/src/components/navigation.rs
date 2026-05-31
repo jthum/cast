@@ -1,5 +1,5 @@
 use egui::{
-    Color32, Response, Sense, StrokeKind, Ui, Widget,
+    Color32, Response, RichText, Sense, StrokeKind, Ui, Widget,
     text::{LayoutJob, TextFormat},
 };
 
@@ -192,6 +192,420 @@ impl Widget for NavList<'_> {
 
         combined.unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, Sense::hover()))
     }
+}
+
+#[derive(Debug)]
+pub struct Breadcrumb {
+    items: Vec<String>,
+    size: Size,
+}
+
+impl Breadcrumb {
+    #[must_use]
+    pub fn new<I, L>(items: I) -> Self
+    where
+        I: IntoIterator<Item = L>,
+        L: Into<String>,
+    {
+        Self {
+            items: items.into_iter().map(Into::into).collect(),
+            size: Size::Medium,
+        }
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+impl Widget for Breadcrumb {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let mut combined: Option<Response> = None;
+
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing.x = theme.spacing.xs;
+            for (index, item) in self.items.iter().enumerate() {
+                let current = index + 1 == self.items.len();
+                let response = breadcrumb_item(ui, &theme, item, self.size, current);
+                combined = Some(match combined.take() {
+                    Some(existing) => existing.union(response),
+                    None => response,
+                });
+                if !current {
+                    let separator = ui.label(
+                        RichText::new("/")
+                            .font(theme.typography.caption.clone())
+                            .color(theme.colors.text_subtle),
+                    );
+                    combined = Some(match combined.take() {
+                        Some(existing) => existing.union(separator),
+                        None => separator,
+                    });
+                }
+            }
+        });
+
+        combined.unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, Sense::hover()))
+    }
+}
+
+#[derive(Debug)]
+pub struct Pagination<'a> {
+    page: &'a mut usize,
+    page_count: usize,
+    size: Size,
+}
+
+impl<'a> Pagination<'a> {
+    #[must_use]
+    pub fn new(page: &'a mut usize, page_count: usize) -> Self {
+        Self {
+            page,
+            page_count: page_count.max(1),
+            size: Size::Small,
+        }
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: Size) -> Self {
+        self.size = size;
+        self
+    }
+}
+
+impl Widget for Pagination<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let page_count = self.page_count;
+        *self.page = (*self.page).min(page_count - 1);
+        let current = *self.page;
+        let mut combined: Option<Response> = None;
+
+        ui.horizontal_wrapped(|ui| {
+            let previous = pagination_button(ui, "<", self.size, false, current == 0);
+            if previous.clicked() && current > 0 {
+                *self.page -= 1;
+            }
+            combined = Some(previous);
+
+            for item in pagination_items(current, page_count) {
+                match item {
+                    PaginationItem::Page(index) => {
+                        let mut response = pagination_button(
+                            ui,
+                            &(index + 1).to_string(),
+                            self.size,
+                            index == current,
+                            false,
+                        );
+                        if response.clicked() && *self.page != index {
+                            *self.page = index;
+                            response.mark_changed();
+                        }
+                        combined = Some(match combined.take() {
+                            Some(existing) => existing.union(response),
+                            None => response,
+                        });
+                    }
+                    PaginationItem::Ellipsis => {
+                        let response = ui.label(
+                            RichText::new("...")
+                                .font(theme_for_ui(ui).typography.caption.clone())
+                                .color(theme_for_ui(ui).colors.text_subtle),
+                        );
+                        combined = Some(match combined.take() {
+                            Some(existing) => existing.union(response),
+                            None => response,
+                        });
+                    }
+                }
+            }
+
+            let next = pagination_button(ui, ">", self.size, false, current + 1 >= page_count);
+            if next.clicked() && current + 1 < page_count {
+                *self.page += 1;
+            }
+            combined = Some(match combined.take() {
+                Some(existing) => existing.union(next),
+                None => next,
+            });
+        });
+
+        combined.unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, Sense::hover()))
+    }
+}
+
+#[derive(Clone, Debug)]
+enum PaginationItem {
+    Page(usize),
+    Ellipsis,
+}
+
+#[derive(Clone, Debug)]
+pub struct SidebarItem {
+    label: String,
+    badge: Option<String>,
+}
+
+impl SidebarItem {
+    #[must_use]
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            badge: None,
+        }
+    }
+
+    #[must_use]
+    pub fn badge(mut self, badge: impl Into<String>) -> Self {
+        self.badge = Some(badge.into());
+        self
+    }
+}
+
+#[derive(Debug)]
+pub struct Sidebar<'a> {
+    selected: &'a mut usize,
+    items: Vec<SidebarItem>,
+    title: Option<String>,
+    subtitle: Option<String>,
+    width: Option<f32>,
+}
+
+impl<'a> Sidebar<'a> {
+    #[must_use]
+    pub fn new<I>(selected: &'a mut usize, items: I) -> Self
+    where
+        I: IntoIterator<Item = SidebarItem>,
+    {
+        Self {
+            selected,
+            items: items.into_iter().collect(),
+            title: None,
+            subtitle: None,
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    #[must_use]
+    pub fn subtitle(mut self, subtitle: impl Into<String>) -> Self {
+        self.subtitle = Some(subtitle.into());
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width.max(180.0));
+        self
+    }
+}
+
+impl Widget for Sidebar<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let width = self
+            .width
+            .unwrap_or_else(|| ui.available_width().max(180.0));
+
+        egui::Frame::new()
+            .fill(theme.colors.surface)
+            .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+            .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.md as i8))
+            .show(ui, |ui| {
+                ui.set_width((width - theme.spacing.md * 2.0).max(80.0));
+                if let Some(title) = self.title {
+                    ui.label(
+                        RichText::new(title)
+                            .font(theme.typography.body_strong.clone())
+                            .color(theme.colors.text),
+                    );
+                }
+                if let Some(subtitle) = self.subtitle {
+                    ui.label(
+                        RichText::new(subtitle)
+                            .font(theme.typography.caption.clone())
+                            .color(theme.colors.text_muted),
+                    );
+                }
+                if !self.items.is_empty() {
+                    ui.add_space(theme.spacing.sm);
+                }
+                let mut combined: Option<Response> = None;
+                for (index, item) in self.items.iter().enumerate() {
+                    let mut response = sidebar_item_ui(ui, &theme, item, *self.selected == index);
+                    if response.clicked() && *self.selected != index {
+                        *self.selected = index;
+                        response.mark_changed();
+                    }
+                    combined = Some(match combined {
+                        Some(existing) => existing.union(response),
+                        None => response,
+                    });
+                }
+                combined.unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, Sense::hover()))
+            })
+            .inner
+    }
+}
+
+fn breadcrumb_item(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    label: &str,
+    size: Size,
+    current: bool,
+) -> Response {
+    let font = match size {
+        Size::Small => theme.typography.caption.clone(),
+        Size::Medium => theme.typography.small.clone(),
+        Size::Large => theme.typography.body.clone(),
+    };
+    let color = if current {
+        theme.colors.text
+    } else {
+        theme.colors.text_muted
+    };
+    ui.label(
+        RichText::new(label)
+            .font(font)
+            .color(color)
+            .extra_letter_spacing(theme.typography.letter_spacing),
+    )
+}
+
+fn pagination_button(
+    ui: &mut Ui,
+    label: &str,
+    size: Size,
+    selected: bool,
+    disabled: bool,
+) -> Response {
+    let theme = theme_for_ui(ui);
+    let metrics = resolve_control_metrics(&theme, size);
+    let button_size = egui::vec2(
+        metrics.min_height.max(28.0),
+        (metrics.min_height - 4.0).max(24.0),
+    );
+    let sense = if disabled {
+        Sense::hover()
+    } else {
+        Sense::click()
+    };
+    let (rect, response) = ui.allocate_exact_size(button_size, sense);
+
+    if ui.is_rect_visible(rect) {
+        let hovered = response.hovered() && !disabled;
+        let fill = if selected {
+            selected_fill(&theme, hovered, response.is_pointer_button_down_on())
+        } else if hovered {
+            theme.colors.surface_muted
+        } else {
+            Color32::TRANSPARENT
+        };
+        let border = if selected {
+            selected_border(&theme, hovered, response.is_pointer_button_down_on())
+        } else {
+            theme.colors.border
+        };
+        ui.painter().rect(
+            rect,
+            egui::CornerRadius::same(theme.radius.md as u8),
+            fill,
+            egui::Stroke::new(theme.stroke.sm, border),
+            StrokeKind::Outside,
+        );
+        let fg = if disabled {
+            theme.colors.text_subtle
+        } else if selected {
+            theme.colors.primary_family.base
+        } else {
+            theme.colors.text
+        };
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            label,
+            theme.typography.small.clone(),
+            fg,
+        );
+    }
+
+    response
+}
+
+fn pagination_items(current: usize, page_count: usize) -> Vec<PaginationItem> {
+    if page_count <= 7 {
+        return (0..page_count).map(PaginationItem::Page).collect();
+    }
+
+    let mut items = Vec::new();
+    let start = current.saturating_sub(1).max(1);
+    let end = (current + 2).min(page_count - 1);
+
+    items.push(PaginationItem::Page(0));
+    if start > 1 {
+        items.push(PaginationItem::Ellipsis);
+    }
+    for page in start..end {
+        items.push(PaginationItem::Page(page));
+    }
+    if end < page_count - 1 {
+        items.push(PaginationItem::Ellipsis);
+    }
+    items.push(PaginationItem::Page(page_count - 1));
+    items
+}
+
+fn sidebar_item_ui(ui: &mut Ui, theme: &CastTheme, item: &SidebarItem, selected: bool) -> Response {
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), theme.controls.min_height),
+        Sense::click(),
+    );
+    if ui.is_rect_visible(rect) {
+        let hovered = response.hovered();
+        let fill = if selected {
+            selected_fill(theme, hovered, response.is_pointer_button_down_on())
+        } else if hovered {
+            theme.colors.surface_muted
+        } else {
+            Color32::TRANSPARENT
+        };
+        ui.painter()
+            .rect_filled(rect, egui::CornerRadius::same(theme.radius.md as u8), fill);
+        let text_color = if selected {
+            theme.colors.primary_family.base
+        } else if hovered {
+            theme.colors.text
+        } else {
+            theme.colors.text_muted
+        };
+        ui.painter().text(
+            rect.left_center() + egui::vec2(theme.spacing.sm, 0.0),
+            egui::Align2::LEFT_CENTER,
+            item.label.as_str(),
+            theme.typography.button.clone(),
+            text_color,
+        );
+        if let Some(badge) = &item.badge {
+            ui.painter().text(
+                rect.right_center() - egui::vec2(theme.spacing.sm, 0.0),
+                egui::Align2::RIGHT_CENTER,
+                badge.as_str(),
+                theme.typography.caption.clone(),
+                theme.colors.text_subtle,
+            );
+        }
+    }
+    response
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -484,6 +898,40 @@ mod tests {
         let nav = NavList::new(&mut selected, ["Workbench", "Components"]);
 
         assert_eq!(nav.labels, ["Workbench", "Components"]);
+    }
+
+    #[test]
+    fn breadcrumb_collects_items() {
+        let breadcrumb = Breadcrumb::new(["Workspace", "Reports"]);
+
+        assert_eq!(breadcrumb.items, ["Workspace", "Reports"]);
+        assert_eq!(breadcrumb.size, Size::Medium);
+    }
+
+    #[test]
+    fn pagination_items_keep_edges_for_long_ranges() {
+        let items = pagination_items(5, 12);
+
+        assert!(matches!(items.first(), Some(PaginationItem::Page(0))));
+        assert!(matches!(items.last(), Some(PaginationItem::Page(11))));
+        assert!(
+            items
+                .iter()
+                .any(|item| matches!(item, PaginationItem::Ellipsis))
+        );
+    }
+
+    #[test]
+    fn sidebar_items_can_carry_badges() {
+        let item = SidebarItem::new("Reports").badge("12");
+        let mut selected = 0;
+        let sidebar = Sidebar::new(&mut selected, [item.clone()])
+            .title("Project")
+            .subtitle("Workspace");
+
+        assert_eq!(item.badge.as_deref(), Some("12"));
+        assert_eq!(sidebar.items.len(), 1);
+        assert_eq!(sidebar.title.as_deref(), Some("Project"));
     }
 
     #[test]

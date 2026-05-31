@@ -14,17 +14,18 @@ use patterns::shell::{
 };
 
 use cast::{
-    AgentComposer, Alert, ApprovalPanel, ArtifactCard, Avatar, Badge, BarChart, BarDatum, Button,
-    Card, CastPaletteInput, CastTheme, ChatMessage, Checkbox, CodeOutputPanel, Combobox,
-    ConfirmDialog, ConfirmDialogResponse, ContextItem, ContextPanel, DateInput, Dialog, Dropdown,
-    EmptyState, FormActions, FormField, FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle,
-    MenuItem, MessageThread, MetricCard, Notice, NumberInput, Panel as CastPanel, PatchFile,
-    PatchReviewPanel, PlanList, PlanStep, PlanStepStatus, Popover, ProgressBar, ProgressMetric,
-    RadioGroup, ReportSection, RunPhase, RunTimeline, RunTimelineItem, SearchInput,
-    SegmentedControl, Select, SemanticColorTokens, Separator, Sheet, Size, Skeleton, Slider,
-    Sparkline, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, TimeInput, Toast,
-    ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput,
-    ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary, Variant,
+    AgentComposer, Alert, ApprovalPanel, ArtifactCard, Avatar, Badge, BarChart, BarDatum,
+    Breadcrumb, Button, Card, CastPaletteInput, CastTheme, ChatMessage, Checkbox, CodeOutputPanel,
+    Combobox, ConfirmDialog, ConfirmDialogResponse, ContextItem, ContextPanel, DateInput, Dialog,
+    Dropdown, EmptyState, FormActions, FormField, FormSection, Intent, Kbd, Label, Link, Loader,
+    LoaderStyle, MenuItem, MessageThread, MetricCard, Notice, NumberInput, Pagination,
+    Panel as CastPanel, PatchFile, PatchReviewPanel, PlanList, PlanStep, PlanStepStatus, Popover,
+    ProgressBar, ProgressMetric, RadioGroup, ReportSection, ResponsiveColumns, RunPhase,
+    RunTimeline, RunTimelineItem, SearchInput, SegmentedControl, Select, SemanticColorTokens,
+    Separator, Sheet, Sidebar, SidebarItem, Size, Skeleton, Slider, Sparkline, Switch, Table, Tabs,
+    TextArea, TextInput, ThemeMode, ThemeSeed, TimeInput, Toast, ToastPlacement, ToastStack,
+    ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput, ToolOutputKind, Tooltip, TypographyTokens,
+    ValidationIssue, ValidationSummary, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -1574,6 +1575,8 @@ fn show_navigation_layout(
 ) {
     Card::new().show(ui, |ui| {
         ui.heading("Navigation and layout");
+        ui.add(Breadcrumb::new(["Workspace", "Components", "Navigation"]));
+        ui.add_space(10.0);
         ui.add(Tabs::new(
             foundation_tab,
             ["Overview", "Components", "Theme", "Diagnostics"],
@@ -1609,6 +1612,43 @@ fn show_navigation_layout(
                     _ => "Focused state and hover affordances are painted by Cast.",
                 });
             });
+        });
+        ui.add_space(12.0);
+        let sidebar_id = ui.make_persistent_id("gallery_navigation_sidebar");
+        let page_id = ui.make_persistent_id("gallery_navigation_pagination");
+        let mut sidebar_selected = ui.data(|data| data.get_temp::<usize>(sidebar_id).unwrap_or(1));
+        let mut page = ui.data(|data| data.get_temp::<usize>(page_id).unwrap_or(0));
+
+        ResponsiveColumns::new().show(
+            ui,
+            |ui| {
+                ui.add(
+                    Sidebar::new(
+                        &mut sidebar_selected,
+                        [
+                            SidebarItem::new("Dashboard"),
+                            SidebarItem::new("Reports").badge("12"),
+                            SidebarItem::new("Settings"),
+                        ],
+                    )
+                    .title("Project")
+                    .subtitle("Formal sidebar primitive")
+                    .width(ui.available_width()),
+                );
+            },
+            |ui| {
+                CastPanel::new().show(ui, |ui| {
+                    ui.label(
+                        "Pagination keeps page state host-owned and uses Cast button geometry.",
+                    );
+                    ui.add_space(8.0);
+                    ui.add(Pagination::new(&mut page, 12));
+                });
+            },
+        );
+        ui.data_mut(|data| {
+            data.insert_temp(sidebar_id, sidebar_selected);
+            data.insert_temp(page_id, page);
         });
     });
 }

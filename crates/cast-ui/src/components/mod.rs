@@ -12,6 +12,7 @@ mod filter_bar;
 mod form;
 mod kbd;
 mod label;
+mod layout;
 mod link;
 mod list;
 mod menu;
@@ -50,10 +51,13 @@ pub use filter_bar::FilterBar;
 pub use form::{FormActions, FormField, FormSection, ValidationIssue, ValidationSummary};
 pub use kbd::Kbd;
 pub use label::Label;
+pub use layout::ResponsiveColumns;
 pub use link::Link;
 pub use list::{ActionRow, ListRow, Table, TableDetailRow, TableRow, TextTable};
 pub use menu::{Combobox, Dropdown, MenuItem, Select};
-pub use navigation::{NavList, SegmentedControl, Tabs};
+pub use navigation::{
+    Breadcrumb, NavList, Pagination, SegmentedControl, Sidebar, SidebarItem, Tabs,
+};
 pub use panel::Panel;
 pub use popover::Popover;
 pub use progress::{Loader, LoaderStyle, ProgressBar, Spinner, SpinnerStyle};
