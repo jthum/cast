@@ -3,7 +3,9 @@ mod alert;
 mod avatar;
 mod badge;
 mod button;
+mod calendar;
 mod card;
+mod carousel;
 mod checkbox;
 mod dialog;
 mod disclosure;
@@ -40,7 +42,9 @@ pub use alert::{Alert, Notice};
 pub use avatar::Avatar;
 pub use badge::Badge;
 pub use button::Button;
+pub use calendar::{Calendar, CalendarDate, CalendarMonth};
 pub use card::{Card, SurfaceChrome, SurfaceSectionStyle};
+pub use carousel::{Carousel, CarouselResponse};
 pub use checkbox::{Checkbox, Radio, RadioGroup};
 pub use dialog::{
     ConfirmDialog, ConfirmDialogResponse, Dialog, DialogController, Sheet, SheetController,
@@ -51,7 +55,7 @@ pub use filter_bar::FilterBar;
 pub use form::{FormActions, FormField, FormSection, ValidationIssue, ValidationSummary};
 pub use kbd::Kbd;
 pub use label::Label;
-pub use layout::{ControlGroup, ResponsiveColumns};
+pub use layout::{ControlGroup, ResizablePanels, ResponsiveColumns};
 pub use link::Link;
 pub use list::{ActionRow, ListRow, Table, TableDetailRow, TableRow, TextTable};
 pub use menu::{Combobox, Dropdown, Menu, MenuItem, MenuResponse, Select};

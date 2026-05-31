@@ -15,15 +15,16 @@ use patterns::shell::{
 
 use cast::{
     AgentComposer, Alert, ApprovalPanel, ArtifactCard, Avatar, Badge, BarChart, BarDatum,
-    Breadcrumb, Button, Card, CastPaletteInput, CastTheme, ChatMessage, Checkbox, CodeOutputPanel,
-    Combobox, ConfirmDialog, ConfirmDialogResponse, ContextItem, ContextPanel, ControlGroup,
-    DateInput, Dialog, Dropdown, EmptyState, FormActions, FormField, FormSection, HoverCard,
-    Intent, Kbd, Label, Link, Loader, LoaderStyle, Menu, MenuItem, MessageThread, MetricCard,
-    Notice, NumberInput, Pagination, Panel as CastPanel, PatchFile, PatchReviewPanel, PlanList,
-    PlanStep, PlanStepStatus, Popover, ProgressBar, ProgressMetric, RadioGroup, ReportSection,
-    ResponsiveColumns, RunPhase, RunTimeline, RunTimelineItem, SearchInput, SegmentedControl,
-    Select, SemanticColorTokens, Separator, Sheet, Sidebar, SidebarItem, Size, Skeleton, Slider,
-    Sparkline, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, TimeInput, Toast,
+    Breadcrumb, Button, Calendar, CalendarDate, CalendarMonth, Card, Carousel, CastPaletteInput,
+    CastTheme, ChatMessage, Checkbox, CodeOutputPanel, Combobox, ConfirmDialog,
+    ConfirmDialogResponse, ContextItem, ContextPanel, ControlGroup, DateInput, Dialog, Dropdown,
+    EmptyState, FormActions, FormField, FormSection, HoverCard, Intent, Kbd, Label, Link, Loader,
+    LoaderStyle, Menu, MenuItem, MessageThread, MetricCard, Notice, NumberInput, Pagination,
+    Panel as CastPanel, PatchFile, PatchReviewPanel, PlanList, PlanStep, PlanStepStatus, Popover,
+    ProgressBar, ProgressMetric, RadioGroup, ReportSection, ResizablePanels, ResponsiveColumns,
+    RunPhase, RunTimeline, RunTimelineItem, SearchInput, SegmentedControl, Select,
+    SemanticColorTokens, Separator, Sheet, Sidebar, SidebarItem, Size, Skeleton, Slider, Sparkline,
+    Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, TimeInput, Toast,
     ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput,
     ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
@@ -1649,6 +1650,74 @@ fn show_navigation_layout(
         ui.data_mut(|data| {
             data.insert_temp(sidebar_id, sidebar_selected);
             data.insert_temp(page_id, page);
+        });
+        ui.add_space(12.0);
+
+        let date_id = ui.make_persistent_id("gallery_calendar_date");
+        let month_id = ui.make_persistent_id("gallery_calendar_month");
+        let carousel_id = ui.make_persistent_id("gallery_carousel_index");
+        let split_id = ui.make_persistent_id("gallery_resizable_ratio");
+        let mut selected_date = ui
+            .data(|data| data.get_temp::<CalendarDate>(date_id))
+            .unwrap_or_else(|| CalendarDate::new(2026, 6, 12));
+        let mut visible_month = ui
+            .data(|data| data.get_temp::<CalendarMonth>(month_id))
+            .unwrap_or_else(|| CalendarMonth::from_date(selected_date));
+        let mut carousel_index = ui
+            .data(|data| data.get_temp::<usize>(carousel_id))
+            .unwrap_or(0);
+        let mut split_ratio = ui
+            .data(|data| data.get_temp::<f32>(split_id))
+            .unwrap_or(0.46);
+
+        ResponsiveColumns::new().show(
+            ui,
+            |ui| {
+                ui.add(
+                    Calendar::new(&mut selected_date, &mut visible_month)
+                        .width(ui.available_width()),
+                );
+            },
+            |ui| {
+                Carousel::new(&mut carousel_index, 3)
+                    .label("Composable views")
+                    .height(118.0)
+                    .show(ui, |ui, slide| match slide {
+                        0 => {
+                            ui.heading("Calendar");
+                            ui.label("Host-owned date and visible-month state.");
+                        }
+                        1 => {
+                            ui.heading("Carousel");
+                            ui.label("Slide content is supplied by the consuming app.");
+                        }
+                        _ => {
+                            ui.heading("Resizable");
+                            ui.label("Split panes can frame inspectors, output, and previews.");
+                        }
+                    });
+                ui.add_space(8.0);
+                ResizablePanels::new(&mut split_ratio)
+                    .height(154.0)
+                    .id_salt("gallery_resizable_preview")
+                    .show(
+                        ui,
+                        |ui| {
+                            ui.add(Badge::new("Input").intent(Intent::Info));
+                            ui.label("Prompt, filters, or navigation.");
+                        },
+                        |ui| {
+                            ui.add(Badge::new("Preview").intent(Intent::Secondary));
+                            ui.label("Output, context, or metadata.");
+                        },
+                    );
+            },
+        );
+        ui.data_mut(|data| {
+            data.insert_temp(date_id, selected_date);
+            data.insert_temp(month_id, visible_month);
+            data.insert_temp(carousel_id, carousel_index);
+            data.insert_temp(split_id, split_ratio);
         });
     });
 }
