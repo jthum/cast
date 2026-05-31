@@ -215,7 +215,12 @@ impl eframe::App for CastGallery {
                     });
                 egui::Frame::new()
                     .fill(self.theme.colors.surface)
-                    .inner_margin(egui::Margin::symmetric(28, 24))
+                    .inner_margin(egui::Margin {
+                        left: 28,
+                        right: 28,
+                        top: 8,
+                        bottom: 24,
+                    })
                     .show(ui, |ui| {
                         let scroll_tab = if self.sidebar_section == 2 {
                             self.component_tab
@@ -617,12 +622,14 @@ where
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
         ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.x = theme.spacing.sm;
             ui.set_width(column_width);
             ui.set_max_width(column_width);
             left(ui);
         });
         ui.add_space(gap);
         ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.x = theme.spacing.sm;
             ui.set_width(column_width);
             ui.set_max_width(column_width);
             right(ui);
