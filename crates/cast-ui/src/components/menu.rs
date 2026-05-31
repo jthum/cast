@@ -10,6 +10,81 @@ use crate::{
     theme::{CastTheme, theme_for_ui},
 };
 
+#[derive(Clone, Debug)]
+pub struct Menu {
+    items: Vec<MenuItem>,
+    width: Option<f32>,
+    close_on_select: bool,
+}
+
+#[derive(Debug)]
+pub struct MenuResponse {
+    pub response: Response,
+    pub selected: Option<usize>,
+}
+
+impl Menu {
+    #[must_use]
+    pub fn new<I>(items: I) -> Self
+    where
+        I: IntoIterator<Item = MenuItem>,
+    {
+        Self {
+            items: items.into_iter().collect(),
+            width: None,
+            close_on_select: true,
+        }
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width.max(120.0));
+        self
+    }
+
+    #[must_use]
+    pub fn close_on_select(mut self, close: bool) -> Self {
+        self.close_on_select = close;
+        self
+    }
+
+    pub fn show(self, ui: &mut Ui, add_trigger: impl FnOnce(&mut Ui) -> Response) -> MenuResponse {
+        let theme = theme_for_ui(ui);
+        let mut selected = None;
+        let mut response = ui.scope(add_trigger).inner;
+        let width = self
+            .width
+            .unwrap_or_else(|| response.rect.width().max(180.0));
+
+        egui::Popup::menu(&response)
+            .frame(menu_frame(&theme))
+            .width(width.max(response.rect.width()))
+            .close_behavior(if self.close_on_select {
+                egui::PopupCloseBehavior::CloseOnClick
+            } else {
+                egui::PopupCloseBehavior::CloseOnClickOutside
+            })
+            .show(|ui| {
+                ui.set_min_width(width.max(response.rect.width()) - theme.spacing.sm);
+                ui.spacing_mut().item_spacing.y = theme.spacing.xs / 2.0;
+                for (index, item) in self.items.into_iter().enumerate() {
+                    if ui.add(item).clicked() {
+                        selected = Some(index);
+                        if self.close_on_select {
+                            ui.close();
+                        }
+                    }
+                }
+            });
+
+        if selected.is_some() {
+            response.mark_changed();
+        }
+
+        MenuResponse { response, selected }
+    }
+}
+
 #[derive(Debug)]
 pub struct Dropdown<'a> {
     selected: &'a mut usize,
@@ -653,6 +728,17 @@ mod tests {
         assert_eq!(dropdown.labels, ["One", "Two"]);
         assert_eq!(dropdown.placeholder, "Select");
         assert_eq!(dropdown.size, None);
+    }
+
+    #[test]
+    fn menu_collects_items_and_width_floor() {
+        let menu = Menu::new([MenuItem::new("Open"), MenuItem::new("Archive")])
+            .width(80.0)
+            .close_on_select(false);
+
+        assert_eq!(menu.items.len(), 2);
+        assert_eq!(menu.width, Some(120.0));
+        assert!(!menu.close_on_select);
     }
 
     #[test]

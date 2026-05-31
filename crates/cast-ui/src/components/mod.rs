@@ -51,15 +51,15 @@ pub use filter_bar::FilterBar;
 pub use form::{FormActions, FormField, FormSection, ValidationIssue, ValidationSummary};
 pub use kbd::Kbd;
 pub use label::Label;
-pub use layout::ResponsiveColumns;
+pub use layout::{ControlGroup, ResponsiveColumns};
 pub use link::Link;
 pub use list::{ActionRow, ListRow, Table, TableDetailRow, TableRow, TextTable};
-pub use menu::{Combobox, Dropdown, MenuItem, Select};
+pub use menu::{Combobox, Dropdown, Menu, MenuItem, MenuResponse, Select};
 pub use navigation::{
     Breadcrumb, NavList, Pagination, SegmentedControl, Sidebar, SidebarItem, Tabs,
 };
 pub use panel::Panel;
-pub use popover::Popover;
+pub use popover::{HoverCard, Popover};
 pub use progress::{Loader, LoaderStyle, ProgressBar, Spinner, SpinnerStyle};
 pub use report::{BarChart, BarDatum, MetricCard, ProgressMetric, ReportSection, Sparkline};
 pub use separator::Separator;

@@ -3,6 +3,83 @@ use egui::{InnerResponse, Ui};
 use crate::theme::theme_for_ui;
 
 #[derive(Clone, Copy, Debug)]
+pub struct ControlGroup {
+    gap: Option<f32>,
+    padding: Option<f32>,
+    width: Option<f32>,
+    wrap: bool,
+}
+
+impl ControlGroup {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            gap: None,
+            padding: None,
+            width: None,
+            wrap: true,
+        }
+    }
+
+    #[must_use]
+    pub fn gap(mut self, gap: f32) -> Self {
+        self.gap = Some(gap.max(0.0));
+        self
+    }
+
+    #[must_use]
+    pub fn padding(mut self, padding: f32) -> Self {
+        self.padding = Some(padding.max(0.0));
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width.max(120.0));
+        self
+    }
+
+    #[must_use]
+    pub fn nowrap(mut self) -> Self {
+        self.wrap = false;
+        self
+    }
+
+    pub fn show<R>(self, ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
+        let theme = theme_for_ui(ui);
+        let gap = self.gap.unwrap_or(theme.spacing.xs);
+        let padding = self.padding.unwrap_or(theme.spacing.xs);
+
+        egui::Frame::new()
+            .fill(theme.colors.surface)
+            .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+            .corner_radius(egui::CornerRadius::same(theme.radius.md.round() as u8))
+            .inner_margin(egui::Margin::same(padding as i8))
+            .show(ui, |ui| {
+                if let Some(width) = self.width {
+                    ui.set_width(width);
+                    ui.set_max_width(width);
+                }
+                let previous_spacing = ui.spacing().item_spacing;
+                ui.spacing_mut().item_spacing = egui::vec2(gap, gap);
+                let inner = if self.wrap {
+                    ui.horizontal_wrapped(add_contents)
+                } else {
+                    ui.horizontal(add_contents)
+                };
+                ui.spacing_mut().item_spacing = previous_spacing;
+                inner.inner
+            })
+    }
+}
+
+impl Default for ControlGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct ResponsiveColumns {
     breakpoint: f32,
     min_column_width: f32,
@@ -104,5 +181,15 @@ mod tests {
 
         assert_eq!(columns.breakpoint, 240.0);
         assert_eq!(columns.min_column_width, 120.0);
+    }
+
+    #[test]
+    fn control_group_defaults_to_wrapped_contents() {
+        let group = ControlGroup::new().width(80.0).gap(2.0).padding(3.0);
+
+        assert_eq!(group.width, Some(120.0));
+        assert_eq!(group.gap, Some(2.0));
+        assert_eq!(group.padding, Some(3.0));
+        assert!(group.wrap);
     }
 }

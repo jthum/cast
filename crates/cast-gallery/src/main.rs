@@ -16,16 +16,16 @@ use patterns::shell::{
 use cast::{
     AgentComposer, Alert, ApprovalPanel, ArtifactCard, Avatar, Badge, BarChart, BarDatum,
     Breadcrumb, Button, Card, CastPaletteInput, CastTheme, ChatMessage, Checkbox, CodeOutputPanel,
-    Combobox, ConfirmDialog, ConfirmDialogResponse, ContextItem, ContextPanel, DateInput, Dialog,
-    Dropdown, EmptyState, FormActions, FormField, FormSection, Intent, Kbd, Label, Link, Loader,
-    LoaderStyle, MenuItem, MessageThread, MetricCard, Notice, NumberInput, Pagination,
-    Panel as CastPanel, PatchFile, PatchReviewPanel, PlanList, PlanStep, PlanStepStatus, Popover,
-    ProgressBar, ProgressMetric, RadioGroup, ReportSection, ResponsiveColumns, RunPhase,
-    RunTimeline, RunTimelineItem, SearchInput, SegmentedControl, Select, SemanticColorTokens,
-    Separator, Sheet, Sidebar, SidebarItem, Size, Skeleton, Slider, Sparkline, Switch, Table, Tabs,
-    TextArea, TextInput, ThemeMode, ThemeSeed, TimeInput, Toast, ToastPlacement, ToastStack,
-    ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput, ToolOutputKind, Tooltip, TypographyTokens,
-    ValidationIssue, ValidationSummary, Variant,
+    Combobox, ConfirmDialog, ConfirmDialogResponse, ContextItem, ContextPanel, ControlGroup,
+    DateInput, Dialog, Dropdown, EmptyState, FormActions, FormField, FormSection, HoverCard,
+    Intent, Kbd, Label, Link, Loader, LoaderStyle, Menu, MenuItem, MessageThread, MetricCard,
+    Notice, NumberInput, Pagination, Panel as CastPanel, PatchFile, PatchReviewPanel, PlanList,
+    PlanStep, PlanStepStatus, Popover, ProgressBar, ProgressMetric, RadioGroup, ReportSection,
+    ResponsiveColumns, RunPhase, RunTimeline, RunTimelineItem, SearchInput, SegmentedControl,
+    Select, SemanticColorTokens, Separator, Sheet, Sidebar, SidebarItem, Size, Skeleton, Slider,
+    Sparkline, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, TimeInput, Toast,
+    ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput,
+    ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary, Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -2265,7 +2265,7 @@ fn show_menus(
 ) {
     Card::new().show(ui, |ui| {
         ui.heading("Menus and dropdowns");
-        ui.horizontal_wrapped(|ui| {
+        ControlGroup::new().show(ui, |ui| {
             ui.add(
                 Dropdown::new(
                     menu_choice,
@@ -2278,6 +2278,50 @@ fn show_menus(
                     .size(Size::Small)
                     .width(144.0),
             );
+        });
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            let menu = Menu::new([
+                MenuItem::new("Open command palette").selected(true),
+                MenuItem::new("Duplicate theme"),
+                MenuItem::new("Archive preset").intent(Intent::Warning),
+                MenuItem::new("Delete preset").intent(Intent::Danger),
+                MenuItem::new("Unavailable action").disabled(),
+            ])
+            .width(220.0)
+            .show(ui, |ui| {
+                ui.add(
+                    Button::new("Actions")
+                        .intent(Intent::Neutral)
+                        .variant(Variant::Outline),
+                )
+            });
+            if menu.selected == Some(0) {
+                command_palette.open = true;
+            }
+            HoverCard::new()
+                .title("Theme preset")
+                .body("Hover cards are non-modal and suited to previews, metadata, and short summaries.")
+                .width(320.0)
+                .muted_sections()
+                .show(
+                    ui,
+                    |ui| {
+                        ui.add(
+                            Button::new("Hover preview")
+                                .intent(Intent::Neutral)
+                                .variant(Variant::Outline),
+                        )
+                    },
+                    |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.add(Badge::new("Runtime").intent(Intent::Info).status_dot());
+                            ui.add(Badge::new("Themeable").intent(Intent::Secondary));
+                        });
+                        ui.add_space(6.0);
+                        ui.label("Use this when a tooltip is too small but a click-triggered popover is too heavy.");
+                    },
+                );
         });
         ui.add_space(8.0);
         CastPanel::new().show(ui, |ui| {
