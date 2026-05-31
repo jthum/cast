@@ -1,5 +1,5 @@
 use cast::{
-    Button, CastTheme, SegmentedControl, Size, Slider, ThemeMode, Variant,
+    Button, CastTheme, Size, ThemeMode, Variant,
     egui::{
         self, Color32, RichText, ScrollArea,
         scroll_area::{ScrollBarVisibility, ScrollSource},
@@ -15,8 +15,6 @@ pub struct AppShellConfig<'a> {
     pub switcher_meta: &'a str,
     pub nav_group: &'a str,
     pub nav_items: &'a [&'a str],
-    pub status_group: &'a str,
-    pub status_items: &'a [(&'a str, &'a str)],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -57,10 +55,10 @@ impl Default for AppShellMetrics {
             compact_breakpoint: 900.0,
             sidebar_width: 248.0,
             compact_sidebar_width: 320.0,
-            topbar_height: 68.0,
+            topbar_height: 60.0,
             content_margin: 28.0,
             compact_content_margin: 16.0,
-            sidebar_margin: 18,
+            sidebar_margin: 14,
         }
     }
 }
@@ -86,58 +84,57 @@ impl Default for AppShellConfig<'static> {
                 "Agent components",
                 "Theme lab",
             ],
-            status_group: "Status",
-            status_items: &[("Runtime theme", "Live"), ("Components", "Ready")],
         }
     }
 }
 
 pub fn show_shell_top_bar(
     ui: &mut egui::Ui,
-    ctx: &egui::Context,
     seed: &mut cast::ThemeSeed,
-    zoom: &mut f32,
+    follows_system_theme: &mut bool,
 ) -> bool {
-    show_app_top_bar(ui, ctx, "Cast Gallery", seed, zoom)
+    show_app_top_bar(ui, "Cast Gallery", seed, follows_system_theme)
 }
 
 pub fn show_shell_top_bar_with_sidebar_button(
     ui: &mut egui::Ui,
-    ctx: &egui::Context,
     seed: &mut cast::ThemeSeed,
-    zoom: &mut f32,
+    follows_system_theme: &mut bool,
 ) -> (bool, bool) {
-    show_app_top_bar_with_sidebar_button(ui, ctx, "Cast Gallery", seed, zoom)
+    show_app_top_bar_with_sidebar_button(ui, "Cast Gallery", seed, follows_system_theme)
 }
 
 pub fn show_app_top_bar(
     ui: &mut egui::Ui,
-    ctx: &egui::Context,
     title: &str,
     seed: &mut cast::ThemeSeed,
-    zoom: &mut f32,
+    follows_system_theme: &mut bool,
 ) -> bool {
-    show_app_top_bar_inner(ui, ctx, title, seed, zoom, None)
+    show_app_top_bar_inner(ui, title, seed, follows_system_theme, None)
 }
 
 pub fn show_app_top_bar_with_sidebar_button(
     ui: &mut egui::Ui,
-    ctx: &egui::Context,
     title: &str,
     seed: &mut cast::ThemeSeed,
-    zoom: &mut f32,
+    follows_system_theme: &mut bool,
 ) -> (bool, bool) {
     let mut sidebar_requested = false;
-    let changed = show_app_top_bar_inner(ui, ctx, title, seed, zoom, Some(&mut sidebar_requested));
+    let changed = show_app_top_bar_inner(
+        ui,
+        title,
+        seed,
+        follows_system_theme,
+        Some(&mut sidebar_requested),
+    );
     (changed, sidebar_requested)
 }
 
 fn show_app_top_bar_inner(
     ui: &mut egui::Ui,
-    ctx: &egui::Context,
     title: &str,
     seed: &mut cast::ThemeSeed,
-    zoom: &mut f32,
+    follows_system_theme: &mut bool,
     mut sidebar_requested: Option<&mut bool>,
 ) -> bool {
     let mut changed = false;
@@ -164,40 +161,95 @@ fn show_app_top_bar_inner(
 
             ui.label(title);
             ui.separator();
-
-            let mut mode_index = match seed.mode {
-                ThemeMode::Light => 0,
-                ThemeMode::Dark => 1,
-            };
-            let previous_mode_index = mode_index;
-            ui.add(SegmentedControl::new(&mut mode_index, ["Light", "Dark"]).size(Size::Small));
-            if mode_index != previous_mode_index {
-                seed.mode = if mode_index == 0 {
-                    ThemeMode::Light
-                } else {
-                    ThemeMode::Dark
+            if theme_mode_toggle(ui, seed.mode, *follows_system_theme).clicked() {
+                seed.mode = match seed.mode {
+                    ThemeMode::Light => ThemeMode::Dark,
+                    ThemeMode::Dark => ThemeMode::Light,
                 };
+                *follows_system_theme = false;
                 changed = true;
-            }
-
-            ui.separator();
-            if !compact {
-                ui.label("Zoom");
-            }
-            let slider_width = if compact { 86.0 } else { 118.0 };
-            if ui
-                .add(
-                    Slider::new(zoom, 0.9..=1.35)
-                        .show_value(false)
-                        .width(slider_width),
-                )
-                .changed()
-            {
-                ctx.set_zoom_factor(*zoom);
             }
         },
     );
     changed
+}
+
+fn theme_mode_toggle(
+    ui: &mut egui::Ui,
+    mode: ThemeMode,
+    follows_system_theme: bool,
+) -> egui::Response {
+    let size = egui::vec2(32.0, 32.0);
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+    let theme = cast::theme_for_ui(ui);
+    let hovered = response.hovered();
+    let fill = if hovered {
+        theme.colors.surface_muted
+    } else {
+        Color32::TRANSPARENT
+    };
+    let stroke = if hovered {
+        egui::Stroke::new(theme.stroke.sm, theme.colors.border)
+    } else {
+        egui::Stroke::new(
+            theme.stroke.sm,
+            cast::mix_with_transparent(theme.colors.border, 0.55),
+        )
+    };
+
+    if ui.is_rect_visible(rect) {
+        ui.painter().rect(
+            rect,
+            egui::CornerRadius::same(theme.radius.md.round() as u8),
+            fill,
+            stroke,
+            egui::StrokeKind::Outside,
+        );
+
+        match mode {
+            ThemeMode::Light => paint_sun_icon(ui, rect.center(), theme.colors.text),
+            ThemeMode::Dark => paint_moon_icon(
+                ui,
+                rect.center(),
+                theme.colors.text,
+                if hovered {
+                    theme.colors.surface_muted
+                } else {
+                    theme.colors.surface
+                },
+            ),
+        }
+    }
+
+    let mode_label = match mode {
+        ThemeMode::Light => "light",
+        ThemeMode::Dark => "dark",
+    };
+    let tooltip = if follows_system_theme {
+        format!("Using system {mode_label} theme. Click to switch manually.")
+    } else {
+        format!("Using {mode_label} theme. Click to switch.")
+    };
+    response.on_hover_text(tooltip)
+}
+
+fn paint_sun_icon(ui: &egui::Ui, center: egui::Pos2, color: Color32) {
+    let stroke = egui::Stroke::new(1.5, color);
+    ui.painter().circle_stroke(center, 4.2, stroke);
+    for index in 0..8 {
+        let angle = index as f32 * std::f32::consts::TAU / 8.0;
+        let direction = egui::vec2(angle.cos(), angle.sin());
+        ui.painter().line_segment(
+            [center + direction * 7.0, center + direction * 10.0],
+            stroke,
+        );
+    }
+}
+
+fn paint_moon_icon(ui: &egui::Ui, center: egui::Pos2, color: Color32, cutout: Color32) {
+    let painter = ui.painter();
+    painter.circle_filled(center + egui::vec2(1.0, 0.0), 8.0, color);
+    painter.circle_filled(center + egui::vec2(4.5, -2.0), 7.8, cutout);
 }
 
 #[allow(dead_code)]
@@ -432,7 +484,7 @@ pub fn show_app_sidebar(
     config: &AppShellConfig<'_>,
     selected: &mut usize,
 ) {
-    ui.add_space(6.0);
+    ui.add_space(2.0);
     ui.label(
         RichText::new(config.title)
             .strong()
@@ -440,21 +492,15 @@ pub fn show_app_sidebar(
             .color(Color32::WHITE),
     );
     ui.label(RichText::new(config.subtitle).color(sidebar_muted_text()));
-    ui.add_space(18.0);
+    ui.add_space(10.0);
 
     sidebar_workspace_switcher(ui, theme, config.switcher_title, config.switcher_meta);
-    ui.add_space(18.0);
+    ui.add_space(10.0);
     sidebar_group_label(ui, config.nav_group);
     for (index, label) in config.nav_items.iter().enumerate() {
         if sidebar_nav_item(ui, theme, label, *selected == index).clicked() {
             *selected = index;
         }
-    }
-
-    ui.add_space(18.0);
-    sidebar_group_label(ui, config.status_group);
-    for (label, value) in config.status_items {
-        sidebar_status_row(ui, theme, label, value);
     }
 }
 
@@ -466,7 +512,7 @@ pub fn show_app_sidebar_tree(
     components_open: &mut bool,
     component_children: &[SidebarChildRoute<'_>],
 ) {
-    ui.add_space(4.0);
+    ui.add_space(2.0);
     ui.label(
         RichText::new(config.title)
             .strong()
@@ -474,10 +520,10 @@ pub fn show_app_sidebar_tree(
             .color(Color32::WHITE),
     );
     ui.label(RichText::new(config.subtitle).color(sidebar_muted_text()));
-    ui.add_space(14.0);
+    ui.add_space(10.0);
 
     sidebar_workspace_switcher(ui, theme, config.switcher_title, config.switcher_meta);
-    ui.add_space(14.0);
+    ui.add_space(10.0);
     sidebar_group_label(ui, config.nav_group);
     let component_child_selected = component_children
         .iter()
@@ -502,12 +548,6 @@ pub fn show_app_sidebar_tree(
         } else if sidebar_nav_item(ui, theme, label, *selected == index).clicked() {
             *selected = index;
         }
-    }
-
-    ui.add_space(14.0);
-    sidebar_group_label(ui, config.status_group);
-    for (label, value) in config.status_items {
-        sidebar_status_row(ui, theme, label, value);
     }
 }
 
@@ -544,7 +584,7 @@ pub fn cast_page_scroll_area(id: impl Hash, theme: &CastTheme) -> ScrollArea {
 
 fn sidebar_workspace_switcher(ui: &mut egui::Ui, theme: &CastTheme, title: &str, meta: &str) {
     let width = ui.available_width();
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 40.0), egui::Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 36.0), egui::Sense::hover());
     if ui.is_rect_visible(rect) {
         ui.painter().rect(
             rect,
@@ -587,7 +627,7 @@ fn sidebar_nav_item(
     selected: bool,
 ) -> egui::Response {
     let width = ui.available_width();
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 32.0), egui::Sense::click());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 28.0), egui::Sense::click());
     if ui.is_rect_visible(rect) {
         let fill = if selected {
             Color32::from_rgba_unmultiplied(255, 255, 255, 44)
@@ -602,12 +642,12 @@ fn sidebar_nav_item(
             Color32::from_rgba_unmultiplied(255, 255, 255, 190)
         };
         ui.painter().rect_filled(
-            rect.shrink2(egui::vec2(0.0, 2.0)),
+            rect.shrink2(egui::vec2(0.0, 1.0)),
             egui::CornerRadius::same(theme.radius.md.round() as u8),
             fill,
         );
         ui.painter().text(
-            rect.left_center() + egui::vec2(12.0, 0.0),
+            rect.left_center(),
             egui::Align2::LEFT_CENTER,
             label,
             theme.typography.button.clone(),
@@ -637,7 +677,7 @@ fn sidebar_parent_nav_item(
 }
 
 fn paint_sidebar_caret(ui: &egui::Ui, rect: egui::Rect, open: bool, color: Color32) {
-    let center = rect.right_center() - egui::vec2(14.0, 0.0);
+    let center = rect.right_center() - egui::vec2(8.0, 0.0);
     let stroke = egui::Stroke::new(1.35, color);
     if open {
         ui.painter().line_segment(
@@ -689,7 +729,7 @@ fn show_sidebar_children(
         }
     }
     let bottom = ui.cursor().min.y;
-    let line_x = ui.min_rect().min.x + 22.0;
+    let line_x = ui.min_rect().min.x + 12.0;
     ui.painter().vline(
         line_x,
         top + 4.0..=bottom - 4.0,
@@ -704,7 +744,7 @@ fn sidebar_child_item(
     selected: bool,
 ) -> egui::Response {
     let width = ui.available_width();
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 28.0), egui::Sense::click());
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 25.0), egui::Sense::click());
     if ui.is_rect_visible(rect) {
         let fill = if selected {
             Color32::from_rgba_unmultiplied(255, 255, 255, 34)
@@ -719,12 +759,12 @@ fn sidebar_child_item(
             Color32::from_rgba_unmultiplied(255, 255, 255, 174)
         };
         ui.painter().rect_filled(
-            rect.shrink2(egui::vec2(0.0, 2.0)),
+            rect.shrink2(egui::vec2(0.0, 1.0)),
             egui::CornerRadius::same(theme.radius.sm.round() as u8),
             fill,
         );
         ui.painter().text(
-            rect.left_center() + egui::vec2(38.0, 0.0),
+            rect.left_center() + egui::vec2(26.0, 0.0),
             egui::Align2::LEFT_CENTER,
             label,
             theme.typography.small.clone(),
@@ -732,27 +772,6 @@ fn sidebar_child_item(
         );
     }
     response
-}
-
-fn sidebar_status_row(ui: &mut egui::Ui, theme: &CastTheme, label: &str, value: &str) {
-    let width = ui.available_width();
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 28.0), egui::Sense::hover());
-    if ui.is_rect_visible(rect) {
-        ui.painter().text(
-            rect.left_center() + egui::vec2(14.0, 0.0),
-            egui::Align2::LEFT_CENTER,
-            label,
-            theme.typography.caption.clone(),
-            sidebar_muted_text(),
-        );
-        ui.painter().text(
-            rect.right_center() - egui::vec2(14.0, 0.0),
-            egui::Align2::RIGHT_CENTER,
-            value,
-            theme.typography.caption.clone(),
-            Color32::from_rgba_unmultiplied(255, 255, 255, 210),
-        );
-    }
 }
 
 fn sidebar_muted_text() -> Color32 {
@@ -796,7 +815,7 @@ mod tests {
 
         assert_eq!(config.title, "Cast");
         assert_eq!(config.nav_items[3], "Agent components");
-        assert_eq!(config.status_items[0], ("Runtime theme", "Live"));
+        assert_eq!(config.nav_items.len(), 5);
     }
 
     #[test]

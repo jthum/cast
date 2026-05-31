@@ -103,11 +103,18 @@ fn main() -> eframe::Result {
         native_options,
         Box::new(|cc| {
             cast::install_cast_fonts(&cc.egui_ctx);
-            let app = CastGallery::new();
+            let app = CastGallery::new(system_theme_mode(&cc.egui_ctx));
             cast::set_theme(&cc.egui_ctx, app.theme.clone());
             Ok(Box::new(app))
         }),
     )
+}
+
+fn system_theme_mode(ctx: &egui::Context) -> ThemeMode {
+    match ctx.system_theme() {
+        Some(egui::Theme::Dark) => ThemeMode::Dark,
+        _ => ThemeMode::Light,
+    }
 }
 
 struct CastGallery {
@@ -158,13 +165,13 @@ struct CastGallery {
     editable_status: usize,
     sidebar_section: usize,
     components_nav_open: bool,
+    follows_system_theme: bool,
     compact_sidebar_open: bool,
     last_scroll_route: Option<(usize, usize)>,
 }
 
 impl CastGallery {
-    fn new() -> Self {
-        let mode = ThemeMode::Light;
+    fn new(mode: ThemeMode) -> Self {
         let seed = ThemeSeed::for_mode(mode).with_typography(TypographyTokens::cast());
         let theme = seed.clone().resolve();
 
@@ -216,6 +223,7 @@ impl CastGallery {
             editable_status: 1,
             sidebar_section: SECTION_WORKBENCH,
             components_nav_open: true,
+            follows_system_theme: true,
             compact_sidebar_open: false,
             last_scroll_route: None,
         }
@@ -251,6 +259,7 @@ impl CastGallery {
                     ThemeMode::Light
                 };
                 self.seed = self.seed.clone().with_mode(next);
+                self.follows_system_theme = false;
                 return true;
             }
             "reset-theme" => {
@@ -268,6 +277,13 @@ impl CastGallery {
 impl eframe::App for CastGallery {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        if self.follows_system_theme {
+            let system_mode = system_theme_mode(&ctx);
+            if system_mode != self.seed.mode {
+                self.seed = self.seed.clone().with_mode(system_mode);
+                self.apply_theme(&ctx);
+            }
+        }
         ctx.set_zoom_factor(self.zoom);
         if ctx.input_mut(|input| input.consume_key(egui::Modifiers::COMMAND, egui::Key::K)) {
             self.command_palette.open = true;
@@ -323,16 +339,16 @@ impl eframe::App for CastGallery {
                 if compact_shell {
                     let (changed, sidebar_requested) = show_shell_top_bar_with_sidebar_button(
                         ui,
-                        &ctx,
                         &mut self.seed,
-                        &mut self.zoom,
+                        &mut self.follows_system_theme,
                     );
                     theme_changed |= changed;
                     if sidebar_requested {
                         self.compact_sidebar_open = true;
                     }
                 } else {
-                    theme_changed |= show_shell_top_bar(ui, &ctx, &mut self.seed, &mut self.zoom);
+                    theme_changed |=
+                        show_shell_top_bar(ui, &mut self.seed, &mut self.follows_system_theme);
                 }
             });
 
