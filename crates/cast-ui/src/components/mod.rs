@@ -29,9 +29,10 @@ mod tooltip;
 
 pub use agent::{
     AgentComposer, AgentComposerResponse, ApprovalPanel, ApprovalPanelResponse, ArtifactCard,
-    ArtifactCardResponse, ChatMessage, ChatRole, CodeOutputPanel, MessageThread, MessageThreadUi,
-    RunPhase, RunTimeline, RunTimelineItem, ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput,
-    ToolOutputKind,
+    ArtifactCardResponse, ChatMessage, ChatRole, CodeOutputPanel, ContextItem, ContextPanel,
+    MessageThread, MessageThreadUi, PatchFile, PatchReviewPanel, PatchReviewResponse, PlanList,
+    PlanStep, PlanStepStatus, RunPhase, RunTimeline, RunTimelineItem, ToolCall, ToolCallBlock,
+    ToolCallStatus, ToolOutput, ToolOutputKind,
 };
 pub use alert::{Alert, Notice};
 pub use avatar::Avatar;

@@ -879,13 +879,22 @@ impl Widget for RunTimeline {
             .show(ui, |ui| {
                 ui.set_width(frame_inner_width(width, theme.spacing.md));
                 let mut combined: Option<Response> = None;
-                for (index, item) in self.items.iter().enumerate() {
-                    let response = timeline_item_ui(ui, &theme, item, index + 1 < self.items.len());
+                let mut rows = Vec::with_capacity(self.items.len());
+
+                for item in &self.items {
+                    let row = allocate_timeline_item(ui, item);
                     combined = Some(match combined {
-                        Some(existing) => existing.union(response),
-                        None => response,
+                        Some(existing) => existing.union(row.response.clone()),
+                        None => row.response.clone(),
                     });
+                    rows.push(row);
                 }
+
+                paint_timeline_guide(ui, &theme, &rows);
+                for (row, item) in rows.iter().zip(&self.items) {
+                    paint_timeline_item(ui, &theme, row.rect, item);
+                }
+
                 combined
                     .unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, egui::Sense::hover()))
             })
@@ -1056,6 +1065,154 @@ impl Widget for CodeOutputPanel {
                 paint_code_region(ui, &theme, &self.body, self.kind, self.wrap, self.height)
             })
             .inner
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ContextPanel {
+    title: String,
+    used: usize,
+    capacity: usize,
+    window_count: Option<usize>,
+    auto_compact_at: Option<usize>,
+    items: Vec<ContextItem>,
+    width: Option<f32>,
+}
+
+impl ContextPanel {
+    #[must_use]
+    pub fn new(used: usize, capacity: usize) -> Self {
+        Self {
+            title: "Context".to_owned(),
+            used,
+            capacity: capacity.max(1),
+            window_count: None,
+            auto_compact_at: None,
+            items: Vec::new(),
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+
+    #[must_use]
+    pub fn window_count(mut self, count: usize) -> Self {
+        self.window_count = Some(count);
+        self
+    }
+
+    #[must_use]
+    pub fn auto_compact_at(mut self, count: usize) -> Self {
+        self.auto_compact_at = Some(count);
+        self
+    }
+
+    #[must_use]
+    pub fn item(mut self, item: ContextItem) -> Self {
+        self.items.push(item);
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    pub fn show(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let width = self
+            .width
+            .unwrap_or_else(|| ui.available_width().max(260.0));
+
+        egui::Frame::new()
+            .fill(theme.colors.surface)
+            .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+            .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.md as i8))
+            .show(ui, |ui| {
+                ui.set_width(frame_inner_width(width, theme.spacing.md));
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(self.title)
+                            .font(theme.typography.heading_sm.clone())
+                            .color(theme.colors.text),
+                    );
+                    ui.add(
+                        Badge::new(format!(
+                            "{} / {}",
+                            compact_number(self.used),
+                            compact_number(self.capacity)
+                        ))
+                        .intent(context_usage_intent(self.used, self.capacity))
+                        .status_dot(),
+                    );
+                });
+                ui.add_space(theme.spacing.sm);
+                paint_context_meter(ui, &theme, self.used, self.capacity);
+                if !self.items.is_empty() {
+                    ui.add_space(theme.spacing.md);
+                    for item in self.items {
+                        context_item_ui(ui, &theme, item);
+                    }
+                }
+                ui.add_space(theme.spacing.sm);
+                ui.horizontal_wrapped(|ui| {
+                    if let Some(count) = self.window_count {
+                        ui.label(
+                            RichText::new(format!("{count} in window"))
+                                .font(theme.typography.small.clone())
+                                .color(theme.colors.text_muted),
+                        );
+                    }
+                    if let Some(count) = self.auto_compact_at {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(
+                                RichText::new(format!("Auto-compacts at {count}"))
+                                    .font(theme.typography.small.clone())
+                                    .color(theme.colors.text_subtle),
+                            );
+                        });
+                    }
+                });
+            })
+            .response
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ContextItem {
+    label: String,
+    detail: String,
+    tokens: Option<usize>,
+    intent: Intent,
+}
+
+impl ContextItem {
+    #[must_use]
+    pub fn new(label: impl Into<String>, detail: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            detail: detail.into(),
+            tokens: None,
+            intent: Intent::Neutral,
+        }
+    }
+
+    #[must_use]
+    pub fn tokens(mut self, tokens: usize) -> Self {
+        self.tokens = Some(tokens);
+        self
+    }
+
+    #[must_use]
+    pub fn intent(mut self, intent: Intent) -> Self {
+        self.intent = intent;
+        self
     }
 }
 
@@ -1313,6 +1470,479 @@ pub struct ApprovalPanelResponse {
     pub cancelled: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PlanStepStatus {
+    #[default]
+    Pending,
+    Active,
+    Done,
+    Blocked,
+}
+
+#[derive(Clone, Debug)]
+pub struct PlanStep {
+    title: String,
+    detail: Option<String>,
+    status: PlanStepStatus,
+    depth: usize,
+}
+
+impl PlanStep {
+    #[must_use]
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            detail: None,
+            status: PlanStepStatus::Pending,
+            depth: 0,
+        }
+    }
+
+    #[must_use]
+    pub fn detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    #[must_use]
+    pub fn status(mut self, status: PlanStepStatus) -> Self {
+        self.status = status;
+        self
+    }
+
+    #[must_use]
+    pub fn depth(mut self, depth: usize) -> Self {
+        self.depth = depth.min(3);
+        self
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PlanList {
+    title: String,
+    summary: Option<String>,
+    steps: Vec<PlanStep>,
+    width: Option<f32>,
+}
+
+impl PlanList {
+    #[must_use]
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            summary: None,
+            steps: Vec::new(),
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn summary(mut self, summary: impl Into<String>) -> Self {
+        self.summary = Some(summary.into());
+        self
+    }
+
+    #[must_use]
+    pub fn step(mut self, step: PlanStep) -> Self {
+        self.steps.push(step);
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+}
+
+impl Widget for PlanList {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let theme = theme_for_ui(ui);
+        let width = self
+            .width
+            .unwrap_or_else(|| ui.available_width().max(260.0));
+
+        egui::Frame::new()
+            .fill(theme.colors.surface)
+            .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+            .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.md as i8))
+            .show(ui, |ui| {
+                ui.set_width(frame_inner_width(width, theme.spacing.md));
+                ui.label(
+                    RichText::new(self.title)
+                        .font(theme.typography.body_strong.clone())
+                        .color(theme.colors.text),
+                );
+                if let Some(summary) = self.summary {
+                    ui.label(
+                        RichText::new(summary)
+                            .font(theme.typography.small.clone())
+                            .color(theme.colors.text_muted),
+                    );
+                }
+                ui.add_space(theme.spacing.sm);
+                let mut combined: Option<Response> = None;
+                for (index, step) in self.steps.iter().enumerate() {
+                    let response = plan_step_ui(ui, &theme, step, index + 1);
+                    combined = Some(match combined {
+                        Some(existing) => existing.union(response),
+                        None => response,
+                    });
+                }
+                combined
+                    .unwrap_or_else(|| ui.allocate_response(egui::Vec2::ZERO, egui::Sense::hover()))
+            })
+            .inner
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PatchFile {
+    path: String,
+    additions: usize,
+    deletions: usize,
+    status: ToolCallStatus,
+}
+
+impl PatchFile {
+    #[must_use]
+    pub fn new(path: impl Into<String>, additions: usize, deletions: usize) -> Self {
+        Self {
+            path: path.into(),
+            additions,
+            deletions,
+            status: ToolCallStatus::Succeeded,
+        }
+    }
+
+    #[must_use]
+    pub fn status(mut self, status: ToolCallStatus) -> Self {
+        self.status = status;
+        self
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PatchReviewPanel {
+    title: String,
+    summary: String,
+    files: Vec<PatchFile>,
+    tests: Option<String>,
+    risk: Option<String>,
+    width: Option<f32>,
+}
+
+impl PatchReviewPanel {
+    #[must_use]
+    pub fn new(title: impl Into<String>, summary: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            summary: summary.into(),
+            files: Vec::new(),
+            tests: None,
+            risk: None,
+            width: None,
+        }
+    }
+
+    #[must_use]
+    pub fn file(mut self, file: PatchFile) -> Self {
+        self.files.push(file);
+        self
+    }
+
+    #[must_use]
+    pub fn tests(mut self, tests: impl Into<String>) -> Self {
+        self.tests = Some(tests.into());
+        self
+    }
+
+    #[must_use]
+    pub fn risk(mut self, risk: impl Into<String>) -> Self {
+        self.risk = Some(risk.into());
+        self
+    }
+
+    #[must_use]
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    pub fn show(self, ui: &mut Ui) -> InnerResponse<PatchReviewResponse> {
+        let theme = theme_for_ui(ui);
+        let width = self
+            .width
+            .unwrap_or_else(|| ui.available_width().max(260.0));
+
+        egui::Frame::new()
+            .fill(theme.colors.surface)
+            .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+            .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
+            .inner_margin(egui::Margin::same(theme.spacing.md as i8))
+            .show(ui, |ui| {
+                ui.set_width(frame_inner_width(width, theme.spacing.md));
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(self.title)
+                            .font(theme.typography.body_strong.clone())
+                            .color(theme.colors.text),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.add(
+                            Badge::new(format!("{} files", self.files.len()))
+                                .intent(Intent::Info)
+                                .status_dot(),
+                        );
+                    });
+                });
+                ui.label(
+                    RichText::new(self.summary)
+                        .font(theme.typography.small.clone())
+                        .color(theme.colors.text_muted),
+                );
+                ui.add_space(theme.spacing.sm);
+                for file in self.files {
+                    patch_file_ui(ui, &theme, file);
+                }
+                if let Some(tests) = self.tests {
+                    ui.add_space(theme.spacing.sm);
+                    ui.add(Badge::new(tests).intent(Intent::Success).status_dot());
+                }
+                if let Some(risk) = self.risk {
+                    ui.add_space(theme.spacing.xs);
+                    ui.label(
+                        RichText::new(risk)
+                            .font(theme.typography.small.clone())
+                            .color(intent_color(&theme, Intent::Warning)),
+                    );
+                }
+                ui.add_space(theme.spacing.sm);
+                let mut result = PatchReviewResponse::default();
+                ui.horizontal_wrapped(|ui| {
+                    result.approved = ui
+                        .add(Button::new("Approve patch").size(Size::Small))
+                        .clicked();
+                    result.rejected = ui
+                        .add(
+                            Button::new("Request changes")
+                                .intent(Intent::Danger)
+                                .variant(Variant::Outline)
+                                .size(Size::Small),
+                        )
+                        .clicked();
+                    result.opened = ui
+                        .add(
+                            Button::new("Open diff")
+                                .variant(Variant::Ghost)
+                                .size(Size::Small),
+                        )
+                        .clicked();
+                });
+                result
+            })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PatchReviewResponse {
+    pub approved: bool,
+    pub rejected: bool,
+    pub opened: bool,
+}
+
+fn paint_context_meter(ui: &mut Ui, theme: &CastTheme, used: usize, capacity: usize) {
+    let width = ui.available_width();
+    let height = theme.spacing.sm.max(8.0);
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+    if !ui.is_rect_visible(rect) {
+        return;
+    }
+
+    let radius = egui::CornerRadius::same((height / 2.0).round() as u8);
+    let percent = (used as f32 / capacity.max(1) as f32).clamp(0.0, 1.0);
+    let fill_rect = egui::Rect::from_min_max(
+        rect.min,
+        egui::pos2(rect.min.x + rect.width() * percent, rect.max.y),
+    );
+    let intent = context_usage_intent(used, capacity);
+
+    ui.painter()
+        .rect_filled(rect, radius, theme.colors.surface_muted);
+    ui.painter()
+        .rect_filled(fill_rect, radius, intent_color(theme, intent));
+}
+
+fn context_usage_intent(used: usize, capacity: usize) -> Intent {
+    let ratio = used as f32 / capacity.max(1) as f32;
+    if ratio >= 0.86 {
+        Intent::Danger
+    } else if ratio >= 0.68 {
+        Intent::Warning
+    } else {
+        Intent::Info
+    }
+}
+
+fn context_item_ui(ui: &mut Ui, theme: &CastTheme, item: ContextItem) {
+    let response = egui::Frame::new()
+        .fill(theme.colors.surface_raised)
+        .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+        .corner_radius(egui::CornerRadius::same(theme.radius.md as u8))
+        .inner_margin(egui::Margin::symmetric(
+            theme.spacing.sm as i8,
+            theme.spacing.xs as i8,
+        ))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.add(Badge::new(item.label).intent(item.intent).status_dot());
+                ui.label(
+                    RichText::new(item.detail)
+                        .font(theme.typography.small.clone())
+                        .color(theme.colors.text_muted),
+                );
+                if let Some(tokens) = item.tokens {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(
+                            RichText::new(compact_number(tokens))
+                                .font(theme.typography.caption.clone())
+                                .color(theme.colors.text_subtle),
+                        );
+                    });
+                }
+            });
+        });
+    ui.add_space(theme.spacing.xs);
+    response.response.on_hover_cursor(egui::CursorIcon::Default);
+}
+
+fn compact_number(value: usize) -> String {
+    if value >= 1_000_000 {
+        format!("{}m", value / 1_000_000)
+    } else if value >= 1_000 {
+        format!("{}k", value / 1_000)
+    } else {
+        value.to_string()
+    }
+}
+
+fn plan_step_ui(ui: &mut Ui, theme: &CastTheme, step: &PlanStep, index: usize) -> Response {
+    let row_height = if step.detail.is_some() { 52.0 } else { 36.0 };
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(ui.available_width(), row_height),
+        egui::Sense::hover(),
+    );
+
+    if ui.is_rect_visible(rect) {
+        let indent = step.depth as f32 * theme.spacing.lg;
+        let content_x = rect.min.x + indent;
+        let badge_rect = egui::Rect::from_min_size(
+            egui::pos2(content_x, rect.min.y + 6.0),
+            egui::vec2(24.0, 22.0),
+        );
+        ui.painter().rect(
+            badge_rect,
+            egui::CornerRadius::same(theme.radius.sm as u8),
+            mix_with_transparent(intent_color(theme, plan_status_intent(step.status)), 0.08),
+            egui::Stroke::new(
+                theme.stroke.sm,
+                mix_with_transparent(intent_color(theme, plan_status_intent(step.status)), 0.28),
+            ),
+            egui::StrokeKind::Outside,
+        );
+        ui.painter().text(
+            badge_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            index.to_string(),
+            theme.typography.caption.clone(),
+            intent_color(theme, plan_status_intent(step.status)),
+        );
+        let text_x = badge_rect.max.x + theme.spacing.sm;
+        ui.painter().text(
+            egui::pos2(text_x, rect.min.y + 6.0),
+            egui::Align2::LEFT_TOP,
+            step.title.as_str(),
+            theme.typography.button.clone(),
+            theme.colors.text,
+        );
+        ui.painter().text(
+            egui::pos2(rect.max.x, rect.min.y + 7.0),
+            egui::Align2::RIGHT_TOP,
+            plan_status_label(step.status),
+            theme.typography.caption.clone(),
+            intent_color(theme, plan_status_intent(step.status)),
+        );
+        if let Some(detail) = &step.detail {
+            ui.painter().text(
+                egui::pos2(text_x, rect.min.y + 28.0),
+                egui::Align2::LEFT_TOP,
+                detail,
+                theme.typography.small.clone(),
+                theme.colors.text_muted,
+            );
+        }
+    }
+
+    response
+}
+
+fn plan_status_label(status: PlanStepStatus) -> &'static str {
+    match status {
+        PlanStepStatus::Pending => "Pending",
+        PlanStepStatus::Active => "Active",
+        PlanStepStatus::Done => "Done",
+        PlanStepStatus::Blocked => "Blocked",
+    }
+}
+
+fn plan_status_intent(status: PlanStepStatus) -> Intent {
+    match status {
+        PlanStepStatus::Pending => Intent::Neutral,
+        PlanStepStatus::Active => Intent::Info,
+        PlanStepStatus::Done => Intent::Success,
+        PlanStepStatus::Blocked => Intent::Warning,
+    }
+}
+
+fn patch_file_ui(ui: &mut Ui, theme: &CastTheme, file: PatchFile) {
+    egui::Frame::new()
+        .fill(theme.colors.surface_raised)
+        .stroke(egui::Stroke::new(theme.stroke.sm, theme.colors.border))
+        .corner_radius(egui::CornerRadius::same(theme.radius.md as u8))
+        .inner_margin(egui::Margin::symmetric(
+            theme.spacing.sm as i8,
+            theme.spacing.xs as i8,
+        ))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.add(
+                    Badge::new(tool_call_status_label(file.status))
+                        .intent(tool_call_intent(file.status))
+                        .status_dot(),
+                );
+                ui.label(
+                    RichText::new(file.path)
+                        .font(theme.typography.code.clone())
+                        .color(theme.colors.text),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(
+                        RichText::new(format!("-{}", file.deletions))
+                            .font(theme.typography.caption.clone())
+                            .color(intent_color(theme, Intent::Danger)),
+                    );
+                    ui.label(
+                        RichText::new(format!("+{}", file.additions))
+                            .font(theme.typography.caption.clone())
+                            .color(intent_color(theme, Intent::Success)),
+                    );
+                });
+            });
+        });
+    ui.add_space(theme.spacing.xs);
+}
+
 fn show_chat_message_content(
     message: ChatMessage,
     ui: &mut Ui,
@@ -1392,33 +2022,55 @@ fn trim_submitted_newline(text: &mut String) {
     }
 }
 
-fn timeline_item_ui(
-    ui: &mut Ui,
-    theme: &CastTheme,
-    item: &RunTimelineItem,
-    has_next: bool,
-) -> Response {
-    let height = if item.detail.is_some() { 58.0 } else { 42.0 };
+#[derive(Clone, Debug)]
+struct TimelineRow {
+    rect: egui::Rect,
+    response: Response,
+}
+
+fn allocate_timeline_item(ui: &mut Ui, item: &RunTimelineItem) -> TimelineRow {
+    let height = timeline_item_height(item);
     let (rect, response) = ui.allocate_exact_size(
         egui::vec2(ui.available_width(), height),
         egui::Sense::hover(),
     );
+    TimelineRow { rect, response }
+}
+
+fn timeline_item_height(item: &RunTimelineItem) -> f32 {
+    if item.detail.is_some() { 58.0 } else { 42.0 }
+}
+
+fn paint_timeline_guide(ui: &Ui, theme: &CastTheme, rows: &[TimelineRow]) {
+    let (Some(first), Some(last)) = (rows.first(), rows.last()) else {
+        return;
+    };
+    if rows.len() < 2 {
+        return;
+    }
+
+    let x = timeline_dot_center(first.rect).x;
+    let start_y = timeline_dot_center(first.rect).y;
+    let end_y = timeline_dot_center(last.rect).y;
+    let line_rect = egui::Rect::from_min_max(egui::pos2(x, start_y), egui::pos2(x, end_y));
+    if ui.is_rect_visible(line_rect.expand(theme.stroke.sm)) {
+        ui.painter().vline(
+            x,
+            start_y..=end_y,
+            egui::Stroke::new(theme.stroke.sm, theme.colors.border),
+        );
+    }
+}
+
+fn paint_timeline_item(ui: &Ui, theme: &CastTheme, rect: egui::Rect, item: &RunTimelineItem) {
     if ui.is_rect_visible(rect) {
-        let x = rect.min.x + 10.0;
-        let dot_center = egui::pos2(x, rect.min.y + 14.0);
-        if has_next {
-            ui.painter().vline(
-                x,
-                (dot_center.y + 7.0)..=(rect.max.y + theme.spacing.xs),
-                egui::Stroke::new(theme.stroke.sm, theme.colors.border),
-            );
-        }
+        let dot_center = timeline_dot_center(rect);
         ui.painter().circle_filled(
             dot_center,
             5.0,
             intent_color(theme, tool_call_intent(item.status)),
         );
-        let content_x = x + 18.0;
+        let content_x = dot_center.x + 18.0;
         ui.painter().text(
             egui::pos2(content_x, rect.min.y + 5.0),
             egui::Align2::LEFT_TOP,
@@ -1445,7 +2097,10 @@ fn timeline_item_ui(
             );
         }
     }
-    response
+}
+
+fn timeline_dot_center(rect: egui::Rect) -> egui::Pos2 {
+    egui::pos2(rect.min.x + 10.0, rect.min.y + 14.0)
 }
 
 fn run_phase_label(phase: RunPhase) -> &'static str {
@@ -1468,6 +2123,7 @@ fn paint_code_region(
     height: f32,
 ) -> Response {
     let output = egui::ScrollArea::vertical()
+        .id_salt(ui.next_auto_id())
         .max_height(height)
         .auto_shrink([false, false])
         .show(ui, |ui| {
@@ -1765,5 +2421,32 @@ mod tests {
         assert_eq!(approval.primary_label, "Approve");
         assert_eq!(approval.intent, Intent::Warning);
         assert!(approval.risk.is_some());
+    }
+
+    #[test]
+    fn review_components_store_workflow_state() {
+        let context = ContextPanel::new(86_000, 200_000)
+            .window_count(3)
+            .auto_compact_at(6)
+            .item(ContextItem::new("File", "src/main.rs").tokens(480));
+        let plan = PlanList::new("Plan")
+            .summary("Review before patching")
+            .step(PlanStep::new("Inspect").status(PlanStepStatus::Done))
+            .step(
+                PlanStep::new("Patch")
+                    .status(PlanStepStatus::Active)
+                    .depth(1),
+            );
+        let patch = PatchReviewPanel::new("Patch", "Two files changed")
+            .file(PatchFile::new("src/main.rs", 12, 4))
+            .tests("checks passed")
+            .risk("Shared route touched");
+
+        assert_eq!(context.used, 86_000);
+        assert_eq!(context.items.len(), 1);
+        assert_eq!(plan.steps[1].status, PlanStepStatus::Active);
+        assert_eq!(plan.steps[1].depth, 1);
+        assert_eq!(patch.files[0].additions, 12);
+        assert_eq!(patch.risk.as_deref(), Some("Shared route touched"));
     }
 }

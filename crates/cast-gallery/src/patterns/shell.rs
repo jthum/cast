@@ -198,6 +198,123 @@ pub fn show_shell_sidebar(ui: &mut egui::Ui, theme: &CastTheme, selected: &mut u
     show_app_sidebar(ui, theme, &AppShellConfig::default(), selected);
 }
 
+pub fn show_shell_sidebar_drawer(
+    ctx: &egui::Context,
+    theme: &CastTheme,
+    open: &mut bool,
+    selected: &mut usize,
+    metrics: AppShellMetrics,
+) {
+    let id = egui::Id::new("cast_gallery_sidebar_drawer");
+    let slide_progress = drawer_animation_progress(ctx, id.with("slide"), *open, theme);
+
+    if !*open && slide_progress <= 0.001 {
+        return;
+    }
+
+    let screen_rect = ctx.content_rect();
+    let width = metrics
+        .compact_sidebar_width
+        .min((screen_rect.width() - theme.spacing.md).max(260.0));
+    let offset = -width * (1.0 - slide_progress.clamp(0.0, 1.0));
+    let mut close_requested = false;
+
+    let backdrop_response = egui::Area::new(id.with("backdrop"))
+        .order(egui::Order::Middle)
+        .fixed_pos(screen_rect.min)
+        .show(ctx, |ui| {
+            let alpha = match theme.mode {
+                ThemeMode::Light => 92,
+                ThemeMode::Dark => 148,
+            };
+            let backdrop_alpha = (alpha as f32 * slide_progress.clamp(0.0, 1.0)).round() as u8;
+            ui.painter()
+                .rect_filled(screen_rect, 0.0, Color32::from_black_alpha(backdrop_alpha));
+            let (_, response) = ui.allocate_exact_size(screen_rect.size(), egui::Sense::click());
+            response
+        });
+
+    if *open && backdrop_response.inner.clicked() {
+        close_requested = true;
+    }
+
+    egui::Area::new(id)
+        .order(egui::Order::Foreground)
+        .fixed_pos(screen_rect.min + egui::vec2(offset, 0.0))
+        .show(ctx, |ui| {
+            let margin = f32::from(metrics.sidebar_margin) * 2.0;
+            let inner_size = egui::vec2(
+                (width - margin).max(0.0),
+                (screen_rect.height() - margin).max(0.0),
+            );
+
+            egui::Frame::new()
+                .fill(shell_sidebar_fill(theme))
+                .stroke(egui::Stroke::NONE)
+                .inner_margin(egui::Margin::symmetric(
+                    metrics.sidebar_margin,
+                    metrics.sidebar_margin,
+                ))
+                .show(ui, |ui| {
+                    ui.set_min_size(inner_size);
+                    ui.set_max_size(inner_size);
+                    cast_scroll_area("compact_sidebar_scroll", theme)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            let previous_section = *selected;
+                            show_shell_sidebar(ui, theme, selected);
+                            if *selected != previous_section {
+                                close_requested = true;
+                            }
+                        });
+                });
+        });
+
+    if close_requested {
+        *open = false;
+    }
+}
+
+fn drawer_animation_seconds(theme: &CastTheme) -> f32 {
+    if theme.animation.should_animate() {
+        theme.animation.normal_seconds() * 1.5
+    } else {
+        0.0
+    }
+}
+
+fn drawer_animation_progress(
+    ctx: &egui::Context,
+    id: egui::Id,
+    open: bool,
+    theme: &CastTheme,
+) -> f32 {
+    let target = if open { 1.0 } else { 0.0 };
+    let previous = ctx.data(|data| data.get_temp::<f32>(id).unwrap_or(0.0));
+    let duration = drawer_animation_seconds(theme);
+    let next = if duration <= 0.0 {
+        target
+    } else {
+        let dt = ctx.input(|input| input.stable_dt.clamp(1.0 / 240.0, 0.05));
+        move_toward(previous, target, dt / duration)
+    };
+
+    if (next - target).abs() > 0.001 {
+        ctx.request_repaint();
+    }
+
+    ctx.data_mut(|data| data.insert_temp(id, next));
+    egui::emath::easing::cubic_out(next.clamp(0.0, 1.0))
+}
+
+fn move_toward(value: f32, target: f32, step: f32) -> f32 {
+    if value < target {
+        (value + step).min(target)
+    } else {
+        (value - step).max(target)
+    }
+}
+
 pub fn show_app_sidebar(
     ui: &mut egui::Ui,
     theme: &CastTheme,
@@ -411,5 +528,12 @@ mod tests {
             metrics.content_margin_for_width(metrics.compact_breakpoint - 1.0),
             metrics.compact_content_margin as i8
         );
+    }
+
+    #[test]
+    fn drawer_animation_is_longer_than_standard_motion() {
+        let theme = CastTheme::light();
+
+        assert!(drawer_animation_seconds(&theme) > theme.animation.normal_seconds());
     }
 }

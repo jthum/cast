@@ -9,20 +9,22 @@ use patterns::entity_table_with_details::{
 use patterns::related_activity::show_related_activity;
 use patterns::shell::{
     AppShellMetrics, cast_page_scroll_area, cast_scroll_area, shell_sidebar_fill,
-    show_shell_sidebar, show_shell_top_bar, show_shell_top_bar_with_sidebar_button,
+    show_shell_sidebar, show_shell_sidebar_drawer, show_shell_top_bar,
+    show_shell_top_bar_with_sidebar_button,
 };
 
 use cast::{
     AgentComposer, Alert, ApprovalPanel, ArtifactCard, Avatar, Badge, Button, Card,
     CastPaletteInput, CastTheme, ChatMessage, Checkbox, CodeOutputPanel, Combobox, ConfirmDialog,
-    ConfirmDialogResponse, DateInput, Dialog, Dropdown, EmptyState, FormActions, FormField,
-    FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle, MenuItem, MessageThread, Notice,
-    NumberInput, Panel as CastPanel, Placement, Popover, ProgressBar, RadioGroup, RunPhase,
-    RunTimeline, RunTimelineItem, SearchInput, SegmentedControl, Select, SemanticColorTokens,
-    Separator, Sheet, Size, Skeleton, Slider, Switch, Table, Tabs, TextArea, TextInput, ThemeMode,
-    ThemeSeed, TimeInput, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallBlock,
-    ToolCallStatus, ToolOutput, ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue,
-    ValidationSummary, Variant,
+    ConfirmDialogResponse, ContextItem, ContextPanel, DateInput, Dialog, Dropdown, EmptyState,
+    FormActions, FormField, FormSection, Intent, Kbd, Label, Link, Loader, LoaderStyle, MenuItem,
+    MessageThread, Notice, NumberInput, Panel as CastPanel, PatchFile, PatchReviewPanel, PlanList,
+    PlanStep, PlanStepStatus, Popover, ProgressBar, RadioGroup, RunPhase, RunTimeline,
+    RunTimelineItem, SearchInput, SegmentedControl, Select, SemanticColorTokens, Separator, Sheet,
+    Size, Skeleton, Slider, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed,
+    TimeInput, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus,
+    ToolOutput, ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary,
+    Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -259,35 +261,13 @@ impl eframe::App for CastGallery {
             });
 
         if compact_shell {
-            let sheet_width = shell_metrics
-                .compact_sidebar_width
-                .min((available_width - self.theme.spacing.md).max(260.0));
-            let theme = self.theme.clone();
-            let sidebar_section = &mut self.sidebar_section;
-            Sheet::new(&mut self.compact_sidebar_open, "gallery_compact_sidebar")
-                .placement(Placement::Left)
-                .width(sheet_width)
-                .closable(true)
-                .show(&ctx, move |ui, sheet| {
-                    egui::Frame::new()
-                        .fill(shell_sidebar_fill(&theme))
-                        .inner_margin(egui::Margin::symmetric(
-                            shell_metrics.sidebar_margin,
-                            shell_metrics.sidebar_margin,
-                        ))
-                        .show(ui, |ui| {
-                            ui.set_min_size(ui.available_size());
-                            cast_scroll_area("compact_sidebar_scroll", &theme)
-                                .auto_shrink([false, false])
-                                .show(ui, |ui| {
-                                    let previous_section = *sidebar_section;
-                                    show_shell_sidebar(ui, &theme, sidebar_section);
-                                    if *sidebar_section != previous_section {
-                                        sheet.close();
-                                    }
-                                });
-                        });
-                });
+            show_shell_sidebar_drawer(
+                &ctx,
+                &self.theme,
+                &mut self.compact_sidebar_open,
+                &mut self.sidebar_section,
+                shell_metrics,
+            );
         }
 
         CentralPanel::default()
@@ -1790,6 +1770,72 @@ fn show_agent_components(
             ui.add(DateInput::new(agent_due_date).label("Due date"));
             ui.add(TimeInput::new(agent_due_time).label("Due time"));
         });
+    });
+
+    ui.add_space(12.0);
+    Card::new().show(ui, |ui| {
+        ui.heading("Run context and review");
+        ui.label("Agentic apps need explicit surfaces for context budget, plans, and patch review before execution reaches approval.");
+        ui.add_space(8.0);
+        show_responsive_pair(
+            ui,
+            |ui| {
+                ContextPanel::new(86_000, 200_000)
+                    .window_count(3)
+                    .auto_compact_at(6)
+                    .item(
+                        ContextItem::new("You", "Build is failing after the React upgrade.")
+                            .tokens(318)
+                            .intent(Intent::Primary),
+                    )
+                    .item(
+                        ContextItem::new("Agent", "Read build log and trace failing module.")
+                            .tokens(542)
+                            .intent(Intent::Secondary),
+                    )
+                    .item(
+                        ContextItem::new("Files", "package.json, src/App.tsx, vite config")
+                            .tokens(1_420)
+                            .intent(Intent::Info),
+                    )
+                    .width(ui.available_width())
+                    .show(ui);
+                ui.add_space(8.0);
+                ui.add(
+                    PlanList::new("Execution plan")
+                        .summary("A structured plan can be revised as the run progresses.")
+                        .step(
+                            PlanStep::new("Inspect failure output")
+                                .detail("Find the first actionable error in the build log.")
+                                .status(PlanStepStatus::Done),
+                        )
+                        .step(
+                            PlanStep::new("Patch imports")
+                                .detail("Update stale React entry points and rerun checks.")
+                                .status(PlanStepStatus::Active),
+                        )
+                        .step(
+                            PlanStep::new("Validate affected screen")
+                                .detail("Confirm visual and test output before final response.")
+                                .status(PlanStepStatus::Pending),
+                        )
+                        .width(ui.available_width()),
+                );
+            },
+            |ui| {
+                PatchReviewPanel::new(
+                    "Patch review",
+                    "Three files changed to restore the build and keep the interface contract stable.",
+                )
+                .file(PatchFile::new("src/App.tsx", 18, 9))
+                .file(PatchFile::new("src/routes/workbench.tsx", 32, 14))
+                .file(PatchFile::new("package.json", 2, 1))
+                .tests("cargo test and npm test passed")
+                .risk("Touches routing and shared imports; review before approving.")
+                .width(ui.available_width())
+                .show(ui);
+            },
+        );
     });
 
     ui.add_space(12.0);
