@@ -8,8 +8,8 @@ use patterns::entity_table_with_details::{
 };
 use patterns::related_activity::show_related_activity;
 use patterns::shell::{
-    cast_page_scroll_area, cast_scroll_area, shell_rule_color, shell_sidebar_fill,
-    show_shell_sidebar, show_shell_top_bar,
+    cast_page_scroll_area, cast_scroll_area, shell_sidebar_fill, show_shell_sidebar,
+    show_shell_top_bar,
 };
 
 use cast::{
@@ -211,16 +211,8 @@ impl eframe::App for CastGallery {
                         theme_changed |=
                             show_shell_top_bar(ui, &ctx, &mut self.seed, &mut self.zoom);
                     });
-                ui.painter().line_segment(
-                    [
-                        egui::pos2(ui.min_rect().min.x, ui.cursor().top()),
-                        egui::pos2(ui.min_rect().max.x, ui.cursor().top()),
-                    ],
-                    egui::Stroke::new(self.theme.stroke.sm, shell_rule_color(&self.theme)),
-                );
-
                 egui::Frame::new()
-                    .fill(self.theme.colors.background)
+                    .fill(self.theme.colors.surface)
                     .inner_margin(egui::Margin::symmetric(28, 24))
                     .show(ui, |ui| {
                         let scroll_tab = if self.sidebar_section == 2 {

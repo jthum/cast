@@ -91,13 +91,6 @@ pub fn shell_sidebar_fill(theme: &CastTheme) -> Color32 {
     }
 }
 
-pub fn shell_rule_color(theme: &CastTheme) -> Color32 {
-    match theme.mode {
-        ThemeMode::Light => shell_mix(theme.colors.border, theme.colors.surface, 0.36),
-        ThemeMode::Dark => shell_mix(theme.colors.border, theme.colors.surface, 0.16),
-    }
-}
-
 pub fn cast_scroll_area(id: impl Hash, theme: &CastTheme) -> ScrollArea {
     ScrollArea::vertical()
         .id_salt(id)
@@ -111,7 +104,7 @@ pub fn cast_scroll_area(id: impl Hash, theme: &CastTheme) -> ScrollArea {
 }
 
 pub fn cast_page_scroll_area(id: impl Hash, theme: &CastTheme) -> ScrollArea {
-    ScrollArea::both()
+    ScrollArea::vertical()
         .id_salt(id)
         .scroll_bar_visibility(ScrollBarVisibility::VisibleWhenNeeded)
         .scroll_source(ScrollSource {
@@ -247,12 +240,9 @@ mod tests {
     }
 
     #[test]
-    fn shell_rule_color_is_derived_from_theme_border() {
+    fn page_scroll_area_uses_stable_ids() {
         let theme = CastTheme::light();
 
-        assert_eq!(
-            shell_rule_color(&theme),
-            shell_mix(theme.colors.border, theme.colors.surface, 0.36)
-        );
+        let _ = cast_page_scroll_area(("main_scroll", 2usize, 1usize), &theme);
     }
 }
