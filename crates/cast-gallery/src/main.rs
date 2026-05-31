@@ -80,6 +80,7 @@ struct CastGallery {
     workflow_segment: usize,
     component_tab: usize,
     sidebar_section: usize,
+    last_scroll_route: Option<(usize, usize)>,
 }
 
 impl CastGallery {
@@ -127,6 +128,7 @@ impl CastGallery {
             workflow_segment: 0,
             component_tab: 0,
             sidebar_section: 0,
+            last_scroll_route: None,
         }
     }
 
@@ -220,12 +222,16 @@ impl eframe::App for CastGallery {
                         } else {
                             0
                         };
-                        cast_page_scroll_area(
-                            ("main_scroll", self.sidebar_section, scroll_tab),
-                            &self.theme,
-                        )
-                        .auto_shrink([false, false])
-                        .show(ui, |ui| {
+                        let scroll_route = (self.sidebar_section, scroll_tab);
+                        let reset_scroll = self.last_scroll_route != Some(scroll_route);
+                        self.last_scroll_route = Some(scroll_route);
+                        let mut scroll_area =
+                            cast_page_scroll_area(("main_scroll", scroll_route), &self.theme);
+                        if reset_scroll {
+                            scroll_area = scroll_area.vertical_scroll_offset(0.0);
+                        }
+
+                        scroll_area.auto_shrink([false, false]).show(ui, |ui| {
                             theme_changed |= show_workspace_view(
                                 ui,
                                 self.sidebar_section,
@@ -609,6 +615,7 @@ where
 
     let column_width = ((available - gap) / 2.0).max(260.0);
     ui.horizontal_top(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
         ui.vertical(|ui| {
             ui.set_width(column_width);
             ui.set_max_width(column_width);

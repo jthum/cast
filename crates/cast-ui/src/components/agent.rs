@@ -100,8 +100,9 @@ impl Widget for ChatMessage {
         chat_message_frame(&theme, colors)
             .show(ui, |ui| {
                 if let Some(width) = self.width {
-                    ui.set_width(width);
-                    ui.set_max_width(width);
+                    let inner_width = frame_inner_width(width, theme.spacing.md);
+                    ui.set_width(inner_width);
+                    ui.set_max_width(inner_width);
                 }
 
                 ui.horizontal(|ui| {
@@ -214,8 +215,9 @@ impl Widget for ToolCall {
             ))
             .show(ui, |ui| {
                 if let Some(width) = self.width {
-                    ui.set_width(width);
-                    ui.set_max_width(width);
+                    let inner_width = frame_inner_width(width, theme.spacing.md);
+                    ui.set_width(inner_width);
+                    ui.set_max_width(inner_width);
                 }
 
                 ui.horizontal(|ui| {
@@ -324,8 +326,9 @@ impl Widget for ToolOutput {
             .inner_margin(egui::Margin::same(theme.spacing.md as i8))
             .show(ui, |ui| {
                 if let Some(width) = self.width {
-                    ui.set_width(width);
-                    ui.set_max_width(width);
+                    let inner_width = frame_inner_width(width, theme.spacing.md);
+                    ui.set_width(inner_width);
+                    ui.set_max_width(inner_width);
                 }
 
                 ui.horizontal(|ui| {
@@ -451,14 +454,16 @@ impl<'a> AgentComposer<'a> {
             ))
             .inner_margin(egui::Margin::same(theme.spacing.sm as i8))
             .show(ui, |ui| {
-                ui.set_width(width);
+                let inner_width = frame_inner_width(width, theme.spacing.sm);
+                ui.set_width(inner_width);
+                ui.set_max_width(inner_width);
                 let edit = ui.add_enabled(
                     enabled,
                     TextArea::new(self.text)
                         .hint_text(self.placeholder)
                         .variant(Variant::Ghost)
                         .rows(self.rows)
-                        .width((width - theme.spacing.sm * 2.0).max(80.0)),
+                        .width(inner_width),
                 );
                 let has_text = !self.text.trim().is_empty();
                 let submit_shortcut = enabled
@@ -578,6 +583,10 @@ fn tool_call_status_label(status: ToolCallStatus) -> &'static str {
         ToolCallStatus::Succeeded => "Done",
         ToolCallStatus::Failed => "Failed",
     }
+}
+
+fn frame_inner_width(outer_width: f32, horizontal_padding: f32) -> f32 {
+    (outer_width - horizontal_padding * 2.0).max(80.0)
 }
 
 fn tool_output_intent(kind: ToolOutputKind) -> Intent {
@@ -708,5 +717,11 @@ mod tests {
         let message = ChatMessage::assistant("Working").streaming(true);
 
         assert!(message.streaming);
+    }
+
+    #[test]
+    fn framed_width_accounts_for_inner_padding() {
+        assert_eq!(frame_inner_width(320.0, 12.0), 296.0);
+        assert_eq!(frame_inner_width(64.0, 12.0), 80.0);
     }
 }
