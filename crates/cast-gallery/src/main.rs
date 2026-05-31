@@ -14,18 +14,20 @@ use patterns::shell::{
 };
 
 use cast::{
-    AgentComposer, Alert, ApprovalPanel, ArtifactCard, Avatar, Badge, Breadcrumb, Button, Calendar,
-    CalendarDate, CalendarMonth, Card, Carousel, CastPaletteInput, CastTheme, ChatMessage,
-    Checkbox, CodeOutputPanel, Combobox, ConfirmDialog, ConfirmDialogResponse, ContextItem,
-    ContextPanel, ControlGroup, DateInput, Dialog, Dropdown, EmptyState, FormActions, FormField,
-    FormSection, HoverCard, Intent, Kbd, Label, Link, Loader, LoaderStyle, Markdown, Menu,
-    MenuItem, MessageThread, Notice, NumberInput, Pagination, Panel as CastPanel, PatchFile,
-    PatchReviewPanel, PlanList, PlanStep, PlanStepStatus, Popover, ProgressBar, RadioGroup,
+    AgentComposer, Alert, ApprovalPanel, ArtifactCard, Avatar, Badge, BarChart, BarDatum,
+    Breadcrumb, Button, Calendar, CalendarDate, CalendarMonth, Card, Carousel, CastPaletteInput,
+    CastTheme, ChatMessage, Checkbox, CodeOutputPanel, Combobox, ConfirmDialog,
+    ConfirmDialogResponse, ContextItem, ContextPanel, ControlGroup, DateInput, Dialog, Dropdown,
+    EmptyState, FormActions, FormField, FormSection, HoverCard, Intent, Kbd, Label, Link, Loader,
+    LoaderStyle, Markdown, Menu, MenuItem, MessageThread, MetricCard, Notice, NumberInput,
+    Pagination, Panel as CastPanel, PatchFile, PatchReviewPanel, PlanList, PlanStep,
+    PlanStepStatus, Popover, ProgressBar, ProgressMetric, RadioGroup, ReportSection,
     ResizablePanels, ResponsiveColumns, RunPhase, RunTimeline, RunTimelineItem, SearchInput,
     SegmentedControl, Select, SemanticColorTokens, Separator, Sheet, Sidebar, SidebarItem, Size,
-    Skeleton, Slider, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed, TimeInput,
-    Toast, ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus, ToolOutput,
-    ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary, Variant,
+    Skeleton, Slider, Sparkline, Switch, Table, Tabs, TextArea, TextInput, ThemeMode, ThemeSeed,
+    TimeInput, Toast, ToastPlacement, ToastStack, ToolCall, ToolCallBlock, ToolCallStatus,
+    ToolOutput, ToolOutputKind, Tooltip, TypographyTokens, ValidationIssue, ValidationSummary,
+    Variant,
     egui::{self, CentralPanel, Color32, Panel as EguiPanel, RichText},
 };
 
@@ -2356,7 +2358,9 @@ fn show_component_gallery(
     Card::new().show(ui, |ui| {
         ui.add(Tabs::new(
             component_tab,
-            ["Core", "Inputs", "Menus", "Data", "Feedback", "Surfaces"],
+            [
+                "Core", "Inputs", "Menus", "Data", "Feedback", "Reports", "Surfaces",
+            ],
         ));
     });
     ui.add_space(12.0);
@@ -2410,6 +2414,7 @@ fn show_component_gallery(
             lead_exported_count,
         ),
         4 => show_text_and_feedback(ui, toast_preview_open, toast_preview_toasts),
+        5 => show_reports(ui),
         _ => {
             show_surfaces(ui);
             ui.add_space(12.0);
@@ -3529,6 +3534,220 @@ fn gallery_toasts() -> Vec<Toast> {
             .body("The host app owns timeout and dismissal behavior.")
             .intent(Intent::Neutral),
     ]
+}
+
+fn show_reports(ui: &mut egui::Ui) {
+    Card::new().muted_sections().show_sections(
+        ui,
+        |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.heading("Agent run report");
+                ui.add(Badge::new("Generated").intent(Intent::Info).status_dot());
+                ui.add(Badge::new("Review ready").intent(Intent::Success));
+            });
+            ui.label(
+                "A composed reporting surface for run summaries, generated artifacts, and operational health.",
+            );
+        },
+        |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.add(Button::new("Export").variant(Variant::Outline).size(Size::Small));
+                ui.add(Button::new("Open artifact").size(Size::Small));
+                ui.add(
+                    Button::new("Schedule review")
+                        .variant(Variant::Ghost)
+                        .size(Size::Small),
+                );
+            });
+        },
+        |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Updated 2 minutes ago");
+                ui.add(Separator::vertical());
+                ui.label("Scope: component gallery, theme checks, and agent workflow blocks");
+            });
+        },
+    );
+    ui.add_space(12.0);
+
+    show_report_metric_grid(ui);
+    ui.add_space(12.0);
+
+    show_responsive_pair(
+        ui,
+        |ui| {
+            ReportSection::new("Run throughput")
+                .description("Completed steps over the last seven checkpoints.")
+                .width(ui.available_width())
+                .show(ui, |ui| {
+                    ui.add(
+                        Sparkline::new([18.0, 24.0, 22.0, 31.0, 29.0, 36.0, 44.0])
+                            .intent(Intent::Primary)
+                            .height(118.0)
+                            .width(ui.available_width()),
+                    );
+                    ui.add_space(12.0);
+                    ui.horizontal_wrapped(|ui| {
+                        ui.add(
+                            Badge::new("Stable trend")
+                                .intent(Intent::Success)
+                                .status_dot(),
+                        );
+                        ui.add(Badge::new("+22%").intent(Intent::Primary));
+                    });
+                });
+        },
+        |ui| {
+            ReportSection::new("Phase distribution")
+                .description("Where the agent spent time during this pass.")
+                .width(ui.available_width())
+                .show(ui, |ui| {
+                    ui.add(
+                        BarChart::new([
+                            BarDatum::new("Plan", 18.0).intent(Intent::Info),
+                            BarDatum::new("Patch", 34.0).intent(Intent::Primary),
+                            BarDatum::new("Test", 27.0).intent(Intent::Success),
+                            BarDatum::new("Review", 16.0).intent(Intent::Secondary),
+                            BarDatum::new("Fix", 9.0).intent(Intent::Warning),
+                        ])
+                        .height(196.0)
+                        .width(ui.available_width()),
+                    );
+                });
+        },
+    );
+    ui.add_space(12.0);
+
+    show_responsive_pair(
+        ui,
+        |ui| {
+            ReportSection::new("Quality gates")
+                .description("Checks that determine whether the generated output is reviewable.")
+                .width(ui.available_width())
+                .show(ui, |ui| {
+                    ui.add(
+                        ProgressMetric::new("Compilation", 1.0)
+                            .detail("cast-ui and cast-gallery build cleanly")
+                            .intent(Intent::Success)
+                            .width(ui.available_width()),
+                    );
+                    ui.add_space(10.0);
+                    ui.add(
+                        ProgressMetric::new("Visual review", 0.72)
+                            .detail("Needs focused report/chart review")
+                            .intent(Intent::Info)
+                            .width(ui.available_width()),
+                    );
+                    ui.add_space(10.0);
+                    ui.add(
+                        ProgressMetric::new("Contrast audit", 0.64)
+                            .detail("Custom palette checks still in progress")
+                            .intent(Intent::Warning)
+                            .width(ui.available_width()),
+                    );
+                });
+        },
+        |ui| {
+            ReportSection::new("Generated artifacts")
+                .description("Files and review items created by the current run.")
+                .width(ui.available_width())
+                .show(ui, |ui| {
+                    Table::new(["Artifact", "Type", "State", "Action"])
+                        .column_weights([2.2, 1.0, 1.0, 1.0])
+                        .min_column_width(92.0)
+                        .show(ui, 3, |row, index| match index {
+                            0 => {
+                                row.text("theme-audit.md");
+                                row.text("Report");
+                                row.cell(|ui| {
+                                    ui.add(
+                                        Badge::new("Ready").intent(Intent::Success).status_dot(),
+                                    );
+                                });
+                                row.cell(|ui| {
+                                    ui.add(
+                                        Button::new("Open")
+                                            .variant(Variant::Ghost)
+                                            .size(Size::Small),
+                                    );
+                                });
+                            }
+                            1 => {
+                                row.text("gallery-screen.png");
+                                row.text("Screenshot");
+                                row.cell(|ui| {
+                                    ui.add(Badge::new("Queued").intent(Intent::Info).status_dot());
+                                });
+                                row.cell(|ui| {
+                                    ui.add(
+                                        Button::new("View")
+                                            .variant(Variant::Ghost)
+                                            .size(Size::Small),
+                                    );
+                                });
+                            }
+                            _ => {
+                                row.text("contrast-matrix.csv");
+                                row.text("Data");
+                                row.cell(|ui| {
+                                    ui.add(
+                                        Badge::new("Review").intent(Intent::Warning).status_dot(),
+                                    );
+                                });
+                                row.cell(|ui| {
+                                    ui.add(
+                                        Button::new("Copy")
+                                            .variant(Variant::Ghost)
+                                            .size(Size::Small),
+                                    );
+                                });
+                            }
+                        });
+                });
+        },
+    );
+}
+
+fn show_report_metric_grid(ui: &mut egui::Ui) {
+    let theme = cast::theme_for_ui(ui);
+    let available = ui.available_width();
+    let gap = theme.spacing.md;
+    let columns = if available < 620.0 {
+        1
+    } else if available < 980.0 {
+        2
+    } else {
+        4
+    };
+    let width = ((available - gap * (columns - 1) as f32) / columns as f32).max(180.0);
+
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = egui::vec2(gap, gap);
+        ui.add(
+            MetricCard::new("Completion", "94%")
+                .delta("+8%", Intent::Success)
+                .detail("Passed planned work")
+                .width(width),
+        );
+        ui.add(
+            MetricCard::new("Commands", "31")
+                .delta("0 failed", Intent::Success)
+                .detail("Shell and cargo checks")
+                .width(width),
+        );
+        ui.add(
+            MetricCard::new("Artifacts", "7")
+                .delta("3 new", Intent::Info)
+                .detail("Files and reports")
+                .width(width),
+        );
+        ui.add(
+            MetricCard::new("Review debt", "4")
+                .delta("-2", Intent::Warning)
+                .detail("Open polish notes")
+                .width(width),
+        );
+    });
 }
 
 fn show_text_and_feedback(

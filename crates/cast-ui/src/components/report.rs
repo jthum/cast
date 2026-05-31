@@ -1,7 +1,9 @@
-use egui::{Color32, InnerResponse, Response, RichText, Sense, Stroke, Ui, Widget};
+use egui::{
+    Color32, Direction, InnerResponse, Response, RichText, Sense, Shape, Stroke, Ui, Widget,
+};
 
 use crate::{
-    color::mix_oklch,
+    color::{mix_oklch, mix_with_transparent, with_alpha},
     components::{Badge, ProgressBar},
     foundation::{Intent, Size},
     theme::{CastTheme, theme_for_ui},
@@ -58,7 +60,7 @@ impl Widget for MetricCard {
             .unwrap_or_else(|| ui.available_width().max(180.0));
 
         egui::Frame::new()
-            .fill(theme.colors.surface)
+            .fill(theme.colors.surface_raised)
             .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
             .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
             .inner_margin(egui::Margin::same(theme.spacing.md as i8))
@@ -337,7 +339,7 @@ impl ReportSection {
             .unwrap_or_else(|| ui.available_width().max(260.0));
 
         egui::Frame::new()
-            .fill(theme.colors.surface)
+            .fill(theme.colors.surface_raised)
             .stroke(Stroke::new(theme.stroke.sm, theme.colors.border))
             .corner_radius(egui::CornerRadius::same(theme.radius.lg as u8))
             .inner_margin(egui::Margin::same(theme.spacing.md as i8))
@@ -362,11 +364,7 @@ impl ReportSection {
 }
 
 fn paint_sparkline(ui: &Ui, theme: &CastTheme, rect: egui::Rect, values: &[f32], intent: Intent) {
-    ui.painter().rect_filled(
-        rect,
-        egui::CornerRadius::same(theme.radius.md as u8),
-        theme.colors.surface_muted,
-    );
+    paint_plot_shell(ui, theme, rect, 3);
 
     if values.len() < 2 {
         return;
@@ -374,24 +372,36 @@ fn paint_sparkline(ui: &Ui, theme: &CastTheme, rect: egui::Rect, values: &[f32],
 
     let (min, max) = value_range(values);
     let accent = intent_color(theme, intent);
-    let inset = egui::vec2(theme.spacing.xs, theme.spacing.xs);
+    let inset = egui::vec2(theme.spacing.sm, theme.spacing.sm);
     let plot = rect.shrink2(inset);
-    let mut previous = sparkline_point(plot, values[0], 0, values.len(), min, max);
+    let points = values
+        .iter()
+        .enumerate()
+        .map(|(index, value)| sparkline_point(plot, *value, index, values.len(), min, max))
+        .collect::<Vec<_>>();
 
-    for (index, value) in values.iter().enumerate().skip(1) {
-        let point = sparkline_point(plot, *value, index, values.len(), min, max);
+    ui.painter().add(Shape::gradient_rect(
+        plot,
+        Direction::TopDown,
+        [
+            mix_with_transparent(accent, 0.12),
+            mix_with_transparent(accent, 0.02),
+        ],
+    ));
+    ui.painter().add(Shape::line(
+        points.clone(),
+        Stroke::new(theme.stroke.lg, with_alpha(accent, 235)),
+    ));
+
+    if let Some(last) = points.last().copied() {
+        ui.painter().circle_filled(last, 3.5, theme.colors.surface);
         ui.painter()
-            .line_segment([previous, point], Stroke::new(theme.stroke.md, accent));
-        previous = point;
+            .circle_stroke(last, 3.5, Stroke::new(theme.stroke.md, accent));
     }
 }
 
 fn paint_bar_chart(ui: &Ui, theme: &CastTheme, rect: egui::Rect, data: &[BarDatum]) {
-    ui.painter().rect_filled(
-        rect,
-        egui::CornerRadius::same(theme.radius.md as u8),
-        theme.colors.surface_muted,
-    );
+    paint_plot_shell(ui, theme, rect, 4);
 
     if data.is_empty() {
         return;
@@ -402,25 +412,45 @@ fn paint_bar_chart(ui: &Ui, theme: &CastTheme, rect: egui::Rect, data: &[BarDatu
         .map(|datum| datum.value.max(0.0))
         .fold(0.0, f32::max)
         .max(1.0);
-    let label_height = 20.0;
-    let gap = theme.spacing.xs;
-    let plot =
-        egui::Rect::from_min_max(rect.min, egui::pos2(rect.max.x, rect.max.y - label_height));
+    let label_height = 24.0;
+    let value_height = 18.0;
+    let gap = theme.spacing.sm;
+    let plot = egui::Rect::from_min_max(
+        rect.min + egui::vec2(theme.spacing.sm, value_height),
+        egui::pos2(rect.max.x - theme.spacing.sm, rect.max.y - label_height),
+    );
     let bar_width =
         ((plot.width() - gap * (data.len().saturating_sub(1) as f32)) / data.len() as f32).max(4.0);
 
     for (index, datum) in data.iter().enumerate() {
         let x = plot.min.x + index as f32 * (bar_width + gap);
-        let height = plot.height() * (datum.value.max(0.0) / max).clamp(0.0, 1.0);
+        let normalized = (datum.value.max(0.0) / max).clamp(0.0, 1.0);
+        let height = plot.height() * normalized;
+        let track_rect = egui::Rect::from_min_max(
+            egui::pos2(x, plot.min.y),
+            egui::pos2((x + bar_width).min(plot.max.x), plot.max.y),
+        );
         let bar_rect = egui::Rect::from_min_max(
             egui::pos2(x, plot.max.y - height),
             egui::pos2((x + bar_width).min(plot.max.x), plot.max.y),
         );
         let accent = intent_color(theme, datum.intent);
         ui.painter().rect_filled(
+            track_rect,
+            egui::CornerRadius::same(theme.radius.sm as u8),
+            mix_with_transparent(theme.colors.text_muted, 0.06),
+        );
+        ui.painter().rect_filled(
             bar_rect,
             egui::CornerRadius::same(theme.radius.sm as u8),
-            mix_oklch(accent, theme.colors.surface, 0.08),
+            mix_oklch(accent, theme.colors.surface, 0.05),
+        );
+        ui.painter().text(
+            egui::pos2(x + bar_width / 2.0, bar_rect.min.y - 4.0),
+            egui::Align2::CENTER_BOTTOM,
+            compact_chart_value(datum.value).as_str(),
+            theme.typography.caption.clone(),
+            theme.colors.text_muted,
         );
         ui.painter().text(
             egui::pos2(x + bar_width / 2.0, rect.max.y - 2.0),
@@ -429,6 +459,48 @@ fn paint_bar_chart(ui: &Ui, theme: &CastTheme, rect: egui::Rect, data: &[BarDatu
             theme.typography.caption.clone(),
             theme.colors.text_subtle,
         );
+    }
+}
+
+fn paint_plot_shell(ui: &Ui, theme: &CastTheme, rect: egui::Rect, grid_lines: usize) {
+    let radius = egui::CornerRadius::same(theme.radius.md as u8);
+    ui.painter()
+        .rect_filled(rect, radius, plot_background(theme));
+    ui.painter().rect_stroke(
+        rect,
+        radius,
+        Stroke::new(
+            theme.stroke.sm,
+            mix_with_transparent(theme.colors.text_muted, 0.10),
+        ),
+        egui::StrokeKind::Inside,
+    );
+
+    if grid_lines == 0 {
+        return;
+    }
+
+    let grid = Stroke::new(
+        theme.stroke.sm,
+        mix_with_transparent(theme.colors.text_muted, 0.10),
+    );
+    for index in 1..grid_lines {
+        let y = rect.top() + rect.height() * index as f32 / grid_lines as f32;
+        ui.painter().hline(rect.x_range(), y, grid);
+    }
+}
+
+fn plot_background(theme: &CastTheme) -> Color32 {
+    mix_oklch(theme.colors.surface_muted, theme.colors.surface, 0.35)
+}
+
+fn compact_chart_value(value: f32) -> String {
+    if value >= 1000.0 {
+        format!("{:.1}k", value / 1000.0)
+    } else if value.fract().abs() < f32::EPSILON {
+        format!("{value:.0}")
+    } else {
+        format!("{value:.1}")
     }
 }
 
