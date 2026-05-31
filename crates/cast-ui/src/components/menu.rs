@@ -4,7 +4,7 @@ use egui::{
 };
 
 use crate::{
-    color::{mix_with_transparent, with_alpha},
+    color::{contrast_ratio, mix_with_transparent, with_alpha},
     foundation::{Intent, Size, Variant},
     style::{IntentColors, menu_frame, resolve_control_metrics},
     theme::{CastTheme, theme_for_ui},
@@ -571,7 +571,7 @@ fn menu_item_colors(
     if selected {
         IntentColors {
             fill: mix_with_transparent(accent, selected_alpha),
-            fg: accent,
+            fg: menu_item_fg(theme, intent),
             border: mix_with_transparent(accent, 0.30),
         }
     } else if pressed {
@@ -609,7 +609,23 @@ fn menu_item_accent(theme: &CastTheme, intent: Intent) -> Color32 {
 fn menu_item_fg(theme: &CastTheme, intent: Intent) -> Color32 {
     match intent {
         Intent::Neutral => with_alpha(theme.colors.text, 225),
-        _ => menu_item_accent(theme, intent),
+        _ => readable_menu_accent(theme, intent),
+    }
+}
+
+fn readable_menu_accent(theme: &CastTheme, intent: Intent) -> Color32 {
+    let accent = menu_item_accent(theme, intent);
+    if contrast_ratio(theme.colors.surface, accent) >= 4.5 {
+        return accent;
+    }
+
+    match intent {
+        Intent::Neutral | Intent::Primary => theme.colors.primary_family.emphasis,
+        Intent::Secondary => theme.colors.secondary_family.emphasis,
+        Intent::Success => theme.colors.success_family.emphasis,
+        Intent::Warning => theme.colors.warning_family.emphasis,
+        Intent::Danger => theme.colors.danger_family.emphasis,
+        Intent::Info => theme.colors.info_family.emphasis,
     }
 }
 
@@ -703,6 +719,17 @@ mod tests {
         let colors = menu_item_colors(&theme, Intent::Danger, false, false, false);
 
         assert_eq!(colors.fg, theme.colors.danger_family.base);
+    }
+
+    #[test]
+    fn dark_selected_menu_item_keeps_readable_text_with_custom_primary() {
+        let theme = CastTheme::from_palette(
+            crate::ThemeMode::Dark,
+            crate::CastPaletteInput::from_primary(Color32::from_rgb(88, 28, 135)),
+        );
+        let colors = menu_item_colors(&theme, Intent::Primary, true, false, false);
+
+        assert!(contrast_ratio(theme.colors.surface, colors.fg) >= 4.5);
     }
 
     #[test]

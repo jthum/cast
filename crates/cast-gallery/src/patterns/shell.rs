@@ -7,9 +7,52 @@ use cast::{
 };
 use std::hash::Hash;
 
+#[derive(Clone, Copy, Debug)]
+pub struct AppShellConfig<'a> {
+    pub title: &'a str,
+    pub subtitle: &'a str,
+    pub switcher_title: &'a str,
+    pub switcher_meta: &'a str,
+    pub nav_group: &'a str,
+    pub nav_items: &'a [&'a str],
+    pub status_group: &'a str,
+    pub status_items: &'a [(&'a str, &'a str)],
+}
+
+impl Default for AppShellConfig<'static> {
+    fn default() -> Self {
+        Self {
+            title: "Cast",
+            subtitle: "Themeable egui components",
+            switcher_title: "Cast UI",
+            switcher_meta: "v0.1",
+            nav_group: "Workspace",
+            nav_items: &[
+                "Workbench",
+                "Foundations",
+                "Components",
+                "Agent components",
+                "Theme lab",
+            ],
+            status_group: "Status",
+            status_items: &[("Runtime theme", "Live"), ("Components", "Ready")],
+        }
+    }
+}
+
 pub fn show_shell_top_bar(
     ui: &mut egui::Ui,
     ctx: &egui::Context,
+    seed: &mut cast::ThemeSeed,
+    zoom: &mut f32,
+) -> bool {
+    show_app_top_bar(ui, ctx, "Cast Gallery", seed, zoom)
+}
+
+pub fn show_app_top_bar(
+    ui: &mut egui::Ui,
+    ctx: &egui::Context,
+    title: &str,
     seed: &mut cast::ThemeSeed,
     zoom: &mut f32,
 ) -> bool {
@@ -18,7 +61,7 @@ pub fn show_shell_top_bar(
         egui::vec2(ui.available_width(), 32.0),
         egui::Layout::left_to_right(egui::Align::Center),
         |ui| {
-            ui.label("Cast Gallery");
+            ui.label(title);
             ui.separator();
 
             let mut mode_index = match seed.mode {
@@ -50,38 +93,39 @@ pub fn show_shell_top_bar(
 }
 
 pub fn show_shell_sidebar(ui: &mut egui::Ui, theme: &CastTheme, selected: &mut usize) {
+    show_app_sidebar(ui, theme, &AppShellConfig::default(), selected);
+}
+
+pub fn show_app_sidebar(
+    ui: &mut egui::Ui,
+    theme: &CastTheme,
+    config: &AppShellConfig<'_>,
+    selected: &mut usize,
+) {
     ui.add_space(6.0);
     ui.label(
-        RichText::new("Cast")
+        RichText::new(config.title)
             .strong()
             .size(theme.typography.heading.size + 2.0)
             .color(Color32::WHITE),
     );
-    ui.label(RichText::new("Themeable egui components").color(sidebar_muted_text()));
+    ui.label(RichText::new(config.subtitle).color(sidebar_muted_text()));
     ui.add_space(18.0);
 
-    sidebar_workspace_switcher(ui, theme);
+    sidebar_workspace_switcher(ui, theme, config.switcher_title, config.switcher_meta);
     ui.add_space(18.0);
-    sidebar_group_label(ui, "Workspace");
-    for (index, label) in [
-        "Workbench",
-        "Foundations",
-        "Components",
-        "Agent components",
-        "Theme lab",
-    ]
-    .iter()
-    .enumerate()
-    {
+    sidebar_group_label(ui, config.nav_group);
+    for (index, label) in config.nav_items.iter().enumerate() {
         if sidebar_nav_item(ui, theme, label, *selected == index).clicked() {
             *selected = index;
         }
     }
 
     ui.add_space(18.0);
-    sidebar_group_label(ui, "Status");
-    sidebar_status_row(ui, theme, "Runtime theme", "Live");
-    sidebar_status_row(ui, theme, "Components", "Ready");
+    sidebar_group_label(ui, config.status_group);
+    for (label, value) in config.status_items {
+        sidebar_status_row(ui, theme, label, value);
+    }
 }
 
 pub fn shell_sidebar_fill(theme: &CastTheme) -> Color32 {
@@ -115,7 +159,7 @@ pub fn cast_page_scroll_area(id: impl Hash, theme: &CastTheme) -> ScrollArea {
         .wheel_scroll_multiplier(egui::vec2(1.0, theme.scroll.wheel_multiplier))
 }
 
-fn sidebar_workspace_switcher(ui: &mut egui::Ui, theme: &CastTheme) {
+fn sidebar_workspace_switcher(ui: &mut egui::Ui, theme: &CastTheme, title: &str, meta: &str) {
     let width = ui.available_width();
     let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 44.0), egui::Sense::hover());
     if ui.is_rect_visible(rect) {
@@ -129,14 +173,14 @@ fn sidebar_workspace_switcher(ui: &mut egui::Ui, theme: &CastTheme) {
         ui.painter().text(
             rect.left_center() + egui::vec2(14.0, 0.0),
             egui::Align2::LEFT_CENTER,
-            "Cast UI",
+            title,
             theme.typography.button.clone(),
             Color32::WHITE,
         );
         ui.painter().text(
             rect.right_center() - egui::vec2(14.0, 0.0),
             egui::Align2::RIGHT_CENTER,
-            "v0.1",
+            meta,
             theme.typography.caption.clone(),
             sidebar_muted_text(),
         );
@@ -244,5 +288,14 @@ mod tests {
         let theme = CastTheme::light();
 
         let _ = cast_page_scroll_area(("main_scroll", 2usize, 1usize), &theme);
+    }
+
+    #[test]
+    fn app_shell_config_defaults_match_gallery_shell() {
+        let config = AppShellConfig::default();
+
+        assert_eq!(config.title, "Cast");
+        assert_eq!(config.nav_items[3], "Agent components");
+        assert_eq!(config.status_items[0], ("Runtime theme", "Live"));
     }
 }

@@ -183,6 +183,7 @@ fn kbd_joiner_layout_job(theme: &CastTheme, text_size: f32) -> LayoutJob {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contrast_ratio;
 
     #[test]
     fn kbd_defaults_to_single_medium_key() {
@@ -212,5 +213,12 @@ mod tests {
             kbd_metrics(&theme, Size::Medium).min_height
                 < kbd_metrics(&theme, Size::Large).min_height
         );
+    }
+
+    #[test]
+    fn dark_keycap_text_has_readable_contrast() {
+        let theme = CastTheme::dark();
+
+        assert!(contrast_ratio(theme.colors.surface_muted, theme.colors.text) >= 4.5);
     }
 }

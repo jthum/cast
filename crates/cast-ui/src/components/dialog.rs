@@ -665,6 +665,15 @@ mod tests {
     }
 
     #[test]
+    fn dark_sheet_uses_neutral_border_token() {
+        let theme = CastTheme::dark();
+        let frame = sheet_frame(&theme, Placement::Right);
+
+        assert_eq!(frame.stroke.color, theme.colors.border);
+        assert!(frame.stroke.width >= 1.0);
+    }
+
+    #[test]
     fn sheet_corner_radius_only_rounds_exposed_edge() {
         let theme = CastTheme::light();
         let radius = theme.radius.lg as u8;
