@@ -8,7 +8,8 @@ use patterns::entity_table_with_details::{
 };
 use patterns::related_activity::show_related_activity;
 use patterns::shell::{
-    cast_scroll_area, shell_rule_color, shell_sidebar_fill, show_shell_sidebar, show_shell_top_bar,
+    cast_page_scroll_area, cast_scroll_area, shell_rule_color, shell_sidebar_fill,
+    show_shell_sidebar, show_shell_top_bar,
 };
 
 use cast::{
@@ -222,52 +223,60 @@ impl eframe::App for CastGallery {
                     .fill(self.theme.colors.background)
                     .inner_margin(egui::Margin::symmetric(28, 24))
                     .show(ui, |ui| {
-                        cast_scroll_area("main_scroll", &self.theme)
-                            .auto_shrink([false, false])
-                            .show(ui, |ui| {
-                                theme_changed |= show_workspace_view(
-                                    ui,
-                                    self.sidebar_section,
-                                    &self.theme,
-                                    &mut self.seed,
-                                    ctx.pixels_per_point(),
-                                    self.zoom,
-                                    &mut self.command,
-                                    &mut self.search,
-                                    &mut self.name,
-                                    &mut self.handle,
-                                    &mut self.preset_query,
-                                    &mut self.preset_choice,
-                                    &mut self.form_validation_attention,
-                                    &mut self.enabled,
-                                    &mut self.notifications,
-                                    &mut self.indeterminate,
-                                    &mut self.form_density,
-                                    &mut self.menu_choice,
-                                    &mut self.dialog_open,
-                                    &mut self.sheet_open,
-                                    &mut self.confirm_dialog_open,
-                                    &mut self.confirm_result,
-                                    &mut self.toast_preview_open,
-                                    &mut self.toast_preview_toasts,
-                                    &mut self.command_palette,
-                                    &mut self.lead_search,
-                                    &mut self.related_activity_open,
-                                    &mut self.related_activity_group,
-                                    &mut self.lead_selected,
-                                    &mut self.lead_expanded,
-                                    &mut self.lead_date_filter,
-                                    &mut self.lead_user_filter,
-                                    &mut self.lead_status_filter,
-                                    &mut self.lead_payment_filter,
-                                    &mut self.lead_rows_per_page,
-                                    &mut self.lead_page,
-                                    &mut self.lead_exported_count,
-                                    &mut self.foundation_tab,
-                                    &mut self.workflow_segment,
-                                    &mut self.component_tab,
-                                );
-                            });
+                        let scroll_tab = if self.sidebar_section == 2 {
+                            self.component_tab
+                        } else {
+                            0
+                        };
+                        cast_page_scroll_area(
+                            ("main_scroll", self.sidebar_section, scroll_tab),
+                            &self.theme,
+                        )
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            theme_changed |= show_workspace_view(
+                                ui,
+                                self.sidebar_section,
+                                &self.theme,
+                                &mut self.seed,
+                                ctx.pixels_per_point(),
+                                self.zoom,
+                                &mut self.command,
+                                &mut self.search,
+                                &mut self.name,
+                                &mut self.handle,
+                                &mut self.preset_query,
+                                &mut self.preset_choice,
+                                &mut self.form_validation_attention,
+                                &mut self.enabled,
+                                &mut self.notifications,
+                                &mut self.indeterminate,
+                                &mut self.form_density,
+                                &mut self.menu_choice,
+                                &mut self.dialog_open,
+                                &mut self.sheet_open,
+                                &mut self.confirm_dialog_open,
+                                &mut self.confirm_result,
+                                &mut self.toast_preview_open,
+                                &mut self.toast_preview_toasts,
+                                &mut self.command_palette,
+                                &mut self.lead_search,
+                                &mut self.related_activity_open,
+                                &mut self.related_activity_group,
+                                &mut self.lead_selected,
+                                &mut self.lead_expanded,
+                                &mut self.lead_date_filter,
+                                &mut self.lead_user_filter,
+                                &mut self.lead_status_filter,
+                                &mut self.lead_payment_filter,
+                                &mut self.lead_rows_per_page,
+                                &mut self.lead_page,
+                                &mut self.lead_exported_count,
+                                &mut self.foundation_tab,
+                                &mut self.workflow_segment,
+                                &mut self.component_tab,
+                            );
+                        });
                     });
             });
 

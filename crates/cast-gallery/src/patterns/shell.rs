@@ -5,6 +5,7 @@ use cast::{
         scroll_area::{ScrollBarVisibility, ScrollSource},
     },
 };
+use std::hash::Hash;
 
 pub fn show_shell_top_bar(
     ui: &mut egui::Ui,
@@ -97,8 +98,20 @@ pub fn shell_rule_color(theme: &CastTheme) -> Color32 {
     }
 }
 
-pub fn cast_scroll_area(id: &'static str, theme: &CastTheme) -> ScrollArea {
+pub fn cast_scroll_area(id: impl Hash, theme: &CastTheme) -> ScrollArea {
     ScrollArea::vertical()
+        .id_salt(id)
+        .scroll_bar_visibility(ScrollBarVisibility::VisibleWhenNeeded)
+        .scroll_source(ScrollSource {
+            scroll_bar: true,
+            drag: theme.scroll.drag_to_scroll,
+            mouse_wheel: true,
+        })
+        .wheel_scroll_multiplier(egui::vec2(1.0, theme.scroll.wheel_multiplier))
+}
+
+pub fn cast_page_scroll_area(id: impl Hash, theme: &CastTheme) -> ScrollArea {
+    ScrollArea::both()
         .id_salt(id)
         .scroll_bar_visibility(ScrollBarVisibility::VisibleWhenNeeded)
         .scroll_source(ScrollSource {
