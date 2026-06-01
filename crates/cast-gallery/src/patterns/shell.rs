@@ -612,14 +612,15 @@ fn sidebar_workspace_switcher(ui: &mut egui::Ui, theme: &CastTheme, title: &str,
 }
 
 fn sidebar_group_label(ui: &mut egui::Ui, label: &str) {
-    ui.add_space(2.0);
+    let theme = cast::theme_for_ui(ui);
+    ui.add_space(theme.stroke.lg);
     let label = label.to_ascii_uppercase();
     ui.label(
         RichText::new(label)
-            .size(12.0)
+            .size(theme.typography.caption.size)
             .color(Color32::from_rgba_unmultiplied(255, 255, 255, 128)),
     );
-    ui.add_space(2.0);
+    ui.add_space(theme.stroke.lg);
 }
 
 fn sidebar_nav_item(
@@ -628,11 +629,12 @@ fn sidebar_nav_item(
     label: &str,
     selected: bool,
 ) -> egui::Response {
+    let metrics = sidebar_nav_metrics(theme);
     let width = ui.available_width();
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 28.0), egui::Sense::click());
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(width, metrics.item_height), egui::Sense::click());
     if ui.is_rect_visible(rect) {
-        let text_inset = 10.0;
-        let paint_rect = rect.translate(egui::vec2(-text_inset, 0.0));
+        let paint_rect = sidebar_nav_paint_rect(rect, metrics);
         let fill = if selected {
             Color32::from_rgba_unmultiplied(255, 255, 255, 44)
         } else if response.hovered() {
@@ -646,12 +648,12 @@ fn sidebar_nav_item(
             Color32::from_rgba_unmultiplied(255, 255, 255, 190)
         };
         ui.painter().rect_filled(
-            paint_rect.shrink2(egui::vec2(0.0, 1.0)),
+            paint_rect.shrink2(egui::vec2(0.0, metrics.vertical_shrink)),
             egui::CornerRadius::same(theme.radius.md.round() as u8),
             fill,
         );
         ui.painter().text(
-            paint_rect.left_center() + egui::vec2(text_inset, 0.0),
+            paint_rect.left_center() + egui::vec2(metrics.item_inset, 0.0),
             egui::Align2::LEFT_CENTER,
             label,
             theme.typography.button.clone(),
@@ -670,9 +672,12 @@ fn sidebar_parent_nav_item(
 ) -> egui::Response {
     let response = sidebar_nav_item(ui, theme, label, selected);
     if ui.is_rect_visible(response.rect) {
+        let metrics = sidebar_nav_metrics(theme);
+        let paint_rect = sidebar_nav_paint_rect(response.rect, metrics);
         paint_sidebar_caret(
             ui,
-            response.rect,
+            paint_rect,
+            metrics,
             open,
             Color32::from_rgba_unmultiplied(255, 255, 255, 170),
         );
@@ -680,36 +685,43 @@ fn sidebar_parent_nav_item(
     response
 }
 
-fn paint_sidebar_caret(ui: &egui::Ui, rect: egui::Rect, open: bool, color: Color32) {
-    let center = rect.right_center() - egui::vec2(8.0, 0.0);
-    let stroke = egui::Stroke::new(1.35, color);
+fn paint_sidebar_caret(
+    ui: &egui::Ui,
+    rect: egui::Rect,
+    metrics: SidebarNavMetrics,
+    open: bool,
+    color: Color32,
+) {
+    let center = rect.right_center() - egui::vec2(metrics.caret_inset, 0.0);
+    let size = metrics.caret_size;
+    let stroke = egui::Stroke::new(metrics.caret_stroke, color);
     if open {
         ui.painter().line_segment(
             [
-                center + egui::vec2(-4.0, -2.0),
-                center + egui::vec2(0.0, 2.0),
+                center + egui::vec2(-size, -size * 0.5),
+                center + egui::vec2(0.0, size * 0.5),
             ],
             stroke,
         );
         ui.painter().line_segment(
             [
-                center + egui::vec2(0.0, 2.0),
-                center + egui::vec2(4.0, -2.0),
+                center + egui::vec2(0.0, size * 0.5),
+                center + egui::vec2(size, -size * 0.5),
             ],
             stroke,
         );
     } else {
         ui.painter().line_segment(
             [
-                center + egui::vec2(-2.0, -4.0),
-                center + egui::vec2(2.0, 0.0),
+                center + egui::vec2(-size * 0.5, -size),
+                center + egui::vec2(size * 0.5, 0.0),
             ],
             stroke,
         );
         ui.painter().line_segment(
             [
-                center + egui::vec2(2.0, 0.0),
-                center + egui::vec2(-2.0, 4.0),
+                center + egui::vec2(size * 0.5, 0.0),
+                center + egui::vec2(-size * 0.5, size),
             ],
             stroke,
         );
@@ -733,10 +745,11 @@ fn show_sidebar_children(
         }
     }
     let bottom = ui.cursor().min.y;
-    let line_x = ui.min_rect().min.x + 12.0;
+    let metrics = sidebar_nav_metrics(theme);
+    let line_x = ui.min_rect().min.x + metrics.child_line_x;
     ui.painter().vline(
         line_x,
-        top + 4.0..=bottom - 4.0,
+        top + metrics.vertical_shrink..=bottom - metrics.vertical_shrink,
         egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 42)),
     );
 }
@@ -747,8 +760,12 @@ fn sidebar_child_item(
     label: &str,
     selected: bool,
 ) -> egui::Response {
+    let metrics = sidebar_nav_metrics(theme);
     let width = ui.available_width();
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 25.0), egui::Sense::click());
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(width, metrics.child_item_height),
+        egui::Sense::click(),
+    );
     if ui.is_rect_visible(rect) {
         let fill = if selected {
             Color32::from_rgba_unmultiplied(255, 255, 255, 34)
@@ -763,12 +780,12 @@ fn sidebar_child_item(
             Color32::from_rgba_unmultiplied(255, 255, 255, 174)
         };
         ui.painter().rect_filled(
-            rect.shrink2(egui::vec2(0.0, 1.0)),
+            rect.shrink2(egui::vec2(0.0, metrics.vertical_shrink)),
             egui::CornerRadius::same(theme.radius.sm.round() as u8),
             fill,
         );
         ui.painter().text(
-            rect.left_center() + egui::vec2(26.0, 0.0),
+            rect.left_center() + egui::vec2(metrics.child_indent, 0.0),
             egui::Align2::LEFT_CENTER,
             label,
             theme.typography.small.clone(),
@@ -776,6 +793,39 @@ fn sidebar_child_item(
         );
     }
     response
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SidebarNavMetrics {
+    item_height: f32,
+    child_item_height: f32,
+    item_inset: f32,
+    child_indent: f32,
+    child_line_x: f32,
+    caret_inset: f32,
+    caret_size: f32,
+    caret_stroke: f32,
+    vertical_shrink: f32,
+}
+
+fn sidebar_nav_metrics(theme: &CastTheme) -> SidebarNavMetrics {
+    SidebarNavMetrics {
+        item_height: (theme.controls.min_height - theme.spacing.sm)
+            .max(theme.typography.button.size + theme.spacing.sm),
+        child_item_height: (theme.controls.min_height - theme.spacing.md)
+            .max(theme.typography.small.size + theme.spacing.xs),
+        item_inset: theme.spacing.sm,
+        child_indent: theme.spacing.lg + theme.spacing.xs,
+        child_line_x: theme.spacing.sm + theme.spacing.xs,
+        caret_inset: theme.spacing.lg,
+        caret_size: theme.spacing.xs,
+        caret_stroke: theme.stroke.md,
+        vertical_shrink: theme.stroke.sm,
+    }
+}
+
+fn sidebar_nav_paint_rect(rect: egui::Rect, metrics: SidebarNavMetrics) -> egui::Rect {
+    rect.translate(egui::vec2(-metrics.item_inset, 0.0))
 }
 
 fn sidebar_muted_text() -> Color32 {
@@ -832,6 +882,24 @@ mod tests {
             metrics.content_margin_for_width(metrics.compact_breakpoint - 1.0),
             metrics.compact_content_margin as i8
         );
+    }
+
+    #[test]
+    fn sidebar_nav_metrics_follow_theme_tokens() {
+        let theme = CastTheme::light();
+        let metrics = sidebar_nav_metrics(&theme);
+
+        assert_eq!(
+            metrics.item_height,
+            theme.controls.min_height - theme.spacing.sm
+        );
+        assert_eq!(
+            metrics.child_item_height,
+            theme.controls.min_height - theme.spacing.md
+        );
+        assert_eq!(metrics.item_inset, theme.spacing.sm);
+        assert_eq!(metrics.caret_inset, theme.spacing.lg);
+        assert_eq!(metrics.caret_size, theme.spacing.xs);
     }
 
     #[test]
