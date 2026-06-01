@@ -749,7 +749,7 @@ fn show_sidebar_children(
     let line_x = ui.min_rect().min.x + metrics.child_line_x;
     ui.painter().vline(
         line_x,
-        top + metrics.vertical_shrink..=bottom - metrics.vertical_shrink,
+        top + metrics.item_gap..=bottom - metrics.item_gap,
         egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 42)),
     );
 }
@@ -767,6 +767,7 @@ fn sidebar_child_item(
         egui::Sense::click(),
     );
     if ui.is_rect_visible(rect) {
+        let paint_rect = sidebar_child_paint_rect(rect, metrics);
         let fill = if selected {
             Color32::from_rgba_unmultiplied(255, 255, 255, 34)
         } else if response.hovered() {
@@ -780,12 +781,12 @@ fn sidebar_child_item(
             Color32::from_rgba_unmultiplied(255, 255, 255, 174)
         };
         ui.painter().rect_filled(
-            rect.shrink2(egui::vec2(0.0, metrics.vertical_shrink)),
+            paint_rect.shrink2(egui::vec2(0.0, metrics.vertical_shrink)),
             egui::CornerRadius::same(theme.radius.sm.round() as u8),
             fill,
         );
         ui.painter().text(
-            rect.left_center() + egui::vec2(metrics.child_indent, 0.0),
+            paint_rect.left_center() + egui::vec2(metrics.child_text_inset, 0.0),
             egui::Align2::LEFT_CENTER,
             label,
             theme.typography.small.clone(),
@@ -800,32 +801,44 @@ struct SidebarNavMetrics {
     item_height: f32,
     child_item_height: f32,
     item_inset: f32,
-    child_indent: f32,
+    child_paint_start: f32,
+    child_text_inset: f32,
     child_line_x: f32,
     caret_inset: f32,
     caret_size: f32,
     caret_stroke: f32,
+    item_gap: f32,
     vertical_shrink: f32,
 }
 
 fn sidebar_nav_metrics(theme: &CastTheme) -> SidebarNavMetrics {
+    let item_gap = theme.stroke.sm;
     SidebarNavMetrics {
-        item_height: (theme.controls.min_height - theme.spacing.sm)
+        item_height: (theme.controls.min_height - theme.spacing.xs)
             .max(theme.typography.button.size + theme.spacing.sm),
-        child_item_height: (theme.controls.min_height - theme.spacing.md)
-            .max(theme.typography.small.size + theme.spacing.xs),
-        item_inset: theme.spacing.sm,
-        child_indent: theme.spacing.lg + theme.spacing.xs,
-        child_line_x: theme.spacing.sm + theme.spacing.xs,
+        child_item_height: (theme.controls.min_height - theme.spacing.sm)
+            .max(theme.typography.small.size + theme.spacing.sm),
+        item_inset: theme.spacing.xs,
+        child_line_x: theme.spacing.sm,
+        child_paint_start: theme.spacing.sm + theme.spacing.xs,
+        child_text_inset: theme.spacing.sm,
         caret_inset: theme.spacing.lg,
         caret_size: theme.spacing.xs,
         caret_stroke: theme.stroke.md,
-        vertical_shrink: theme.stroke.sm,
+        item_gap,
+        vertical_shrink: item_gap * 0.5,
     }
 }
 
 fn sidebar_nav_paint_rect(rect: egui::Rect, metrics: SidebarNavMetrics) -> egui::Rect {
     rect.translate(egui::vec2(-metrics.item_inset, 0.0))
+}
+
+fn sidebar_child_paint_rect(rect: egui::Rect, metrics: SidebarNavMetrics) -> egui::Rect {
+    egui::Rect::from_min_max(
+        rect.min + egui::vec2(metrics.child_paint_start, 0.0),
+        rect.max - egui::vec2(metrics.item_inset, 0.0),
+    )
 }
 
 fn sidebar_muted_text() -> Color32 {
@@ -891,15 +904,31 @@ mod tests {
 
         assert_eq!(
             metrics.item_height,
-            theme.controls.min_height - theme.spacing.sm
+            theme.controls.min_height - theme.spacing.xs
         );
         assert_eq!(
             metrics.child_item_height,
-            theme.controls.min_height - theme.spacing.md
+            theme.controls.min_height - theme.spacing.sm
         );
-        assert_eq!(metrics.item_inset, theme.spacing.sm);
+        assert_eq!(metrics.item_inset, theme.spacing.xs);
+        assert_eq!(
+            metrics.child_paint_start,
+            theme.spacing.sm + theme.spacing.xs
+        );
         assert_eq!(metrics.caret_inset, theme.spacing.lg);
         assert_eq!(metrics.caret_size, theme.spacing.xs);
+    }
+
+    #[test]
+    fn sidebar_child_rect_aligns_with_parent_trailing_edge() {
+        let theme = CastTheme::light();
+        let metrics = sidebar_nav_metrics(&theme);
+        let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(200.0, 28.0));
+        let parent = sidebar_nav_paint_rect(rect, metrics);
+        let child = sidebar_child_paint_rect(rect, metrics);
+
+        assert_eq!(child.max.x, parent.max.x);
+        assert!(child.min.x > metrics.child_line_x);
     }
 
     #[test]
