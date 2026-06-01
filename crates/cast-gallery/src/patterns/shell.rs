@@ -818,7 +818,7 @@ fn sidebar_nav_metrics(theme: &CastTheme) -> SidebarNavMetrics {
             .max(theme.typography.button.size + theme.spacing.sm),
         child_item_height: (theme.controls.min_height - theme.spacing.sm)
             .max(theme.typography.small.size + theme.spacing.sm),
-        item_inset: theme.spacing.xs,
+        item_inset: theme.spacing.sm,
         child_line_x: theme.spacing.sm,
         child_paint_start: theme.spacing.sm + theme.spacing.xs,
         child_text_inset: theme.spacing.sm,
@@ -910,7 +910,7 @@ mod tests {
             metrics.child_item_height,
             theme.controls.min_height - theme.spacing.sm
         );
-        assert_eq!(metrics.item_inset, theme.spacing.xs);
+        assert_eq!(metrics.item_inset, theme.spacing.sm);
         assert_eq!(
             metrics.child_paint_start,
             theme.spacing.sm + theme.spacing.xs
