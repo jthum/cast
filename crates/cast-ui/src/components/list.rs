@@ -1206,7 +1206,16 @@ fn paint_table_outline(ui: &Ui, theme: &CastTheme, rect: egui::Rect) {
     ui.painter().rect_stroke(
         rect,
         egui::CornerRadius::same(theme.radius.lg.round() as u8),
-        egui::Stroke::new(table_outline_width(theme), table_outline_color(theme)),
+        egui::Stroke::new(
+            table_outline_highlight_width(theme),
+            table_outline_highlight(theme),
+        ),
+        StrokeKind::Outside,
+    );
+    ui.painter().rect_stroke(
+        rect,
+        egui::CornerRadius::same(theme.radius.lg.round() as u8),
+        egui::Stroke::new(table_outline_width(theme), table_outline_border(theme)),
         StrokeKind::Outside,
     );
 }
@@ -1371,11 +1380,29 @@ fn table_header_font(theme: &CastTheme) -> egui::FontId {
 }
 
 fn table_outline_width(theme: &CastTheme) -> f32 {
+    theme.stroke.sm.max(1.0)
+}
+
+fn table_outline_border(theme: &CastTheme) -> Color32 {
+    match theme.mode {
+        ThemeMode::Light => theme.colors.border,
+        ThemeMode::Dark => mix_with_transparent(theme.colors.text_muted, 0.24),
+    }
+}
+
+fn table_outline_highlight_width(theme: &CastTheme) -> f32 {
     (theme.stroke.md + theme.stroke.sm).max(2.0)
 }
 
-fn table_outline_color(theme: &CastTheme) -> Color32 {
-    mix_with_transparent(theme.colors.primary_family.base, 0.10)
+fn table_outline_highlight(theme: &CastTheme) -> Color32 {
+    let neutral = mix_oklch(table_header_fill(theme), theme.colors.text_muted, 0.42);
+    mix_with_transparent(
+        neutral,
+        match theme.mode {
+            ThemeMode::Light => 0.16,
+            ThemeMode::Dark => 0.20,
+        },
+    )
 }
 
 fn table_internal_rule_color(theme: &CastTheme) -> Color32 {
@@ -1727,9 +1754,14 @@ mod tests {
 
         assert_eq!(table_header_fill(&theme), theme.colors.surface_muted);
         assert_eq!(table_header_text_color(&theme), theme.colors.text);
+        assert_eq!(table_outline_border(&theme), theme.colors.border);
+        assert_eq!(table_outline_width(&theme), theme.stroke.sm.max(1.0));
         assert_eq!(
-            table_outline_color(&theme),
-            mix_with_transparent(theme.colors.primary_family.base, 0.10)
+            table_outline_highlight(&theme),
+            mix_with_transparent(
+                mix_oklch(table_header_fill(&theme), theme.colors.text_muted, 0.42),
+                0.16
+            )
         );
         assert_eq!(table_internal_rule_color(&theme), theme.colors.border);
         assert_eq!(
@@ -1738,7 +1770,7 @@ mod tests {
         );
         assert_eq!(table_header_font(&theme).size, theme.typography.small.size);
         assert_ne!(
-            table_outline_color(&theme),
+            table_outline_highlight(&theme),
             table_internal_rule_color(&theme)
         );
     }
@@ -1748,8 +1780,15 @@ mod tests {
         let theme = CastTheme::dark();
 
         assert_eq!(
-            table_outline_color(&theme),
-            mix_with_transparent(theme.colors.primary_family.base, 0.10)
+            table_outline_border(&theme),
+            mix_with_transparent(theme.colors.text_muted, 0.24)
+        );
+        assert_eq!(
+            table_outline_highlight(&theme),
+            mix_with_transparent(
+                mix_oklch(table_header_fill(&theme), theme.colors.text_muted, 0.42),
+                0.20
+            )
         );
         assert_eq!(
             table_internal_rule_color(&theme),

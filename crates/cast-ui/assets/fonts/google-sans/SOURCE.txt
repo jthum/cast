@@ -1,0 +1,4 @@
+Google Sans font files downloaded from the Google Fonts CSS2 API:
+https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&display=swap
+
+The current Google Fonts FAQ says Google Sans is available under the SIL Open Font License.

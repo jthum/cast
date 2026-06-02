@@ -131,13 +131,14 @@ impl<'a> Dialog<'a> {
         self.show_sections(
             ctx,
             move |ui, dialog| {
-                paint_dialog_header(
+                paint_dialog_header_with_gap(
                     ui,
                     &current_theme(ui.ctx()).unwrap_or_else(CastTheme::light),
                     title.as_deref(),
                     description.as_deref(),
                     closable,
                     dialog,
+                    0.0,
                 );
             },
             add_contents,
@@ -546,13 +547,14 @@ impl<'a> Sheet<'a> {
             ctx,
             move |ui, sheet| {
                 let mut dialog = DialogController::default();
-                paint_dialog_header(
+                paint_dialog_header_with_gap(
                     ui,
                     &current_theme(ui.ctx()).unwrap_or_else(CastTheme::light),
                     title.as_deref(),
                     description.as_deref(),
                     closable,
                     &mut dialog,
+                    0.0,
                 );
                 if dialog.close_requested() {
                     sheet.close();
@@ -853,6 +855,26 @@ fn paint_dialog_header(
     closable: bool,
     controller: &mut DialogController,
 ) {
+    paint_dialog_header_with_gap(
+        ui,
+        theme,
+        title,
+        description,
+        closable,
+        controller,
+        theme.spacing.md,
+    );
+}
+
+fn paint_dialog_header_with_gap(
+    ui: &mut Ui,
+    theme: &CastTheme,
+    title: Option<&str>,
+    description: Option<&str>,
+    closable: bool,
+    controller: &mut DialogController,
+    bottom_gap: f32,
+) {
     let has_header = title.is_some() || description.is_some() || closable;
     if !has_header {
         return;
@@ -892,7 +914,9 @@ fn paint_dialog_header(
         }
     });
 
-    ui.add_space(theme.spacing.lg);
+    if bottom_gap > 0.0 {
+        ui.add_space(bottom_gap);
+    }
 }
 
 fn close_icon_button(ui: &mut Ui, theme: &CastTheme) -> Response {
