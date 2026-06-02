@@ -1517,11 +1517,6 @@ fn show_typography_editor(ui: &mut egui::Ui, seed: &mut ThemeSeed) -> bool {
             seed.typography = TypographyTokens::cast().with_body_size(seed.typography.body.size);
             changed = true;
         }
-        if ui.button("Google Sans").clicked() {
-            seed.typography =
-                TypographyTokens::google_sans().with_body_size(seed.typography.body.size);
-            changed = true;
-        }
         if ui.button("Inter").clicked() {
             seed.typography = TypographyTokens::inter().with_body_size(seed.typography.body.size);
             changed = true;
@@ -1822,24 +1817,6 @@ fn font_family_selector(
                 font_family_option(
                     ui,
                     &mut selected,
-                    named_font_family(cast::FontStack::GOOGLE_SANS_BODY_FAMILY),
-                    "Google Sans Regular",
-                );
-                font_family_option(
-                    ui,
-                    &mut selected,
-                    named_font_family(cast::FontStack::GOOGLE_SANS_BUTTON_FAMILY),
-                    "Google Sans Medium",
-                );
-                font_family_option(
-                    ui,
-                    &mut selected,
-                    named_font_family(cast::FontStack::GOOGLE_SANS_STRONG_FAMILY),
-                    "Google Sans SemiBold",
-                );
-                font_family_option(
-                    ui,
-                    &mut selected,
                     named_font_family(cast::FontStack::INTER_BODY_FAMILY),
                     "Inter Regular",
                 );
@@ -1884,21 +1861,6 @@ fn font_family_label(family: &egui::FontFamily) -> String {
     match family {
         egui::FontFamily::Proportional => "System UI".to_owned(),
         egui::FontFamily::Monospace => "System Mono".to_owned(),
-        egui::FontFamily::Name(name)
-            if name.as_ref() == cast::FontStack::GOOGLE_SANS_BODY_FAMILY =>
-        {
-            "Google Sans Regular".to_owned()
-        }
-        egui::FontFamily::Name(name)
-            if name.as_ref() == cast::FontStack::GOOGLE_SANS_BUTTON_FAMILY =>
-        {
-            "Google Sans Medium".to_owned()
-        }
-        egui::FontFamily::Name(name)
-            if name.as_ref() == cast::FontStack::GOOGLE_SANS_STRONG_FAMILY =>
-        {
-            "Google Sans SemiBold".to_owned()
-        }
         egui::FontFamily::Name(name) if name.as_ref() == cast::FontStack::INTER_BODY_FAMILY => {
             "Inter Regular".to_owned()
         }

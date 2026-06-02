@@ -16,16 +16,10 @@ const THEME_ID: &str = "cast_theme";
 const INTER_REGULAR_FONT: &str = "cast_inter_regular";
 const INTER_MEDIUM_FONT: &str = "cast_inter_medium";
 const INTER_SEMIBOLD_FONT: &str = "cast_inter_semibold";
-const GOOGLE_SANS_REGULAR_FONT: &str = "cast_google_sans_regular";
-const GOOGLE_SANS_MEDIUM_FONT: &str = "cast_google_sans_medium";
-const GOOGLE_SANS_SEMIBOLD_FONT: &str = "cast_google_sans_semibold";
 const JETBRAINS_MONO_FONT: &str = "cast_jetbrains_mono";
 const INTER_REGULAR_FAMILY: &str = "Cast Inter";
 const INTER_MEDIUM_FAMILY: &str = "Cast Inter Medium";
 const INTER_SEMIBOLD_FAMILY: &str = "Cast Inter SemiBold";
-const GOOGLE_SANS_REGULAR_FAMILY: &str = "Cast Google Sans";
-const GOOGLE_SANS_MEDIUM_FAMILY: &str = "Cast Google Sans Medium";
-const GOOGLE_SANS_SEMIBOLD_FAMILY: &str = "Cast Google Sans SemiBold";
 const JETBRAINS_MONO_FAMILY_NAME: &str = "Cast JetBrains Mono";
 const EXTERNAL_BODY_FONT: &str = "cast_external_body";
 const EXTERNAL_BUTTON_FONT: &str = "cast_external_button";
@@ -475,10 +469,6 @@ pub struct FontStack {
 }
 
 impl FontStack {
-    pub const GOOGLE_SANS_BODY_FAMILY: &'static str = GOOGLE_SANS_REGULAR_FAMILY;
-    pub const GOOGLE_SANS_BUTTON_FAMILY: &'static str = GOOGLE_SANS_MEDIUM_FAMILY;
-    pub const GOOGLE_SANS_STRONG_FAMILY: &'static str = GOOGLE_SANS_SEMIBOLD_FAMILY;
-    pub const GOOGLE_SANS_HEADING_FAMILY: &'static str = GOOGLE_SANS_SEMIBOLD_FAMILY;
     pub const INTER_BODY_FAMILY: &'static str = INTER_REGULAR_FAMILY;
     pub const INTER_BUTTON_FAMILY: &'static str = INTER_MEDIUM_FAMILY;
     pub const INTER_STRONG_FAMILY: &'static str = INTER_SEMIBOLD_FAMILY;
@@ -487,7 +477,7 @@ impl FontStack {
 
     #[must_use]
     pub fn cast() -> Self {
-        let mut stack = Self::google_sans();
+        let mut stack = Self::inter();
         stack.faces.push(FontFace::from_static(
             JETBRAINS_MONO_FONT,
             include_bytes!("../../assets/fonts/jetbrains-mono/JetBrainsMono[wght].ttf"),
@@ -495,52 +485,6 @@ impl FontStack {
         stack.mono_family = JETBRAINS_MONO_FAMILY_NAME.to_owned();
         stack.mono = vec![JETBRAINS_MONO_FONT.to_owned()];
         stack
-    }
-
-    #[must_use]
-    pub fn google_sans() -> Self {
-        Self {
-            faces: vec![
-                FontFace::from_static(
-                    GOOGLE_SANS_REGULAR_FONT,
-                    include_bytes!("../../assets/fonts/google-sans/GoogleSans-Regular.ttf"),
-                ),
-                FontFace::from_static(
-                    GOOGLE_SANS_MEDIUM_FONT,
-                    include_bytes!("../../assets/fonts/google-sans/GoogleSans-Medium.ttf"),
-                ),
-                FontFace::from_static(
-                    GOOGLE_SANS_SEMIBOLD_FONT,
-                    include_bytes!("../../assets/fonts/google-sans/GoogleSans-SemiBold.ttf"),
-                ),
-            ],
-            body_family: GOOGLE_SANS_REGULAR_FAMILY.to_owned(),
-            button_family: GOOGLE_SANS_MEDIUM_FAMILY.to_owned(),
-            strong_family: GOOGLE_SANS_SEMIBOLD_FAMILY.to_owned(),
-            heading_family: GOOGLE_SANS_SEMIBOLD_FAMILY.to_owned(),
-            mono_family: "Cast Mono".to_owned(),
-            body: vec![
-                GOOGLE_SANS_REGULAR_FONT.to_owned(),
-                GOOGLE_SANS_MEDIUM_FONT.to_owned(),
-                GOOGLE_SANS_SEMIBOLD_FONT.to_owned(),
-            ],
-            button: vec![
-                GOOGLE_SANS_MEDIUM_FONT.to_owned(),
-                GOOGLE_SANS_REGULAR_FONT.to_owned(),
-                GOOGLE_SANS_SEMIBOLD_FONT.to_owned(),
-            ],
-            strong: vec![
-                GOOGLE_SANS_SEMIBOLD_FONT.to_owned(),
-                GOOGLE_SANS_MEDIUM_FONT.to_owned(),
-                GOOGLE_SANS_REGULAR_FONT.to_owned(),
-            ],
-            heading: vec![
-                GOOGLE_SANS_SEMIBOLD_FONT.to_owned(),
-                GOOGLE_SANS_MEDIUM_FONT.to_owned(),
-                GOOGLE_SANS_REGULAR_FONT.to_owned(),
-            ],
-            mono: Vec::new(),
-        }
     }
 
     #[must_use]
@@ -1686,11 +1630,6 @@ impl TypographyTokens {
     }
 
     #[must_use]
-    pub fn google_sans() -> Self {
-        Self::from_font_stack(&FontStack::google_sans())
-    }
-
-    #[must_use]
     pub fn inter() -> Self {
         Self::from_font_stack(&FontStack::inter())
     }
@@ -2289,36 +2228,16 @@ mod tests {
     }
 
     #[test]
-    fn google_sans_typography_uses_distinct_weight_families() {
-        let stack = FontStack::google_sans();
-        let typography = TypographyTokens::google_sans();
-
-        assert_eq!(stack.body_family, FontStack::GOOGLE_SANS_BODY_FAMILY);
-        assert_eq!(
-            typography.body.family,
-            FontFamily::Name(Arc::from(FontStack::GOOGLE_SANS_BODY_FAMILY))
-        );
-        assert_eq!(
-            typography.button.family,
-            FontFamily::Name(Arc::from(FontStack::GOOGLE_SANS_BUTTON_FAMILY))
-        );
-        assert_eq!(
-            typography.heading.family,
-            FontFamily::Name(Arc::from(FontStack::GOOGLE_SANS_HEADING_FAMILY))
-        );
-    }
-
-    #[test]
     fn cast_typography_uses_bundled_mono_family() {
         let stack = FontStack::cast();
         let typography = TypographyTokens::cast();
 
-        assert_eq!(stack.body_family, FontStack::GOOGLE_SANS_BODY_FAMILY);
+        assert_eq!(stack.body_family, FontStack::INTER_BODY_FAMILY);
         assert_eq!(stack.mono_family, FontStack::JETBRAINS_MONO_FAMILY);
         assert!(!stack.mono.is_empty());
         assert_eq!(
             typography.body.family,
-            FontFamily::Name(Arc::from(FontStack::GOOGLE_SANS_BODY_FAMILY))
+            FontFamily::Name(Arc::from(FontStack::INTER_BODY_FAMILY))
         );
         assert_eq!(
             typography.code.family,
