@@ -1371,14 +1371,11 @@ fn table_header_font(theme: &CastTheme) -> egui::FontId {
 }
 
 fn table_outline_width(theme: &CastTheme) -> f32 {
-    theme.stroke.md.max(theme.stroke.sm)
+    (theme.stroke.md + theme.stroke.sm).max(2.0)
 }
 
 fn table_outline_color(theme: &CastTheme) -> Color32 {
-    match theme.mode {
-        ThemeMode::Light => theme.colors.border_strong,
-        ThemeMode::Dark => mix_with_transparent(theme.colors.text_muted, 0.34),
-    }
+    mix_with_transparent(theme.colors.primary_family.base, 0.10)
 }
 
 fn table_internal_rule_color(theme: &CastTheme) -> Color32 {
@@ -1730,7 +1727,10 @@ mod tests {
 
         assert_eq!(table_header_fill(&theme), theme.colors.surface_muted);
         assert_eq!(table_header_text_color(&theme), theme.colors.text);
-        assert_eq!(table_outline_color(&theme), theme.colors.border_strong);
+        assert_eq!(
+            table_outline_color(&theme),
+            mix_with_transparent(theme.colors.primary_family.base, 0.10)
+        );
         assert_eq!(table_internal_rule_color(&theme), theme.colors.border);
         assert_eq!(
             table_header_font(&theme).family,
@@ -1749,7 +1749,7 @@ mod tests {
 
         assert_eq!(
             table_outline_color(&theme),
-            mix_with_transparent(theme.colors.text_muted, 0.34)
+            mix_with_transparent(theme.colors.primary_family.base, 0.10)
         );
         assert_eq!(
             table_internal_rule_color(&theme),

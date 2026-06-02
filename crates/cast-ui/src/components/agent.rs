@@ -2,7 +2,7 @@ use egui::{Color32, InnerResponse, Response, RichText, TextEdit, Ui, Widget};
 
 use crate::{
     color::mix_with_transparent,
-    components::{Badge, Button, Loader, Markdown},
+    components::{Badge, Button, Loader, Markdown, Select},
     foundation::{Intent, Size, Variant},
     theme::{CastTheme, ThemeMode, theme_for_ui},
 };
@@ -511,7 +511,7 @@ impl<'a> AgentComposer<'a> {
                 }
 
                 ui.add_space(theme.spacing.xs);
-                let buttons = ui.horizontal(|ui| {
+                let buttons = ui.horizontal_centered(|ui| {
                     let mut attachment_clicked = false;
                     let mut tool_clicked = false;
                     let mut stopped = false;
@@ -529,20 +529,18 @@ impl<'a> AgentComposer<'a> {
                     }
                     if let Some(selected) = selected_model {
                         if !model_options.is_empty() {
-                            let selected_text = model_options
-                                .get(*selected)
-                                .or_else(|| model_options.first())
-                                .cloned()
-                                .unwrap_or_default();
-                            egui::ComboBox::from_id_salt(ui.next_auto_id())
-                                .selected_text(format!("{model_label}: {selected_text}"))
-                                .show_ui(ui, |ui| {
-                                    for (index, option) in model_options.iter().enumerate() {
-                                        if ui.selectable_value(selected, index, option).changed() {
-                                            model_changed = true;
-                                        }
-                                    }
-                                });
+                            ui.label(
+                                RichText::new(model_label)
+                                    .font(theme.typography.caption.clone())
+                                    .color(theme.colors.text_muted)
+                                    .extra_letter_spacing(theme.typography.letter_spacing),
+                            );
+                            let response = ui.add(
+                                Select::new(selected, model_options)
+                                    .size(Size::Small)
+                                    .width((inner_width * 0.34).clamp(132.0, 188.0)),
+                            );
+                            model_changed = response.changed();
                         }
                     }
                     let response = ui
@@ -550,7 +548,7 @@ impl<'a> AgentComposer<'a> {
                             if loading {
                                 let response = ui.add(
                                     Button::new(stop_label)
-                                        .leading_icon("[]")
+                                        .leading_icon("■")
                                         .intent(Intent::Danger)
                                         .variant(Variant::Outline)
                                         .size(Size::Small),
@@ -560,7 +558,7 @@ impl<'a> AgentComposer<'a> {
                             } else {
                                 ui.add(
                                     Button::new(send_label)
-                                        .leading_icon("[>]")
+                                        .leading_icon("▶")
                                         .enabled(enabled && has_text)
                                         .size(Size::Small),
                                 )

@@ -4,6 +4,7 @@ use egui::{
 };
 
 use crate::{
+    color::mix_with_transparent,
     foundation::Intent,
     style::{alert_intent_colors, toast_frame},
     theme::{CastTheme, theme_for_ui},
@@ -110,6 +111,7 @@ impl Toast {
                 });
             })
             .response;
+        paint_toast_highlight(ui, &theme, response.rect, colors.fg);
 
         ToastResponse {
             response,
@@ -282,6 +284,15 @@ fn paint_toast_marker(ui: &mut Ui, theme: &CastTheme, color: Color32) {
     let center = egui::pos2(rect.center().x, rect.center().y);
 
     ui.painter().circle_filled(center, 4.0, color);
+}
+
+fn paint_toast_highlight(ui: &Ui, theme: &CastTheme, rect: egui::Rect, color: Color32) {
+    ui.painter().rect_stroke(
+        rect,
+        egui::CornerRadius::same(theme.radius.lg as u8),
+        Stroke::new(1.5, mix_with_transparent(color, 0.10)),
+        StrokeKind::Outside,
+    );
 }
 
 fn toast_close_button(ui: &mut Ui, theme: &CastTheme) -> Response {

@@ -13,7 +13,9 @@ use crate::{
         },
     },
     foundation::{Intent, Placement, Size, Variant},
-    style::{dialog_backdrop, dialog_frame, dialog_shell_frame, surface_shadow},
+    style::{
+        dialog_backdrop, dialog_frame, dialog_shell_frame, resolve_control_metrics, surface_shadow,
+    },
     theme::{CastTheme, current_theme},
 };
 
@@ -591,11 +593,12 @@ fn show_dialog_sections<R>(
     ui.spacing_mut().item_spacing.y = 0.0;
 
     let section_padding = theme.components.section.padding;
+    let chrome_padding = theme.components.section.compact_padding;
     let header = show_surface_section_with_radius(
         ui,
         theme,
         sections.header,
-        section_padding,
+        chrome_padding,
         surface_section_radius(theme.radius.lg, true, false),
         |ui| {
             add_header(ui, controller);
@@ -614,7 +617,7 @@ fn show_dialog_sections<R>(
         ui,
         theme,
         sections.footer,
-        section_padding,
+        chrome_padding,
         surface_section_radius(theme.radius.lg, false, true),
         |ui| {
             add_footer(ui, controller);
@@ -642,11 +645,12 @@ fn show_sheet_sections<R>(
     ui.spacing_mut().item_spacing.y = 0.0;
 
     let section_padding = theme.components.section.padding;
+    let chrome_padding = theme.components.section.compact_padding;
     let header = show_surface_section_with_radius(
         ui,
         theme,
         sections.header,
-        section_padding,
+        chrome_padding,
         sheet_section_radius(theme, placement, SheetSection::Header),
         |ui| {
             add_header(ui, controller);
@@ -656,16 +660,27 @@ fn show_sheet_sections<R>(
         paint_section_divider(ui, theme, header.response.rect, header.response.rect.max.y);
     }
 
-    let body = show_surface_section(ui, theme, SurfaceChrome::Flat, section_padding, |ui| {
-        add_contents(ui, controller)
-    })
-    .inner;
+    let body_height = (ui.available_height() - sheet_footer_reserved_height(theme, chrome_padding))
+        .max(theme.spacing.xl);
+    let body = ui
+        .allocate_ui_with_layout(
+            egui::vec2(ui.available_width(), body_height),
+            egui::Layout::top_down(egui::Align::Min),
+            |ui| {
+                show_surface_section(ui, theme, SurfaceChrome::Flat, section_padding, |ui| {
+                    ui.set_min_height((body_height - section_padding * 2.0).max(0.0));
+                    add_contents(ui, controller)
+                })
+                .inner
+            },
+        )
+        .inner;
 
     let footer = show_surface_section_with_radius(
         ui,
         theme,
         sections.footer,
-        section_padding,
+        chrome_padding,
         sheet_section_radius(theme, placement, SheetSection::Footer),
         |ui| {
             add_footer(ui, controller);
@@ -677,6 +692,12 @@ fn show_sheet_sections<R>(
 
     ui.spacing_mut().item_spacing = previous_spacing;
     body
+}
+
+fn sheet_footer_reserved_height(theme: &CastTheme, padding: f32) -> f32 {
+    let metrics = resolve_control_metrics(theme, Size::Small);
+
+    metrics.min_height + padding * 2.0
 }
 
 fn sheet_frame(theme: &CastTheme, placement: Placement) -> egui::Frame {

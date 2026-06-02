@@ -284,7 +284,10 @@ impl Widget for Pagination<'_> {
         let mut combined: Option<Response> = None;
 
         ui.horizontal_wrapped(|ui| {
-            let previous = pagination_button(ui, "<", self.size, false, current == 0);
+            let theme = theme_for_ui(ui);
+            ui.spacing_mut().item_spacing.x = theme.spacing.xs;
+
+            let previous = pagination_button(ui, "‹", self.size, false, current == 0);
             if previous.clicked() && current > 0 {
                 *self.page -= 1;
             }
@@ -310,11 +313,7 @@ impl Widget for Pagination<'_> {
                         });
                     }
                     PaginationItem::Ellipsis => {
-                        let response = ui.label(
-                            RichText::new("...")
-                                .font(theme_for_ui(ui).typography.caption.clone())
-                                .color(theme_for_ui(ui).colors.text_subtle),
-                        );
+                        let response = pagination_ellipsis(ui, self.size);
                         combined = Some(match combined.take() {
                             Some(existing) => existing.union(response),
                             None => response,
@@ -323,7 +322,7 @@ impl Widget for Pagination<'_> {
                 }
             }
 
-            let next = pagination_button(ui, ">", self.size, false, current + 1 >= page_count);
+            let next = pagination_button(ui, "›", self.size, false, current + 1 >= page_count);
             if next.clicked() && current + 1 < page_count {
                 *self.page += 1;
             }
@@ -491,10 +490,8 @@ fn pagination_button(
 ) -> Response {
     let theme = theme_for_ui(ui);
     let metrics = resolve_control_metrics(&theme, size);
-    let button_size = egui::vec2(
-        metrics.min_height.max(28.0),
-        (metrics.min_height - 4.0).max(24.0),
-    );
+    let side = pagination_button_side(metrics.min_height);
+    let button_size = egui::vec2(side, side);
     let sense = if disabled {
         Sense::hover()
     } else {
@@ -505,16 +502,18 @@ fn pagination_button(
     if ui.is_rect_visible(rect) {
         let hovered = response.hovered() && !disabled;
         let fill = if selected {
-            selected_fill(&theme, hovered, response.is_pointer_button_down_on())
+            theme.colors.primary_family.base
         } else if hovered {
             theme.colors.surface_muted
         } else {
             Color32::TRANSPARENT
         };
         let border = if selected {
-            selected_border(&theme, hovered, response.is_pointer_button_down_on())
-        } else {
+            theme.colors.primary_family.base
+        } else if hovered {
             theme.colors.border
+        } else {
+            Color32::TRANSPARENT
         };
         ui.painter().rect(
             rect,
@@ -526,7 +525,7 @@ fn pagination_button(
         let fg = if disabled {
             theme.colors.text_subtle
         } else if selected {
-            theme.colors.primary_family.base
+            theme.colors.primary_family.fg
         } else {
             theme.colors.text
         };
@@ -540,6 +539,29 @@ fn pagination_button(
     }
 
     response
+}
+
+fn pagination_ellipsis(ui: &mut Ui, size: Size) -> Response {
+    let theme = theme_for_ui(ui);
+    let metrics = resolve_control_metrics(&theme, size);
+    let side = pagination_button_side(metrics.min_height);
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(side, side), Sense::hover());
+
+    if ui.is_rect_visible(rect) {
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            "…",
+            theme.typography.caption.clone(),
+            theme.colors.text_subtle,
+        );
+    }
+
+    response
+}
+
+fn pagination_button_side(min_height: f32) -> f32 {
+    (min_height - 2.0).max(28.0)
 }
 
 fn pagination_items(current: usize, page_count: usize) -> Vec<PaginationItem> {

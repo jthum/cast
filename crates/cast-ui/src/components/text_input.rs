@@ -344,9 +344,9 @@ fn input_interaction_halo(
     });
 
     if focused {
-        Some(egui::Stroke::new(3.0, mix_with_transparent(color, 0.14)))
+        Some(egui::Stroke::new(3.5, mix_with_transparent(color, 0.14)))
     } else if hovered || status.is_some() {
-        Some(egui::Stroke::new(2.0, mix_with_transparent(color, 0.09)))
+        Some(egui::Stroke::new(2.5, mix_with_transparent(color, 0.09)))
     } else {
         None
     }

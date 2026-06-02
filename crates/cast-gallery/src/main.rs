@@ -2371,9 +2371,16 @@ fn show_component_gallery(
             ui.add_space(12.0);
             show_buttons_and_badges(ui);
             ui.add_space(12.0);
-            let mut nav_tab = 0;
-            let mut nav_segment = 0;
+            let nav_tab_id = ui.make_persistent_id("component_gallery_navigation_tab");
+            let nav_segment_id = ui.make_persistent_id("component_gallery_navigation_segment");
+            let mut nav_tab = ui.data(|data| data.get_temp::<usize>(nav_tab_id).unwrap_or(0));
+            let mut nav_segment =
+                ui.data(|data| data.get_temp::<usize>(nav_segment_id).unwrap_or(0));
             show_navigation_layout(ui, &mut nav_tab, &mut nav_segment);
+            ui.data_mut(|data| {
+                data.insert_temp(nav_tab_id, nav_tab);
+                data.insert_temp(nav_segment_id, nav_segment);
+            });
         }
         1 => show_forms(
             ui,
