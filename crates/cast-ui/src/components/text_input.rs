@@ -19,6 +19,7 @@ pub struct TextInput<'a> {
     size: Option<Size>,
     variant: Variant,
     enabled: bool,
+    password: bool,
 }
 
 impl<'a> TextInput<'a> {
@@ -35,6 +36,7 @@ impl<'a> TextInput<'a> {
             size: None,
             variant: Variant::Solid,
             enabled: true,
+            password: false,
         }
     }
 
@@ -107,6 +109,12 @@ impl<'a> TextInput<'a> {
         self.enabled = false;
         self
     }
+
+    #[must_use]
+    pub fn password(mut self, password: bool) -> Self {
+        self.password = password;
+        self
+    }
 }
 
 impl Widget for TextInput<'_> {
@@ -124,10 +132,12 @@ impl Widget for TextInput<'_> {
         let status_text = self.status_text;
         let status_intent = self.status_intent;
         let enabled = self.enabled;
+        let password = self.password;
         let input_radius = egui::CornerRadius::same(theme.components.input.radius as u8);
         let mut edit = TextEdit::singleline(self.text)
             .frame(input_frame(&theme, self.variant))
             .font(font.clone())
+            .password(password)
             .min_size(egui::vec2(0.0, input_min_height(&theme, size, metrics)))
             .text_color(if enabled {
                 theme.components.input.fg
@@ -730,6 +740,14 @@ mod tests {
         let input = TextInput::new(&mut value);
 
         assert_eq!(input.size, None);
+    }
+
+    #[test]
+    fn text_input_can_enable_password_mode() {
+        let mut value = String::new();
+        let input = TextInput::new(&mut value).password(true);
+
+        assert!(input.password);
     }
 
     #[test]

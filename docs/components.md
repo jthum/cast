@@ -56,6 +56,17 @@ ui.add(cast::Button::new("Delete").intent(cast::Intent::Danger));
 ui.add(cast::Badge::new("Running").intent(cast::Intent::Info).status_dot());
 ```
 
+Use `TextInput::password(true)` for token, password, and secret fields that should be masked:
+
+```rust
+ui.add(
+    cast::TextInput::new(&mut self.api_token)
+        .label("API token")
+        .hint_text("Paste token")
+        .password(true),
+);
+```
+
 ## Navigation And Layout
 
 Navigation and layout primitives include:
