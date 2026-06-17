@@ -1,6 +1,6 @@
 # Cast Design Tokens
 
-Cast themes are resolved at runtime from a small editable `ThemeSeed` into a complete `CastTheme`. Widgets read the resolved theme from egui context with `theme_for_ui(ui)`, while the gallery keeps the seed editable so token changes can be previewed live.
+Cast themes are resolved at runtime from a small editable `ThemeSeed` into a complete `CastTheme`. Widgets read the resolved theme from egui context with `theme_for_ui(ui)`, while the gallery keeps the seed editable so token changes can be previewed live. The crate package is `cast-ui`, but docs use the recommended dependency alias `cast`.
 
 The current model separates seed input, global tokens, component tokens, and egui style integration:
 
@@ -198,7 +198,7 @@ The final alpha is derived from `shadow_alpha * alpha_scale`, clamped to the val
 
 `SurfaceSectionTokens`:
 
-- `muted_fill`
+- `muted_fill`: header/footer chrome for sectioned surfaces. This is derived slightly lighter than `surface_muted` so card, dialog, sheet, popover, and panel headers do not become visually heavy.
 - `divider`
 - `divider_width`
 - `padding`
