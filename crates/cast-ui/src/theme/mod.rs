@@ -1455,7 +1455,7 @@ impl ComponentTokens {
                 padding: spacing.md,
             },
             section: SurfaceSectionTokens {
-                muted_fill: colors.surface_muted,
+                muted_fill: section_muted_fill(colors),
                 divider: colors.border,
                 divider_width: stroke.sm,
                 padding: spacing.lg,
@@ -1510,6 +1510,10 @@ pub struct SurfaceTokens {
     pub border_width: f32,
     pub radius: f32,
     pub padding: f32,
+}
+
+fn section_muted_fill(colors: &ColorTokens) -> Color32 {
+    mix_oklch(colors.surface_muted, colors.surface, 0.50)
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
@@ -2139,6 +2143,10 @@ mod tests {
         assert_eq!(theme.components.inset.fill, theme.colors.surface);
         assert_eq!(theme.components.row.border, theme.colors.border);
         assert_eq!(
+            theme.components.section.muted_fill,
+            section_muted_fill(&theme.colors)
+        );
+        assert_ne!(
             theme.components.section.muted_fill,
             theme.colors.surface_muted
         );

@@ -2504,6 +2504,7 @@ fn show_turin_run_summary(ui: &mut egui::Ui) {
                 ui.heading("React 19 build recovery");
                 ui.add(Badge::new("Running").intent(Intent::Info).status_dot());
             });
+            ui.add_space(theme.spacing.xs);
             ui.label(
                 RichText::new("Turin is tracing the failed build, preparing a patch, and waiting for approval before applying file changes.")
                     .font(theme.typography.small.clone())
