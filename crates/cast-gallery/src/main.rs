@@ -2500,9 +2500,9 @@ fn show_turin_run_summary(ui: &mut egui::Ui) {
         ui,
         |ui| {
             ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = egui::vec2(theme.spacing.sm, theme.spacing.xs);
                 ui.heading("React 19 build recovery");
                 ui.add(Badge::new("Running").intent(Intent::Info).status_dot());
-                ui.add(Badge::new("Patch ready").intent(Intent::Warning).status_dot());
             });
             ui.label(
                 RichText::new("Turin is tracing the failed build, preparing a patch, and waiting for approval before applying file changes.")
@@ -2511,46 +2511,35 @@ fn show_turin_run_summary(ui: &mut egui::Ui) {
             );
         },
         |ui| {
-            ResponsiveColumns::new()
-                .breakpoint(760.0)
-                .min_column_width(180.0)
-                .gap(theme.spacing.sm)
-                .show(
-                    ui,
-                    |ui| {
-                        ui.add(
-                            MetricCard::new("Checks", "5 / 7")
-                                .delta("2 running", Intent::Info)
-                                .detail("Build, lint, and unit tests")
-                                .width(ui.available_width()),
-                        );
-                        ui.add_space(theme.spacing.sm);
-                        ui.add(
-                            MetricCard::new("Context", "86k")
-                                .delta("43%", Intent::Success)
-                                .detail("Within the active window")
-                                .width(ui.available_width()),
-                        );
-                    },
-                    |ui| {
-                        ui.add(
-                            MetricCard::new("Patch", "3 files")
-                                .delta("+52 / -18", Intent::Warning)
-                                .detail("Awaiting approval")
-                                .width(ui.available_width()),
-                        );
-                        ui.add_space(theme.spacing.sm);
-                        ui.add(
-                            MetricCard::new("Confidence", "High")
-                                .delta("tests next", Intent::Primary)
-                                .detail("Failure isolated to stale imports")
-                                .width(ui.available_width()),
-                        );
-                    },
+            ui.add(
+                ProgressMetric::new("Run progress", 0.62)
+                    .detail("2 checks running, 1 approval required")
+                    .intent(Intent::Info)
+                    .width(ui.available_width()),
+            );
+            ui.add_space(theme.spacing.sm);
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = egui::vec2(theme.spacing.sm, theme.spacing.xs);
+                ui.label(
+                    RichText::new("5 / 7 checks")
+                        .font(theme.typography.small.clone())
+                        .color(theme.colors.text_muted),
                 );
+                ui.label(
+                    RichText::new("86k context")
+                        .font(theme.typography.small.clone())
+                        .color(theme.colors.text_muted),
+                );
+                ui.label(
+                    RichText::new("3-file patch")
+                        .font(theme.typography.small.clone())
+                        .color(theme.colors.text_muted),
+                );
+            });
         },
         |ui| {
             ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = egui::vec2(theme.spacing.sm, theme.spacing.xs);
                 ui.add(Button::new("Approve patch").intent(Intent::Warning));
                 ui.add(
                     Button::new("Open branch")
@@ -2577,130 +2566,96 @@ fn show_turin_thread(
 ) {
     let theme = cast::theme_for_ui(ui);
 
-    Card::new().show(ui, |ui| {
-        ui.horizontal_wrapped(|ui| {
-            ui.heading("Agent thread");
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = egui::vec2(theme.spacing.sm, theme.spacing.xs);
+        ui.heading("Agent thread");
+        if *agent_loading {
             ui.add(Badge::new("Streaming").intent(Intent::Info).status_dot());
-        });
-        ui.add_space(theme.spacing.sm);
-        MessageThread::new()
-            .width(ui.available_width())
-            .show(ui, |thread| {
-                thread.message(
-                    ChatMessage::user("Build is failing on main after the React 19 upgrade. Please inspect the log, patch the failure, and explain the risk.")
-                        .metadata("You - 09:42"),
-                );
-                thread.rich_message(
-                    ChatMessage::assistant("I found the first actionable error in the Vite build. The router imports still point at the old React entry point, so I am preparing a narrow patch and will run the affected checks before finalizing.")
-                        .metadata("Turin - now")
-                        .streaming(*agent_loading),
-                    |ui| {
-                        ui.add_space(theme.spacing.xs);
-                        ui.add(
-                            ToolCall::new("rg \"react-dom/client|createRoot\" src package.json")
-                                .status(ToolCallStatus::Succeeded)
-                                .metadata("118ms")
-                                .body("Matched stale imports in src/main.tsx and one test helper.")
-                                .width(ui.available_width()),
-                        );
-                    },
-                );
-            });
-        ui.add_space(theme.spacing.sm);
-        ui.add(
-            ToolCallBlock::new("cargo test -p turin-workbench", agent_tool_open)
-                .status(ToolCallStatus::Running)
-                .arguments("profile: test, filter: routing")
-                .elapsed("21.4s")
-                .preview("running 42 tests\nworkbench::routing::keeps_session_state ... ok\nworkbench::build::react_19_entrypoint ... running")
-                .width(ui.available_width()),
-        );
-        ui.add_space(theme.spacing.sm);
-        ui.add(
-            CodeOutputPanel::new(
-                "Build output",
-                "vite v7.0.0 building for production...\ntransforming...\nerror: Module not found: react-dom/client\n\nSuggested patch prepared for src/main.tsx and test/setup.ts.",
-            )
-            .kind(ToolOutputKind::Error)
-            .metadata("stderr")
-            .height(156.0)
-            .width(ui.available_width()),
-        );
-        ui.add_space(theme.spacing.sm);
-        let composer = AgentComposer::new(command)
-            .placeholder("Ask Turin to patch, test, inspect files, or explain the result...")
-            .send_label("Run")
-            .stop_label("Stop")
-            .attachment_label("Attach")
-            .tool_label("Tools")
-            .model_selector(agent_model, ["Swift", "Balanced", "Deep review"])
-            .loading(*agent_loading)
-            .rows(3)
-            .width(ui.available_width())
-            .show(ui);
-        if composer.inner.submitted {
-            *agent_loading = true;
-        }
-        if composer.inner.stopped {
-            *agent_loading = false;
         }
     });
+    ui.add_space(theme.spacing.sm);
+    MessageThread::new()
+        .width(ui.available_width())
+        .show(ui, |thread| {
+            thread.message(
+                ChatMessage::user("Build is failing on main after the React 19 upgrade. Please inspect the log, patch the failure, and explain the risk.")
+                    .metadata("You - 09:42"),
+            );
+            thread.rich_message(
+                ChatMessage::assistant("I found the first actionable error in the Vite build. The router imports still point at the old React entry point, so I am preparing a narrow patch and will run the affected checks before finalizing.")
+                    .metadata("Turin - now")
+                    .streaming(*agent_loading),
+                |ui| {
+                    ui.add_space(theme.spacing.xs);
+                    ui.add(
+                        ToolCall::new("rg \"react-dom/client|createRoot\" src package.json")
+                            .status(ToolCallStatus::Succeeded)
+                            .metadata("118ms")
+                            .body("Matched stale imports in src/main.tsx and one test helper.")
+                            .width(ui.available_width()),
+                    );
+                },
+            );
+        });
+    ui.add_space(theme.spacing.sm);
+    ui.add(
+        ToolCallBlock::new("cargo test -p turin-workbench", agent_tool_open)
+            .status(ToolCallStatus::Running)
+            .arguments("profile: test, filter: routing")
+            .elapsed("21.4s")
+            .preview("running 42 tests\nworkbench::routing::keeps_session_state ... ok\nworkbench::build::react_19_entrypoint ... running\n\nerror: Module not found: react-dom/client\nSuggested patch prepared for src/main.tsx and test/setup.ts.")
+            .width(ui.available_width()),
+    );
+    ui.add_space(theme.spacing.sm);
+    let composer = AgentComposer::new(command)
+        .placeholder("Ask Turin to patch, test, inspect files, or explain the result...")
+        .send_label("Run")
+        .stop_label("Stop")
+        .attachment_label("Attach")
+        .tool_label("Tools")
+        .model_selector(agent_model, ["Swift", "Balanced", "Deep review"])
+        .loading(*agent_loading)
+        .rows(3)
+        .width(ui.available_width())
+        .show(ui);
+    if composer.inner.submitted {
+        *agent_loading = true;
+    }
+    if composer.inner.stopped {
+        *agent_loading = false;
+    }
 }
 
 fn show_turin_side_panel(ui: &mut egui::Ui) {
     let theme = cast::theme_for_ui(ui);
 
-    ContextPanel::new(86_000, 200_000)
-        .title("Run context")
-        .window_count(3)
-        .auto_compact_at(6)
-        .item(
-            ContextItem::new("Issue", "React 19 upgrade broke the production build")
-                .tokens(318)
-                .intent(Intent::Primary),
-        )
-        .item(
-            ContextItem::new("Files", "src/main.tsx, test/setup.ts, package.json")
-                .tokens(1_420)
-                .intent(Intent::Info),
-        )
-        .item(
-            ContextItem::new(
-                "Policy",
-                "Ask before applying patches or running write commands",
-            )
-            .tokens(542)
-            .intent(Intent::Warning),
-        )
-        .width(ui.available_width())
-        .show(ui);
-
+    ui.heading("Run state");
+    ui.label(
+        RichText::new("React 19 upgrade broke the production build. Context is within budget and the patch is ready for review.")
+            .font(theme.typography.small.clone())
+            .color(theme.colors.text_muted),
+    );
     ui.add_space(theme.spacing.sm);
     ui.add(
-        PlanList::new("Execution plan")
-            .summary("Turin keeps the run state explicit and reviewable.")
-            .step(
-                PlanStep::new("Inspect failing build log")
-                    .detail("Find the first error with a clear source location.")
-                    .status(PlanStepStatus::Done),
-            )
-            .step(
-                PlanStep::new("Prepare narrow patch")
-                    .detail("Update React entry points without touching unrelated code.")
-                    .status(PlanStepStatus::Active),
-            )
-            .step(
-                PlanStep::new("Run focused checks")
-                    .detail("Validate build and affected route tests.")
-                    .status(PlanStepStatus::Pending),
-            )
-            .step(
-                PlanStep::new("Summarize outcome")
-                    .detail("Explain changes, risk, and remaining work.")
-                    .status(PlanStepStatus::Pending),
-            )
+        ProgressMetric::new("Context window", 0.43)
+            .detail("86k / 200k tokens across 3 windows")
+            .intent(Intent::Success)
             .width(ui.available_width()),
     );
+    ui.add_space(theme.spacing.sm);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = egui::vec2(theme.spacing.sm, theme.spacing.xs);
+        ui.label(
+            RichText::new("Files: src/main.tsx, test/setup.ts")
+                .font(theme.typography.caption.clone())
+                .color(theme.colors.text_subtle),
+        );
+        ui.label(
+            RichText::new("Approval required")
+                .font(theme.typography.caption.clone())
+                .color(theme.colors.text_subtle),
+        );
+    });
 
     ui.add_space(theme.spacing.sm);
     ui.add(
@@ -2764,21 +2719,21 @@ fn show_turin_review_queue(
 
     Card::new().show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = egui::vec2(theme.spacing.sm, theme.spacing.xs);
             ui.heading("Review queue");
-            ui.add(Badge::new("Editable cells").intent(Intent::Info).status_dot());
         });
         ui.label(
-            RichText::new("A dense Turin table with selection owned by checkbox cells, inline editing, status badges, and expandable details.")
+            RichText::new("Selection is checkbox-owned. Row details stay collapsed until the operator asks for more context.")
                 .font(theme.typography.small.clone())
                 .color(theme.colors.text_muted),
         );
         ui.add_space(theme.spacing.sm);
         Table::new(["", "Item", "State", "Owner", "Action"])
-            .column_weights([0.32, 2.5, 1.15, 1.0, 1.08])
+            .column_weights([0.18, 2.64, 1.15, 1.0, 1.08])
             .selected_rows(selected_rows)
             .expanded_rows(expanded_rows)
             .expanded_row_height(88.0)
-            .min_column_width(72.0)
+            .min_column_width(56.0)
             .show_with_details(
                 ui,
                 4,
@@ -2847,23 +2802,6 @@ fn show_turin_review_queue(
                 },
             );
 
-        ui.add_space(theme.spacing.sm);
-        ui.horizontal_wrapped(|ui| {
-            ArtifactCard::new("react-19-entrypoint.patch")
-                .kind("Patch")
-                .description("Prepared source changes waiting for approval.")
-                .metadata("3 files")
-                .intent(Intent::Warning)
-                .width((ui.available_width() * 0.5).max(260.0))
-                .show(ui);
-            ArtifactCard::new("build-diagnostics.md")
-                .kind("Report")
-                .description("Trace of the build failure and validation plan.")
-                .metadata("Markdown")
-                .intent(Intent::Info)
-                .width(ui.available_width().max(260.0))
-                .show(ui);
-        });
     });
 }
 

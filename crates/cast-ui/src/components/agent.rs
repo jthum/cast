@@ -512,6 +512,7 @@ impl<'a> AgentComposer<'a> {
 
                 ui.add_space(theme.spacing.xs);
                 let buttons = ui.horizontal_centered(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.spacing.sm;
                     let mut attachment_clicked = false;
                     let mut tool_clicked = false;
                     let mut stopped = false;
@@ -1140,6 +1141,7 @@ impl ContextPanel {
             .show(ui, |ui| {
                 ui.set_width(frame_inner_width(width, theme.spacing.md));
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.spacing.xs;
                     ui.label(
                         RichText::new(self.title)
                             .font(theme.typography.heading_sm.clone())
@@ -1165,6 +1167,7 @@ impl ContextPanel {
                 }
                 ui.add_space(theme.spacing.sm);
                 ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.spacing.sm;
                     if let Some(count) = self.window_count {
                         ui.label(
                             RichText::new(format!("{count} in window"))
@@ -1285,6 +1288,7 @@ impl ArtifactCard {
             .show(ui, |ui| {
                 ui.set_width(frame_inner_width(width, theme.spacing.md));
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme.spacing.xs;
                     ui.add(Badge::new(self.kind).intent(self.intent).status_dot());
                     if let Some(metadata) = &self.metadata {
                         ui.label(
@@ -1310,6 +1314,7 @@ impl ArtifactCard {
                 ui.add_space(theme.spacing.sm);
                 let mut result = ArtifactCardResponse::default();
                 ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(theme.spacing.sm, theme.spacing.xs);
                     result.opened = ui.add(Button::new("Open").size(Size::Small)).clicked();
                     result.copied = ui
                         .add(
@@ -1447,6 +1452,7 @@ impl ApprovalPanel {
                 ui.add_space(theme.spacing.sm);
                 let mut result = ApprovalPanelResponse::default();
                 ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(theme.spacing.sm, theme.spacing.xs);
                     result.approved = ui
                         .add(
                             Button::new(self.primary_label)
@@ -1799,6 +1805,7 @@ fn context_item_ui(ui: &mut Ui, theme: &CastTheme, item: ContextItem) {
         ))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = theme.spacing.xs;
                 ui.add(Badge::new(item.label).intent(item.intent).status_dot());
                 ui.label(
                     RichText::new(item.detail)
@@ -1964,6 +1971,7 @@ fn show_chat_message_content(
             }
 
             ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = theme.spacing.xs;
                 paint_role_dot(ui, &theme, message.intent);
                 ui.label(
                     RichText::new(message.title)
