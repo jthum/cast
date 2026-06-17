@@ -3,7 +3,7 @@ use cast::{
     egui::{self, RichText},
 };
 
-const COMMANDS: [CommandPaletteItem; 8] = [
+const COMMANDS: [CommandPaletteItem; 9] = [
     CommandPaletteItem {
         id: "open-workspace",
         title: "Open workspace",
@@ -23,6 +23,13 @@ const COMMANDS: [CommandPaletteItem; 8] = [
         title: "Show agent components",
         detail: "Review chat, composer, and tool-call primitives",
         shortcut: "A",
+        intent: Intent::Primary,
+    },
+    CommandPaletteItem {
+        id: "turin-screen",
+        title: "Open Turin screen",
+        detail: "Review a realistic Turin-style agent workspace",
+        shortcut: "U",
         intent: Intent::Primary,
     },
     CommandPaletteItem {

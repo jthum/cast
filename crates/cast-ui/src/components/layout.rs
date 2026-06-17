@@ -362,7 +362,7 @@ impl ResponsiveColumns {
         let available = ui.available_width();
 
         ui.vertical(|ui| {
-            if available < self.breakpoint {
+            if available < self.breakpoint || available < self.min_column_width * 2.0 + gap {
                 let left_response = ui.vertical(left);
                 ui.add_space(gap);
                 let right_response = ui.vertical(right);
@@ -414,6 +414,13 @@ mod tests {
 
         assert_eq!(columns.breakpoint, 240.0);
         assert_eq!(columns.min_column_width, 120.0);
+    }
+
+    #[test]
+    fn responsive_columns_require_room_for_both_minimums() {
+        let columns = ResponsiveColumns::new().min_column_width(360.0).gap(16.0);
+
+        assert!(700.0 < columns.min_column_width * 2.0 + columns.gap.unwrap());
     }
 
     #[test]

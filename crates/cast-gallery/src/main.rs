@@ -37,6 +37,7 @@ const SECTION_FOUNDATIONS: usize = 1;
 const SECTION_COMPONENTS: usize = 2;
 const SECTION_AGENT_COMPONENTS: usize = 3;
 const SECTION_THEME_LAB: usize = 4;
+const SECTION_TURIN_SCREEN: usize = 5;
 const SECTION_COMPONENT_BUTTONS: usize = 20;
 const SECTION_COMPONENT_INPUTS: usize = 21;
 const SECTION_COMPONENT_TABLES: usize = 22;
@@ -242,6 +243,7 @@ impl CastGallery {
                 self.components_nav_open = true;
             }
             "agent-components" => self.sidebar_section = SECTION_AGENT_COMPONENTS,
+            "turin-screen" => self.sidebar_section = SECTION_TURIN_SCREEN,
             "theme-lab" => self.sidebar_section = SECTION_THEME_LAB,
             "export-table" => {
                 self.lead_exported_count = Some(
@@ -627,6 +629,26 @@ fn show_workspace_view(
                 agent_retry_budget,
                 agent_due_date,
                 agent_due_time,
+                editable_task,
+                editable_status,
+            );
+        }
+        SECTION_TURIN_SCREEN => {
+            workspace_header(
+                ui,
+                "Turin screen",
+                "A realistic agent workspace composed from Cast primitives for dense desktop workflows.",
+                Intent::Primary,
+            );
+            ui.add_space(12.0);
+            show_turin_screen(
+                ui,
+                command,
+                agent_model,
+                agent_loading,
+                agent_tool_open,
+                lead_selected,
+                lead_expanded,
                 editable_task,
                 editable_status,
             );
@@ -2428,6 +2450,421 @@ fn show_component_gallery(
             show_raw_egui_controls(ui, search, enabled);
         }
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn show_turin_screen(
+    ui: &mut egui::Ui,
+    command: &mut String,
+    agent_model: &mut usize,
+    agent_loading: &mut bool,
+    agent_tool_open: &mut bool,
+    lead_selected: &mut [bool; LEAD_COUNT],
+    lead_expanded: &mut [bool; LEAD_COUNT],
+    editable_task: &mut String,
+    editable_status: &mut usize,
+) {
+    let theme = cast::theme_for_ui(ui);
+
+    show_turin_run_summary(ui);
+    ui.add_space(theme.spacing.md);
+
+    ResponsiveColumns::new()
+        .breakpoint(980.0)
+        .min_column_width(360.0)
+        .gap(theme.spacing.md)
+        .show(
+            ui,
+            |ui| {
+                show_turin_thread(ui, command, agent_model, agent_loading, agent_tool_open);
+            },
+            |ui| {
+                show_turin_side_panel(ui);
+            },
+        );
+
+    ui.add_space(theme.spacing.md);
+    show_turin_review_queue(
+        ui,
+        lead_selected,
+        lead_expanded,
+        editable_task,
+        editable_status,
+    );
+}
+
+fn show_turin_run_summary(ui: &mut egui::Ui) {
+    let theme = cast::theme_for_ui(ui);
+
+    Card::new().muted_sections().show_sections(
+        ui,
+        |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.heading("React 19 build recovery");
+                ui.add(Badge::new("Running").intent(Intent::Info).status_dot());
+                ui.add(Badge::new("Patch ready").intent(Intent::Warning).status_dot());
+            });
+            ui.label(
+                RichText::new("Turin is tracing the failed build, preparing a patch, and waiting for approval before applying file changes.")
+                    .font(theme.typography.small.clone())
+                    .color(theme.colors.text_muted),
+            );
+        },
+        |ui| {
+            ResponsiveColumns::new()
+                .breakpoint(760.0)
+                .min_column_width(180.0)
+                .gap(theme.spacing.sm)
+                .show(
+                    ui,
+                    |ui| {
+                        ui.add(
+                            MetricCard::new("Checks", "5 / 7")
+                                .delta("2 running", Intent::Info)
+                                .detail("Build, lint, and unit tests")
+                                .width(ui.available_width()),
+                        );
+                        ui.add_space(theme.spacing.sm);
+                        ui.add(
+                            MetricCard::new("Context", "86k")
+                                .delta("43%", Intent::Success)
+                                .detail("Within the active window")
+                                .width(ui.available_width()),
+                        );
+                    },
+                    |ui| {
+                        ui.add(
+                            MetricCard::new("Patch", "3 files")
+                                .delta("+52 / -18", Intent::Warning)
+                                .detail("Awaiting approval")
+                                .width(ui.available_width()),
+                        );
+                        ui.add_space(theme.spacing.sm);
+                        ui.add(
+                            MetricCard::new("Confidence", "High")
+                                .delta("tests next", Intent::Primary)
+                                .detail("Failure isolated to stale imports")
+                                .width(ui.available_width()),
+                        );
+                    },
+                );
+        },
+        |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.add(Button::new("Approve patch").intent(Intent::Warning));
+                ui.add(
+                    Button::new("Open branch")
+                        .variant(Variant::Outline)
+                        .intent(Intent::Primary),
+                );
+                ui.add(
+                    Button::new("Stop run")
+                        .leading_icon("■")
+                        .variant(Variant::Outline)
+                        .intent(Intent::Danger),
+                );
+            });
+        },
+    );
+}
+
+fn show_turin_thread(
+    ui: &mut egui::Ui,
+    command: &mut String,
+    agent_model: &mut usize,
+    agent_loading: &mut bool,
+    agent_tool_open: &mut bool,
+) {
+    let theme = cast::theme_for_ui(ui);
+
+    Card::new().show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.heading("Agent thread");
+            ui.add(Badge::new("Streaming").intent(Intent::Info).status_dot());
+        });
+        ui.add_space(theme.spacing.sm);
+        MessageThread::new()
+            .width(ui.available_width())
+            .show(ui, |thread| {
+                thread.message(
+                    ChatMessage::user("Build is failing on main after the React 19 upgrade. Please inspect the log, patch the failure, and explain the risk.")
+                        .metadata("You - 09:42"),
+                );
+                thread.rich_message(
+                    ChatMessage::assistant("I found the first actionable error in the Vite build. The router imports still point at the old React entry point, so I am preparing a narrow patch and will run the affected checks before finalizing.")
+                        .metadata("Turin - now")
+                        .streaming(*agent_loading),
+                    |ui| {
+                        ui.add_space(theme.spacing.xs);
+                        ui.add(
+                            ToolCall::new("rg \"react-dom/client|createRoot\" src package.json")
+                                .status(ToolCallStatus::Succeeded)
+                                .metadata("118ms")
+                                .body("Matched stale imports in src/main.tsx and one test helper.")
+                                .width(ui.available_width()),
+                        );
+                    },
+                );
+            });
+        ui.add_space(theme.spacing.sm);
+        ui.add(
+            ToolCallBlock::new("cargo test -p turin-workbench", agent_tool_open)
+                .status(ToolCallStatus::Running)
+                .arguments("profile: test, filter: routing")
+                .elapsed("21.4s")
+                .preview("running 42 tests\nworkbench::routing::keeps_session_state ... ok\nworkbench::build::react_19_entrypoint ... running")
+                .width(ui.available_width()),
+        );
+        ui.add_space(theme.spacing.sm);
+        ui.add(
+            CodeOutputPanel::new(
+                "Build output",
+                "vite v7.0.0 building for production...\ntransforming...\nerror: Module not found: react-dom/client\n\nSuggested patch prepared for src/main.tsx and test/setup.ts.",
+            )
+            .kind(ToolOutputKind::Error)
+            .metadata("stderr")
+            .height(156.0)
+            .width(ui.available_width()),
+        );
+        ui.add_space(theme.spacing.sm);
+        let composer = AgentComposer::new(command)
+            .placeholder("Ask Turin to patch, test, inspect files, or explain the result...")
+            .send_label("Run")
+            .stop_label("Stop")
+            .attachment_label("Attach")
+            .tool_label("Tools")
+            .model_selector(agent_model, ["Swift", "Balanced", "Deep review"])
+            .loading(*agent_loading)
+            .rows(3)
+            .width(ui.available_width())
+            .show(ui);
+        if composer.inner.submitted {
+            *agent_loading = true;
+        }
+        if composer.inner.stopped {
+            *agent_loading = false;
+        }
+    });
+}
+
+fn show_turin_side_panel(ui: &mut egui::Ui) {
+    let theme = cast::theme_for_ui(ui);
+
+    ContextPanel::new(86_000, 200_000)
+        .title("Run context")
+        .window_count(3)
+        .auto_compact_at(6)
+        .item(
+            ContextItem::new("Issue", "React 19 upgrade broke the production build")
+                .tokens(318)
+                .intent(Intent::Primary),
+        )
+        .item(
+            ContextItem::new("Files", "src/main.tsx, test/setup.ts, package.json")
+                .tokens(1_420)
+                .intent(Intent::Info),
+        )
+        .item(
+            ContextItem::new(
+                "Policy",
+                "Ask before applying patches or running write commands",
+            )
+            .tokens(542)
+            .intent(Intent::Warning),
+        )
+        .width(ui.available_width())
+        .show(ui);
+
+    ui.add_space(theme.spacing.sm);
+    ui.add(
+        PlanList::new("Execution plan")
+            .summary("Turin keeps the run state explicit and reviewable.")
+            .step(
+                PlanStep::new("Inspect failing build log")
+                    .detail("Find the first error with a clear source location.")
+                    .status(PlanStepStatus::Done),
+            )
+            .step(
+                PlanStep::new("Prepare narrow patch")
+                    .detail("Update React entry points without touching unrelated code.")
+                    .status(PlanStepStatus::Active),
+            )
+            .step(
+                PlanStep::new("Run focused checks")
+                    .detail("Validate build and affected route tests.")
+                    .status(PlanStepStatus::Pending),
+            )
+            .step(
+                PlanStep::new("Summarize outcome")
+                    .detail("Explain changes, risk, and remaining work.")
+                    .status(PlanStepStatus::Pending),
+            )
+            .width(ui.available_width()),
+    );
+
+    ui.add_space(theme.spacing.sm);
+    ui.add(
+        RunTimeline::new()
+            .item(
+                RunTimelineItem::new(RunPhase::Planning, "Planned repair path")
+                    .detail("Scoped the work to React entrypoint changes")
+                    .metadata("09:43"),
+            )
+            .item(
+                RunTimelineItem::new(RunPhase::ToolCall, "Searched project files")
+                    .status(ToolCallStatus::Succeeded)
+                    .metadata("09:44"),
+            )
+            .item(
+                RunTimelineItem::new(RunPhase::Patch, "Prepared source patch")
+                    .status(ToolCallStatus::Succeeded)
+                    .metadata("09:46"),
+            )
+            .item(
+                RunTimelineItem::new(RunPhase::Test, "Running focused tests")
+                    .status(ToolCallStatus::Running)
+                    .metadata("active"),
+            )
+            .width(ui.available_width()),
+    );
+
+    ui.add_space(theme.spacing.sm);
+    ApprovalPanel::new(
+        "Approve patch application",
+        "Apply the prepared React entrypoint patch and rerun the focused checks.",
+    )
+    .risk("Writes to source files and may affect startup behavior.")
+    .primary_label("Approve")
+    .secondary_label("Hold")
+    .intent(Intent::Warning)
+    .width(ui.available_width())
+    .show(ui);
+}
+
+fn show_turin_review_queue(
+    ui: &mut egui::Ui,
+    lead_selected: &mut [bool; LEAD_COUNT],
+    lead_expanded: &mut [bool; LEAD_COUNT],
+    editable_task: &mut String,
+    editable_status: &mut usize,
+) {
+    let theme = cast::theme_for_ui(ui);
+    let selected_rows: Vec<usize> = lead_selected
+        .iter()
+        .take(4)
+        .enumerate()
+        .filter_map(|(index, selected)| selected.then_some(index))
+        .collect();
+    let expanded_rows: Vec<usize> = lead_expanded
+        .iter()
+        .take(4)
+        .enumerate()
+        .filter_map(|(index, expanded)| expanded.then_some(index))
+        .collect();
+
+    Card::new().show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.heading("Review queue");
+            ui.add(Badge::new("Editable cells").intent(Intent::Info).status_dot());
+        });
+        ui.label(
+            RichText::new("A dense Turin table with selection owned by checkbox cells, inline editing, status badges, and expandable details.")
+                .font(theme.typography.small.clone())
+                .color(theme.colors.text_muted),
+        );
+        ui.add_space(theme.spacing.sm);
+        Table::new(["", "Item", "State", "Owner", "Action"])
+            .column_weights([0.32, 2.5, 1.15, 1.0, 1.08])
+            .selected_rows(selected_rows)
+            .expanded_rows(expanded_rows)
+            .expanded_row_height(88.0)
+            .min_column_width(72.0)
+            .show_with_details(
+                ui,
+                4,
+                |row, index| {
+                    row.centered_cell(|ui| {
+                        ui.add(Checkbox::new(&mut lead_selected[index], "").size(Size::Small));
+                    });
+                    match index {
+                        0 => {
+                            row.editable_text(editable_task);
+                            row.select(editable_status, ["Queued", "In progress", "Done"]);
+                            row.text("Agent");
+                        }
+                        1 => {
+                            row.text("Patch src/main.tsx import");
+                            row.cell(|ui| {
+                                ui.add(Badge::new("Ready").intent(Intent::Success).status_dot());
+                            });
+                            row.text("Turin");
+                        }
+                        2 => {
+                            row.text("Rerun route tests");
+                            row.cell(|ui| {
+                                ui.add(Badge::new("Running").intent(Intent::Info).status_dot());
+                            });
+                            row.text("CI");
+                        }
+                        _ => {
+                            row.text("Write final response");
+                            row.cell(|ui| {
+                                ui.add(Badge::new("Blocked").intent(Intent::Warning).status_dot());
+                            });
+                            row.text("You");
+                        }
+                    }
+                    row.cell(|ui| {
+                        let label = if lead_expanded[index] { "Hide" } else { "Details" };
+                        if ui
+                            .add(Button::new(label).variant(Variant::Ghost).size(Size::Small))
+                            .clicked()
+                        {
+                            lead_expanded[index] = !lead_expanded[index];
+                        }
+                    });
+                },
+                |detail, index| {
+                    detail.show(|ui| {
+                        ui.vertical(|ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.add(Badge::new("Impact").intent(Intent::Primary).status_dot());
+                                ui.label(match index {
+                                    0 => "Editable task row used for operator correction before approval.",
+                                    1 => "Replaces stale entrypoint import with the React 19-compatible path.",
+                                    2 => "Validates the route and startup flow before patch approval.",
+                                    _ => "Final response should include changed files, tests, and remaining risk.",
+                                });
+                            });
+                            ui.add_space(theme.spacing.xs);
+                            ui.label(
+                                RichText::new("Expanded rows reuse the table surface instead of introducing a separate details card.")
+                                    .font(theme.typography.caption.clone())
+                                    .color(theme.colors.text_subtle),
+                            );
+                        });
+                    });
+                },
+            );
+
+        ui.add_space(theme.spacing.sm);
+        ui.horizontal_wrapped(|ui| {
+            ArtifactCard::new("react-19-entrypoint.patch")
+                .kind("Patch")
+                .description("Prepared source changes waiting for approval.")
+                .metadata("3 files")
+                .intent(Intent::Warning)
+                .width((ui.available_width() * 0.5).max(260.0))
+                .show(ui);
+            ArtifactCard::new("build-diagnostics.md")
+                .kind("Report")
+                .description("Trace of the build failure and validation plan.")
+                .metadata("Markdown")
+                .intent(Intent::Info)
+                .width(ui.available_width().max(260.0))
+                .show(ui);
+        });
+    });
 }
 
 #[allow(clippy::too_many_arguments)]

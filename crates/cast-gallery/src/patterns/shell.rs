@@ -15,6 +15,7 @@ pub struct AppShellConfig<'a> {
     pub switcher_meta: &'a str,
     pub nav_group: &'a str,
     pub nav_items: &'a [&'a str],
+    pub component_parent_route: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -83,7 +84,9 @@ impl Default for AppShellConfig<'static> {
                 "Components",
                 "Agent components",
                 "Theme lab",
+                "Turin screen",
             ],
+            component_parent_route: 2,
         }
     }
 }
@@ -530,7 +533,7 @@ pub fn show_app_sidebar_tree(
         .iter()
         .any(|child| child.route == *selected);
     for (index, label) in config.nav_items.iter().enumerate() {
-        if index == 2 {
+        if index == config.component_parent_route {
             if sidebar_parent_nav_item(
                 ui,
                 theme,
@@ -882,7 +885,9 @@ mod tests {
 
         assert_eq!(config.title, "Cast");
         assert_eq!(config.nav_items[3], "Agent components");
-        assert_eq!(config.nav_items.len(), 5);
+        assert_eq!(config.nav_items[5], "Turin screen");
+        assert_eq!(config.nav_items.len(), 6);
+        assert_eq!(config.component_parent_route, 2);
     }
 
     #[test]
